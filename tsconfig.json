@@ -1,0 +1,20 @@
+  {
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": [
+     "./client/*.ts",
+     "./start.ts", "./service.ts",
+     "./worker.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "lib",
+    "docs"
+  ]
+}

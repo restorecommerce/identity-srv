@@ -1,0 +1,61 @@
+{
+  "name": "@restorecommerce/identity-srv",
+  "version": "0.1.0",
+  "description": "Restore Commerce identity microservice",
+  "main": "index.js",
+  "author": "Invend GmbH",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/restorecommerce/identity-srv.git"
+  },
+  "license": "MIT",
+  "keywords": [
+    "restore",
+    "commerce",
+    "microservice",
+    "identity",
+    "srv"
+  ],
+  "dependencies": {
+    "@restorecommerce/api-resource-srv": "git+ssh://git@gitlab.n-fuse.co:10022/restorecommerce/api-resource-srv.git",
+    "@restorecommerce/chassis-srv": "git+https://github.com/restorecommerce/chassis-srv",
+    "@restorecommerce/cluster-service": "^0.1.0",
+    "@restorecommerce/command-service-interface": "git+ssh://git@gitlab.n-fuse.co:10022/restorecommerce/command-service-interface.git",
+    "@restorecommerce/grpc-client": "github:restorecommerce/grpc-client",
+    "@restorecommerce/kafka-client": "github:restorecommerce/kafka-client",
+    "@restorecommerce/logger": "^0.1.0",
+    "@restorecommerce/service-config": "^0.1.0",
+    "bcryptjs": "^2.3.0",
+    "co": "^4.6.0",
+    "lodash": "^4.13.1",
+    "node-fetch": "^1.7.3",
+    "uuid": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/mocha": "^2.2.39",
+    "@types/should": "^11.2.0",
+    "arangojs": "^5.0.2",
+    "co-mocha": "^1.1.2",
+    "coveralls": "^3.0.0",
+    "istanbul": "^0.4.4",
+    "mocha": "^4.0.1",
+    "nodemon": "^1.12.1",
+    "should": "^11.2.1"
+  },
+  "scripts": {
+    "start": "npm run createtopics && node start.js",
+    "dev": "export NODE_ENV=development; npm run createtopics && nodemon start.js",
+    "pretest": "npm run tsctests && npm run createtopics",
+    "test": "npm run lint && npm run mocha",
+    "lint": "tslint './client/*.ts' './service.ts' './start.ts'",
+    "mocha": "NODE_ENV=test mocha -R spec ./test/*.js --full-trace",
+    "tsctests": "tsc test/*.ts --module commonjs -target ES6",
+    "test-debug": "mocha ./test/*.js --inspect-brk",
+    "coveralls": "NODE_ENV=test; istanbul cover ./node_modules/mocha/bin/_mocha --report lcovonly -- -R spec ./test/*",
+    "createtopics": "node setupTopics.js io.xingular.command io.restorecommerce.command io.xingular.users.resource io.restorecommerce.users.resource io.xingular.persons.resource io.restorecommerce.persons.resource io.xingular.rendering io.restorecommerce.rendering",
+    "postinstall": "tsc -d"
+  },
+  "engines": {
+    "node": ">= 9.2.0"
+  }
+}

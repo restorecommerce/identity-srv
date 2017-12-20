@@ -1,0 +1,132 @@
+{
+  "logger": {
+    "elasticsearch": {
+      "level": "silly",
+      "clientOpts": {
+        "host": "elasticsearch:9200"
+      },
+      "source": "identity-srv"
+    }
+  },
+  "client": {
+    "hbs_templates": {
+      "prefix": "http://console:80/"
+    },
+    "blackbox-notification": {
+      "transports": {
+        "grpc": {
+          "service": "io.restorecommerce.notification.Service",
+          "timeout": 3000,
+          "protos": [
+            "io/restorecommerce/notification.proto"
+          ],
+          "protoRoot": "./protos/"
+        }
+      },
+      "endpoints": {
+        "allHooks": {
+          "loadbalancer": {
+            "name": "roundRobin"
+          },
+          "publisher": {
+            "name": "static",
+            "instances": [
+              "grpc://identity-srv:50051"
+            ]
+          }
+        },
+        "send": {
+          "loadbalancer": {
+            "name": "roundRobin"
+          },
+          "publisher": {
+            "name": "static",
+            "instances": [
+              "grpc://identity-srv:50051"
+            ]
+          }
+        },
+        "getHook": {
+          "loadbalancer": {
+            "name": "roundRobin"
+          },
+          "publisher": {
+            "name": "static",
+            "instances": [
+              "grpc://identity-srv:50051"
+            ]
+          }
+        },
+        "addHook": {
+          "loadbalancer": {
+            "name": "roundRobin"
+          },
+          "publisher": {
+            "name": "static",
+            "instances": [
+              "grpc://identity-srv:50051"
+            ]
+          }
+        },
+        "updateHook": {
+          "loadbalancer": {
+            "name": "roundRobin"
+          },
+          "publisher": {
+            "name": "static",
+            "instances": [
+              "grpc://identity-srv:50051"
+            ]
+          }
+        },
+        "removeHook": {
+          "loadbalancer": {
+            "name": "roundRobin"
+          },
+          "publisher": {
+            "name": "static",
+            "instances": [
+              "grpc://identity-srv:50052"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "database": {
+    "main": {
+      "provider": "arango",
+      "host": "arangodb",
+      "port": 8529,
+      "database": "identity-srv",
+      "autoCreate": true
+    }
+  },
+  "events": {
+    "kafka": {
+      "connectionString": "zookeeper:2181"
+    }
+  },
+  "server": {
+    "transports": [
+      {
+        "name": "grpcIdentity",
+        "provider": "grpc",
+        "services": {
+          "user": "io.restorecommerce.user.Service",
+          "person": "io.restorecommerce.person.Service",
+          "reflection": "grpc.reflection.v1alpha.ServerReflection",
+          "commandinterface": "io.restorecommerce.commandinterface.Service"
+        },
+        "protos": [
+          "io/restorecommerce/user.proto",
+          "io/restorecommerce/person.proto",
+          "grpc/reflection/v1alpha/reflection.proto",
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "protos/",
+        "addr": "identity-srv:50051"
+      }
+    ]
+  }
+}

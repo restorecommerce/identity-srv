@@ -1,0 +1,468 @@
+{
+  "service": {
+    "userActivationRequired": true
+  },
+  "logger": {
+    "console": {
+      "handleExceptions": false,
+      "level": "error",
+      "colorize": true,
+      "prettyPrint": true
+    }
+  },
+  "client": {
+    "hbs_templates": {
+      "url": true,
+      "prefix": "http://localhost:8080/",
+      "templates": {
+        "subject": "identity_email_subject.hbs",
+        "body": "identity_email_body.hbs",
+        "body_1": "identity_email_body_1.hbs",
+        "layout": "identity_email_layout.hbs"
+      }
+    },
+    "blackbox": {
+      "logger": {
+        "console": {
+          "handleExceptions": false,
+          "level": "silly",
+          "colorize": true,
+          "prettyPrint": true
+        }
+      },
+      "transports": {
+        "grpc": {
+          "service": "io.restorecommerce.user.Service",
+          "protos": [
+            "io/restorecommerce/user.proto"
+          ],
+          "protoRoot": "protos/",
+          "timeout": 3000
+        }
+      },
+      "loadbalancer": {
+        "name": "roundRobin"
+      },
+      "publisher": {
+        "name": "static",
+        "instances": [
+          "grpc://localhost:50051"
+        ]
+      },
+      "endpoints": {
+        "activate": {},
+        "changePassword": {},
+        "changeEmailId": {},
+        "find": {},
+        "register": {},
+        "unregister": {},
+        "verifyPassword": {},
+        "read": {},
+        "create": {},
+        "delete": {},
+        "update": {},
+        "upsert": {}
+      }
+    },
+    "blackbox-notification": {
+      "transports": {
+        "grpc": {
+          "service": "io.restorecommerce.notification.Service",
+          "timeout": 3000,
+          "protos": [
+            "io/restorecommerce/notification.proto"
+          ],
+          "protoRoot": "./protos/"
+        }
+      },
+      "endpoints": {
+        "send": {
+          "loadbalancer": {
+            "name": "roundRobin"
+          },
+          "publisher": {
+            "name": "static",
+            "instances": [
+              "grpc://localhost:50052"
+            ]
+          }
+        }
+      }
+    },
+    "blackbox-relection": {
+      "logger": {
+        "console": {
+          "handleExceptions": false,
+          "level": "silly",
+          "colorize": true,
+          "prettyPrint": true
+        }
+      },
+      "transports": {
+        "grpc": {
+          "service": "grpc.reflection.v1alpha.ServerReflection",
+          "protos": [
+            "io/restorecommerce/user.proto",
+            "grpc/reflection/v1alpha/reflection.proto"
+          ],
+          "protoRoot": "protos/",
+          "timeout": 3000
+        }
+      },
+      "loadbalancer": {
+        "name": "roundRobin"
+      },
+      "publisher": {
+        "name": "static",
+        "instances": [
+          "grpc://localhost:50051"
+        ]
+      },
+      "endpoints": {
+        "serverReflectionInfo": {}
+      }
+    },
+    "blackbox-ci": {
+      "logger": {
+        "console": {
+          "handleExceptions": false,
+          "level": "silly",
+          "colorize": true,
+          "prettyPrint": true
+        }
+      },
+      "transports": {
+        "grpc": {
+          "service": "io.restorecommerce.commandinterface.Service",
+          "protos": [
+            "io/restorecommerce/commandinterface.proto"
+          ],
+          "protoRoot": "protos/",
+          "timeout": 3000
+        }
+      },
+      "loadbalancer": {
+        "name": "roundRobin"
+      },
+      "publisher": {
+        "name": "static",
+        "instances": [
+          "grpc://localhost:50051"
+        ]
+      },
+      "endpoints": {
+        "reconfigure": {},
+        "reset": {},
+        "restore": {},
+        "check": {},
+        "version": {}
+      }
+    }
+  },
+  "database": {
+    "main": {
+      "provider": "arango",
+      "host": "0.0.0.0",
+      "port": 8529,
+      "database": "identity-srv-test",
+      "autoCreate": true,
+      "retries": 6,
+      "delay": 30000
+    }
+  },
+  "events": {
+    "kafka": {
+      "provider": "kafka",
+      "groupId": "restore-identity-srv-test",
+      "clientId": "restore-identity-srv-test",
+      "protos": [
+        "io/restorecommerce/user.proto",
+        "io/restorecommerce/person.proto",
+        "io/restorecommerce/rendering.proto"
+      ],
+      "protoRoot": "protos/",
+      "connectionString": "0.0.0.0:2181",
+      "usersModified": {
+        "protos": [
+          "io/restorecommerce/user.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.user.User"
+      },
+      "personsModified": {
+        "protos": [
+          "io/restorecommerce/person.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.person.PersonList"
+      },
+      "usersCreated": {
+        "protos": [
+          "io/restorecommerce/user.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.user.User"
+      },
+      "personsCreated": {
+        "protos": [
+          "io/restorecommerce/person.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.person.PersonList"
+      },
+      "usersDeleted": {
+        "protos": [
+          "io/restorecommerce/user.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.user.User"
+      },
+      "personsDeleted": {
+        "protos": [
+          "io/restorecommerce/person.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.person.Deleted"
+      },
+      "usersRead": {
+        "protos": [
+          "io/restorecommerce/user.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.user.User"
+      },
+      "personsRead": {
+        "protos": [
+          "io/restorecommerce/person.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.person.Person"
+      },
+      "registered": {
+        "protos": [
+          "io/restorecommerce/user.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.user.User"
+      },
+      "activated": {
+        "protos": [
+          "io/restorecommerce/user.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.user.Activate"
+      },
+      "passwordChanged": {
+        "protos": [
+          "io/restorecommerce/user.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.user.PasswordChanged"
+      },
+      "emailIdChanged": {
+        "protos": [
+          "io/restorecommerce/user.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.user.EmailIdChanged"
+      },
+      "unregistered": {
+        "protos": [
+          "io/restorecommerce/user.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.user.Deleted"
+      },
+      "renderRequest": {
+        "protos": [
+          "io/restorecommerce/rendering.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.rendering.RenderRequest"
+      },
+      "identityRenderResponse": {
+        "protos": [
+          "io/restorecommerce/rendering.proto"
+        ],
+        "protoRoot": "protos/",
+        "messageObject": "io.restorecommerce.rendering.RenderResponse"
+      },
+      "topics": {
+        "users": {
+          "topic": "io.restorecommerce.users.resource"
+        },
+        "persons": {
+          "topic": "io.restorecommerce.persons.resource"
+        },
+        "command": {
+          "topic": "io.restorecommerce.command",
+          "events": [
+            "healthCheckCommand",
+            "restoreCommand",
+            "resetStartCommand"
+          ]
+        },
+        "rendering": {
+          "topic": "io.restorecommerce.rendering",
+          "events": [
+            "identityRenderResponse"
+          ]
+        }
+      }
+    },
+    "enableEvents": "true"
+  },
+  "server": {
+    "services": {
+      "io-restorecommerce-person-srv": {
+        "read": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "create": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "delete": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "update": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "upsert": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        }
+      },
+      "io-restorecommerce-user-srv": {
+        "activate": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "changePassword": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "changeEmailId": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "find": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "register": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "unregister": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "verifyPassword": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "read": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "create": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "delete": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "update": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "upsert": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        }
+      },
+      "io-restorecommerce-identity-reflection": {
+        "serverReflectionInfo": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        }
+      },
+      "io-restorecommerce-identity-cis": {
+        "reconfigure": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "reset": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "restore": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "check": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "version": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        }
+      }
+    },
+    "transports": [
+      {
+        "name": "grpcIdentity",
+        "provider": "grpc",
+        "services": {
+          "io-restorecommerce-user-srv": "io.restorecommerce.user.Service",
+          "io-restorecommerce-person-srv": "io.restorecommerce.person.Service",
+          "io-restorecommerce-identity-reflection": "grpc.reflection.v1alpha.ServerReflection",
+          "io-restorecommerce-identity-cis": "io.restorecommerce.commandinterface.Service"
+        },
+        "protos": [
+          "io/restorecommerce/user.proto",
+          "io/restorecommerce/person.proto",
+          "grpc/reflection/v1alpha/reflection.proto",
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "protos/",
+        "addr": "localhost:50051"
+      }
+    ]
+  },
+  "serviceNames": {
+    "user": "io-restorecommerce-user-srv",
+    "person": "io-restorecommerce-person-srv",
+    "reflection": "io-restorecommerce-identity-reflection",
+    "cis": "io-restorecommerce-identity-cis"
+  }
+}
