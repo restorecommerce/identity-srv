@@ -1,0 +1,16 @@
+node_modules/
+npm-debug.log
+
+coverage/
+pid/
+
+.project
+.settings
+.directory
+
+*.js
+*.d.ts
+!setupTopics.js
+
+*.log
+*~
