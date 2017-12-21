@@ -22,7 +22,7 @@ before_install:
   - docker ps -a
   - docker logs chassis_adb
   - docker logs chassis_zk
-- docker logs chassis_kafka
+  - docker logs chassis_kafka
 scripts:
   - 'npm test'
 after_success:
