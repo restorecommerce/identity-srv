@@ -217,14 +217,14 @@ List of events emitted to Kafka by this microservice for below topics:
   - healthCheckResponse
   - resetResponse
 
-For `sendEmail` event protobuf message structure see [Notification Service](https://gitlab.n-fuse.co/restorecommerce/notification-srv)
-and for `renderRequest` event protobuf message structure see [Rendering Service](https://gitlab.n-fuse.co/restorecommerce/rendering-srv).
+For `sendEmail` event protobuf message structure see [Notification Service](https://github.com/restorecommerce/notification-srv)
+and for `renderRequest` event protobuf message structure see [Rendering Service](https://github.com/restorecommerce/rendering-srv).
 
 ## Shared Interface
 
-This microservice implements a shared [Command Interface Service](https://gitlab.n-fuse.co/restorecommerce/command-service-interface) which
+This microservice implements a shared [Command Interface Service](https://github.com/restorecommerce/command-service-interface) which
 provides endpoints for retrieving the system status and resetting/restoring the system in case of failure. These endpoints can be called via gRPC or Kafka events (through the `io.restorecommerce.command` topic).
-For usage details please see [the shared interface tests](https://gitlab.n-fuse.co/restorecommerce/command-service-interface/tree/master/test).
+For usage details please see [the shared interface tests](https://github.com/restorecommerce/command-service-interface/tree/master/test).
 
 ## Usage
 
