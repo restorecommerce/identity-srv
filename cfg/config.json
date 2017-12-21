@@ -7,10 +7,10 @@
       "url": true,
       "prefix": "http://localhost:8080/",
       "templates": {
-        "subject": "xingular_identity/subject.hbs",
-        "body_register": "xingular_identity/body_register.hbs",
-        "body_change": "xingular_identity/body_change.hbs",
-        "layout": "xingular_identity/layout.hbs"
+        "subject": "restore_identity/subject.hbs",
+        "body_register": "restore_identity/body_register.hbs",
+        "body_change": "restore_identity/body_change.hbs",
+        "layout": "restore_identity/layout.hbs"
       }
     },
     "blackbox": {
@@ -20,7 +20,7 @@
           "protos": [
             "io/restorecommerce/user.proto"
           ],
-          "protoRoot": "protos/",
+          "protoRoot": "node_modules/@restorecommerce/protos/",
           "timeout": 3000
         }
       },
@@ -57,7 +57,7 @@
             "io/restorecommerce/user.proto",
             "grpc/reflection/v1alpha/reflection.proto"
           ],
-          "protoRoot": "protos/",
+          "protoRoot": "node_modules/@restorecommerce/protos/",
           "timeout": 3000
         }
       },
@@ -81,7 +81,7 @@
           "protos": [
             "io/restorecommerce/commandinterface.proto"
           ],
-          "protoRoot": "protos/",
+          "protoRoot": "node_modules/@restorecommerce/protos/",
           "timeout": 3000
         }
       },
@@ -110,7 +110,7 @@
           "protos": [
             "io/restorecommerce/notification.proto"
           ],
-          "protoRoot": "./protos/"
+          "protoRoot": "node_modules/@restorecommerce/protos/"
         }
       },
       "endpoints": {
@@ -149,144 +149,144 @@
         "protos": [
           "io/restorecommerce/user.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.UserList"
       },
       "personsCreated": {
         "protos": [
           "io/restorecommerce/person.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.person.PersonList"
       },
       "usersModified": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.UserList"
       },
       "personsModified": {
         "protos": [
           "io/restorecommerce/person.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.person.PersonList"
       },
       "usersDeleted": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.Deleted"
       },
       "personsDeleted": {
         "protos": [
           "io/restorecommerce/person.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.person.Deleted"
       },
       "registered": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.User"
       },
       "activated": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.Activate"
       },
       "passwordChanged": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.PasswordChanged"
       },
       "emailIdChanged": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.EmailIdChanged"
       },
       "unregistered": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.Deleted"
       },
       "restoreCommand": {
         "protos": [
           "io/restorecommerce/commandinterface.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.RestoreRequest"
       },
       "healthCheckCommand": {
         "protos": [
           "io/restorecommerce/commandinterface.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.HealthCheckRequest"
       },
       "healthCheckResponse": {
         "protos": [
           "io/restorecommerce/commandinterface.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.HealthCheckResponse"
       },
       "resetCommand": {
         "protos": [
           "io/restorecommerce/commandinterface.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.ResetRequest"
       },
       "resetResponse": {
         "protos": [
           "io/restorecommerce/commandinterface.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.ResetResponse"
       },
       "renderRequest": {
         "protos": [
           "io/restorecommerce/rendering.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.rendering.RenderRequest"
       },
       "identityRenderResponse": {
         "protos": [
           "io/restorecommerce/rendering.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.rendering.RenderResponse"
       },
       "sendEmail": {
         "protos": [
           "io/restorecommerce/notification.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.notification.Notification"
       },
       "topics": {
         "users": {
-          "topic": "io.xingular.users.resource"
+          "topic": "io.restorecommerce.users.resource"
         },
         "persons": {
-          "topic": "io.xingular.persons.resource"
+          "topic": "io.restorecommerce.persons.resource"
         },
         "command": {
-          "topic": "io.xingular.command",
+          "topic": "io.restorecommerce.command",
           "events": [
             "healthCheckCommand",
             "restoreCommand",
@@ -294,13 +294,13 @@
           ]
         },
         "rendering": {
-          "topic": "io.xingular.rendering",
+          "topic": "io.restorecommerce.rendering",
           "events": [
             "identityRenderResponse"
           ]
         },
         "notification": {
-          "topic": "io.xingular.notification"
+          "topic": "io.restorecommerce.notification"
         }
       }
     },
@@ -308,7 +308,7 @@
   },
   "server": {
     "services": {
-      "io-xingular-person-srv": {
+      "io-restorecommerce-person-srv": {
         "read": {
           "transport": [
             "grpcIdentity"
@@ -335,7 +335,7 @@
           ]
         }
       },
-      "io-xingular-user-srv": {
+      "io-restorecommerce-user-srv": {
         "activate": {
           "transport": [
             "grpcIdentity"
@@ -402,14 +402,14 @@
           ]
         }
       },
-      "io-xingular-identity-reflection": {
+      "io-restorecommerce-identity-reflection": {
         "serverReflectionInfo": {
           "transport": [
             "grpcIdentity"
           ]
         }
       },
-      "io-xingular-identity-cis": {
+      "io-restorecommerce-identity-cis": {
         "reconfigure": {
           "transport": [
             "grpcIdentity"
@@ -442,10 +442,10 @@
         "name": "grpcIdentity",
         "provider": "grpc",
         "services": {
-          "io-xingular-user-srv": "io.restorecommerce.user.Service",
-          "io-xingular-person-srv": "io.restorecommerce.person.Service",
-          "io-xingular-identity-reflection": "grpc.reflection.v1alpha.ServerReflection",
-          "io-xingular-identity-cis": "io.restorecommerce.commandinterface.Service"
+          "io-restorecommerce-user-srv": "io.restorecommerce.user.Service",
+          "io-restorecommerce-person-srv": "io.restorecommerce.person.Service",
+          "io-restorecommerce-identity-reflection": "grpc.reflection.v1alpha.ServerReflection",
+          "io-restorecommerce-identity-cis": "io.restorecommerce.commandinterface.Service"
         },
         "protos": [
           "io/restorecommerce/user.proto",
@@ -453,15 +453,15 @@
           "grpc/reflection/v1alpha/reflection.proto",
           "io/restorecommerce/commandinterface.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "addr": "localhost:50051"
       }
     ]
   },
   "serviceNames": {
-    "user": "io-xingular-user-srv",
-    "person": "io-xingular-person-srv",
-    "reflection": "io-xingular-identity-reflection",
-    "cis": "io-xingular-identity-cis"
+    "user": "io-restorecommerce-user-srv",
+    "person": "io-restorecommerce-person-srv",
+    "reflection": "io-restorecommerce-identity-reflection",
+    "cis": "io-restorecommerce-identity-cis"
   }
 }

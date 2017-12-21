@@ -57,15 +57,6 @@ export interface Person {
   email: string;
 }
 
-export interface CallUsersList {
-  request: items
-}
-
-export interface items {
-  Users: User[];
-  totalCount: number;
-}
-
 export class Service extends ServiceBase {
   db: any;
   topics: any;

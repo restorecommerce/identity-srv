@@ -218,7 +218,7 @@ List of events emitted to Kafka by this microservice for below topics:
   - resetResponse
 
 For `sendEmail` event protobuf message structure see [Notification Service](https://gitlab.n-fuse.co/restorecommerce/notification-srv)
-and for `renderRequest` event protobuf message structure see [Rendering Service](https://gitlab.n-fuse.co/xingular/rendering-srv).
+and for `renderRequest` event protobuf message structure see [Rendering Service](https://gitlab.n-fuse.co/restorecommerce/rendering-srv).
 
 ## Shared Interface
 
