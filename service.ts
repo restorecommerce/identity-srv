@@ -10,7 +10,7 @@ import * as grpcClient from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import * as fetch from 'node-fetch';
-import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/api-resource-srv';
+import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
 
 const password = {
   hash: (pw): string => {

@@ -6,7 +6,7 @@ import { Events, Topic } from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import { database, grpc, Server } from '@restorecommerce/chassis-srv';
 import { Service, PersonService } from './service';
-import * as rcsi from '@restorecommerce/command-service-interface';
+import * as rcsi from '@restorecommerce/command-interface';
 
 const RESTORE_CMD_EVENT = 'restoreCommand';
 const HEALTH_CMD_EVENT = 'healthCheckCommand';
@@ -127,7 +127,7 @@ export class Worker {
     await co(server.bind(serviceNamesCfg.user, service));
 
     // Add CommandInterfaceService
-    const CommandInterfaceService = rcsi.CommandInterfaceService;
+    const CommandInterfaceService = rcsi.CommandInterface;
     const userRestoreSetup = makeUserRestoreSetup(db);
     const restoreSetup = {
       [userTopic]: {
