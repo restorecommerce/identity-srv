@@ -141,10 +141,10 @@ modifying User resource.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| Read | ReadRequest | UserList | Read a list of User resources |
 | Create | UserList | UserList | Create a list of User resources |
-| Delete | DeleteRequest | Empty | Delete a list of User resources |
+| Read | ReadRequest | UserList | Read a list of User resources |
 | Update | UserList | UserList | Update a list of User resources |
+| Delete | DeleteRequest | Empty | Delete a list of User resources |
 | Upsert | UserList | UserList | Create or Update a list of User resources |
 
 ### Person
@@ -179,10 +179,10 @@ modifying User resource.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| Read | ReadRequest | PersonList | Read a list of Person resources  |
 | Create | PersonList | PersonList | Create a list of Person resources |
-| Delete | DeleteRequest | Empty | Delete a list of Person resources |
+| Read | ReadRequest | PersonList | Read a list of Person resources  |
 | Update | PersonList | PersonList | Update a list of Person resources |
+| Delete | DeleteRequest | Empty | Delete a list of Person resources |
 | Upsert | PersonList | PersonList | Create or Update a list of Person resources |
 
 ## Kafka Events
