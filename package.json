@@ -17,10 +17,10 @@
     "srv"
   ],
   "dependencies": {
-    "@restorecommerce/api-resource-srv": "git+ssh://git@gitlab.n-fuse.co:10022/restorecommerce/api-resource-srv.git",
-    "@restorecommerce/chassis-srv": "git+https://github.com/restorecommerce/chassis-srv",
+    "@restorecommerce/resource-base-interface": "github:restorecommerce/resource-base-interface",
+    "@restorecommerce/chassis-srv": "github:restorecommerce/chassis-srv",
     "@restorecommerce/cluster-service": "^0.1.0",
-    "@restorecommerce/command-service-interface": "git+ssh://git@gitlab.n-fuse.co:10022/restorecommerce/command-service-interface.git",
+    "@restorecommerce/command-interface": "github:restorecommerce/command-interface",
     "@restorecommerce/grpc-client": "github:restorecommerce/grpc-client",
     "@restorecommerce/kafka-client": "github:restorecommerce/kafka-client",
     "@restorecommerce/logger": "^0.1.0",
