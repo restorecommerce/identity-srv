@@ -1,6 +1,6 @@
 # identity-srv
 
-[![Version npm][version]](https://badge.fury.io/js/%40restorecommerce%2Flogger)[![Build Status][build]](https://travis-ci.org/restorecommerce/identity-srv?branch=master)[![Dependencies][depend]](https://david-dm.org/restorecommerce/identity-srv)[![Coverage Status][cover]](https://coveralls.io/r/restorecommerce/identity-srv?branch=master)
+[![Version npm][version]](http://browsenpm.org/package/%40restorecommerce%2Flogger)[![Build Status][build]](https://travis-ci.org/restorecommerce/identity-srv?branch=master)[![Dependencies][depend]](https://david-dm.org/restorecommerce/identity-srv)[![Coverage Status][cover]](https://coveralls.io/r/restorecommerce/identity-srv?branch=master)
 
 [version]: http://img.shields.io/npm/v/identity-srv.svg?style=flat-square
 [build]: http://img.shields.io/travis/restorecommerce/identity-srv/master.svg?style=flat-square
