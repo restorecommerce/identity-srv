@@ -68,7 +68,7 @@ export class Service extends ServiceBase {
   registerBodyTpl: string;
   changeBodyTpl: string;
   emailData: any;
-  // renderingTopic: kafkaClient.Topic;
+
   constructor(cfg: any, topics: any, personService: any, db: any,
     logger: any, isEventsEnabled: boolean) {
     super('users', topics.users, logger, new ResourcesAPIBase(db, 'users'),
@@ -87,9 +87,9 @@ export class Service extends ServiceBase {
   }
 
   /**
-   * Endpoint find.
-   * params: id,name,email
-   * Search for users containing any of the provided field values.
+   * Endpoint to search for users containing any of the provided field values.
+   * @param {call} call request containing either userid, username or email
+   * @return the list of users found
    */
   async find(call: Call, context: any): Promise<any> {
     const request = call.request;
@@ -114,7 +114,9 @@ export class Service extends ServiceBase {
   }
 
   /**
-   * Returns true if the user activation process is required.
+   * Endpoint to check if User activation process is required.
+   * @param {call} call request containing either userid, username or email
+   * @return true if the user activation process is required.
    */
   isUserActivationRequired(): Boolean {
     const userActivationRequired: boolean = this.cfg.get('service:userActivationRequired');
@@ -126,9 +128,8 @@ export class Service extends ServiceBase {
   }
 
   /**
-   * converts a user to a guest/
-   *
-   * @param  {object} user
+   * converts a user to a guest
+   * @param  {User} user
    * @return {object} user
    */
   makeGuest(user: User): Object {
@@ -142,9 +143,8 @@ export class Service extends ServiceBase {
 
   /**
  * creates a person out of a user.
- *
- * @param  {object} user
- * @return {object} person
+ * @param  {User} user
+ * @return {any} person
  */
   makePerson(user: User): any {
     return {
@@ -155,14 +155,18 @@ export class Service extends ServiceBase {
 
   /**
    * Returns an ID based on collection name and document name.
+   * @param  {string} collectionName
+   * @param  {string} documentName
+   * @return {string} id based on collection and document name.
    */
   makeID(collectionName: string, documentName: string): string {
     return util.format('/%s/%s', collectionName, documentName);
   }
 
   /**
-   * Endpoint createUsers.
-   * Register a list of users or guest users.
+   * Endpoint createUsers, register a list of users or guest users.
+   * @param  {any} call request containing a list of Users
+   * @param {context}
    * @return type is any since it can be guest or user type
    */
   async createUsers(call: any, context: any): Promise<any> {
@@ -177,8 +181,9 @@ export class Service extends ServiceBase {
   }
 
   /**
-   * Endpoint register.
-   * Register a user or guest user.
+   * Endpoint register, register a user or guest user.
+   * @param  {any} call request containing a  User
+   * @param {context}
    * @return type is any since it can be guest or user type
    */
   async register(call: Call, context: any): Promise<any> {
@@ -316,6 +321,10 @@ export class Service extends ServiceBase {
     return user;
   }
 
+  /**
+   * Endpoint sendEmail to trigger sending mail notification.
+   * @param  {any} renderResponse
+   */
   async sendEmail(renderResponse: any): Promise<any> {
     const emailAddress = renderResponse.id;
     const response = renderResponse.response[0];
@@ -332,8 +341,10 @@ export class Service extends ServiceBase {
   }
 
   /**
-   * Endpoint activate.
-   * Activate a user.
+   * Endpoint to activate a User
+   *  @param  {Call} call request containing user details
+   *  @param {any} context
+   *  @return empty response
    */
   async activate(call: Call, context: any): Promise<any> {
     const request = call.request;
@@ -380,8 +391,10 @@ export class Service extends ServiceBase {
   }
 
   /**
-   * Endpoint changePassword.
-   * Change user password.
+   * Endpoint to change user password.
+   * @param  {Call} call request containing user details
+   * @param {any} context
+   * @return {User} returns user details
    */
   async changePassword(call: Call, context: any): Promise<any> {
     const request = call.request;
@@ -413,9 +426,11 @@ export class Service extends ServiceBase {
   }
 
   /**
-  * Endpoint changeEmailId.
-  * Change user email id.
-  */
+   * Endpoint to change email Id.
+   * @param  {Call} call request containing new email Id of User
+   * @param {any} context
+   * @return {User} returns user details
+   */
   async changeEmailId(call: Call, context: any): Promise<any> {
     const request = call.request;
     const logger = context.logger;
@@ -492,9 +507,11 @@ export class Service extends ServiceBase {
   }
 
   /**
-   * Endpoint verifyPassword.
-   * Checks if the provided password and user matches
+   * Endpoint verifyPassword, checks if the provided password and user matches
    * the one found in the database.
+   * @param  {Call} call request containing user details
+   * @param {any} context
+   * @return {User} returns user details
    */
   async verifyPassword(call: any, context: any): Promise<any> {
     const filter = toStruct({
@@ -513,8 +530,11 @@ export class Service extends ServiceBase {
   }
 
   /**
-   * Endpoint unregister.
-   * Delete a user and associated person belonging to the user.
+   * Endpoint unregister, delete a user and associated person
+   * belonging to the user.
+   * @param  {any} call request containing list of userIds
+   * @param {any} context
+   * @return {} returns empty response
    */
   async unregister(call: any, context: any): Promise<any> {
     const request = call.request;
@@ -551,8 +571,9 @@ export class Service extends ServiceBase {
   /**
    * Initializes useful data for rendering requests
    * before sending emails (user registration / change).
-   * @param topic Kafka topic with rendering-srv events.
-   * @param tplConfig Templates prefix and URLs.
+   * @param {kafkaClient.Topic} renderingTopic Kafka topic with
+   * rendering-srv events.
+   * @param {any } tplConfig Templates prefix and URLs.
    */
   async setRenderRequestConfigs(renderingTopic: kafkaClient.Topic, tplConfig: any): Promise<any> {
     const templates = tplConfig.templates;

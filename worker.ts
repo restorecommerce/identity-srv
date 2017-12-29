@@ -154,7 +154,7 @@ export class Worker {
     this.server = server;
   }
 
-  async end(): Promise<any> {
+  async stop(): Promise<any> {
     this.logger.info('Shutting down');
     await co(this.server.end());
     await this.events.stop();
@@ -236,7 +236,7 @@ if (require.main === module) {
   });
 
   process.on('SIGINT', () => {
-    worker.end().then().catch((err) => {
+    worker.stop().then().catch((err) => {
       logger.error('shutdown error', err);
       process.exit(1);
     });

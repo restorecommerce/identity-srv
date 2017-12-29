@@ -1,6 +1,6 @@
 # identity-srv
 
-[![Version npm][version]](http://browsenpm.org/package/%40restorecommerce%2Flogger)[![Build Status][build]](https://travis-ci.org/restorecommerce/identity-srv?branch=master)[![Dependencies][depend]](https://david-dm.org/restorecommerce/identity-srv)[![Coverage Status][cover]](https://coveralls.io/r/restorecommerce/identity-srv?branch=master)
+<img src="http://img.shields.io/npm/v/%40restorecommerce%2Fidentity%2Dsrv.svg?style=flat-square" alt="">[![Build Status][build]](https://travis-ci.org/restorecommerce/identity-srv?branch=master)[![Dependencies][depend]](https://david-dm.org/restorecommerce/identity-srv)[![Coverage Status][cover]](https://coveralls.io/r/restorecommerce/identity-srv?branch=master)
 
 [version]: http://img.shields.io/npm/v/identity-srv.svg?style=flat-square
 [build]: http://img.shields.io/travis/restorecommerce/identity-srv/master.svg?style=flat-square
@@ -9,7 +9,7 @@
 
 This microservice handles the user and person resources.
 It provides a [gRPC](https://grpc.io/docs) interface for handling CRUD operations and user-specific functionalities.
-This service directly communicates with an ArangoDB instance and it also communicates asynchronously with [Apache Kafka](https://kafka.apache.org/),
+This service directly communicates with an ArangoDB instance and asynchronously with [Apache Kafka](https://kafka.apache.org/),
 using an event-driven approach with message structures defined with [Protocol Buffers](https://developers.google.com/protocol-buffers/) (see [kafka-client](https://github.com/restorecommerce/kafka-client) for more information).
 
 
@@ -25,8 +25,8 @@ A User resource.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | id | string | required | User ID, unique, key |
-| created | double | required | Date of the user creation |
-| modified | double | required | Last time the user was modified |
+| created | double | required | Date when user was created |
+| modified | double | required | Date when user was modified |
 | creator | string | optional | User ID of the creator |
 | name | string | required | User name |
 | email | string | required | Email address |
@@ -54,7 +54,7 @@ A list of User resources.
 #### Register
 Used to register a User.
 Requests are performed providing `io.restorecommerce.user.RegisterRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message. Upon successful registration an userID, activation code is sent to the emailID
-of the registered User.
+of the registered User. `sendEmail` notification event is emitted when registering the User and this message is consumed by [notification-srv](http://github.com/restorecommerce/notification-srv) which internally uses [mailer](https://github.com/restorecommerce/mailer) to send email.
 
 `io.restorecommerce.user.RegisterRequest`
 
@@ -89,7 +89,7 @@ Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest`
 | password | string | required | new password |
 
 #### ChangeEmailID
-Used to change EmailID of the User (User should already be activated to perform this operation). Requests are performed providing `io.restorecommerce.user.ChangeEmailIdRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message.
+Used to change EmailID of the User (User should be activated to perform this operation). Requests are performed providing `io.restorecommerce.user.ChangeEmailIdRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message.
 After the EmailID is changed user account needs to be activated again with the new
 activation code sent via Email to User.
 
@@ -114,7 +114,7 @@ Used to verify the password of the User. Requests are performed providing `io.re
 Used for bulk creation of Users. Requests are performed providing `io.restorecommerce.user.UserList` protobuf message as input and responses are a `io.restorecommerce.user.UserList` message.
 
 #### Unregister
-Used to unregister the User. Requests are performed providing `io.restorecommerce.user.UnregisterRequest` protobuf message as input and responses are a `google.protobuf.Empty` message.
+Used to unregister a User. Requests are performed providing `io.restorecommerce.user.UnregisterRequest` protobuf message as input and responses are a `google.protobuf.Empty` message.
 
 `io.restorecommerce.user.UnregisterRequest`
 
@@ -141,16 +141,18 @@ modifying User resource.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| Create | UserList | UserList | Create a list of User resources |
-| Read | ReadRequest | UserList | Read a list of User resources |
-| Update | UserList | UserList | Update a list of User resources |
-| Delete | DeleteRequest | Empty | Delete a list of User resources |
-| Upsert | UserList | UserList | Create or Update a list of User resources |
+| Create | io.restorecommerce.user.UserList | io.restorecommerce.user.UserList | Create a list of User resources |
+| Read | io.restorecommerce.resourcebase.ReadRequest | io.restorecommerce.user.UserList | Read a list of User resources |
+| Update | io.restorecommerce.user.UserList | io.restorecommerce.user.UserList | Update a list of User resources |
+| Delete | io.restorecommerce.resourcebase.DeleteRequest | Empty | Delete a list of User resources |
+| Upsert | io.restorecommerce.user.UserList | io.restorecommerce.user.UserList | Create or Update a list of User resources |
+
+For the detailed prtobuf message structure of `io.restorecommerce.resourcebase.ReadRequest` and `io.restorecommerce.resourcebase.DeleteRequest` refer [resource-base-interface](https://github.com/restorecommerce/resource-base-interface).
 
 ### Person
 A Person resource.
 
-`io.restorecommerce.user.Person`
+`io.restorecommerce.person.Person`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
@@ -162,11 +164,11 @@ A Person resource.
 
 A list of Persons resource.
 
-`io.restorecommerce.user.PersonList`
+`io.restorecommerce.person.PersonList`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| items | []Person | required | List of Persons |
+| items | []io.restorecommerce.person.Person | required | List of Persons |
 | total_count | number | optional | number of Persons |
 
 
@@ -179,11 +181,11 @@ modifying User resource.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| Create | PersonList | PersonList | Create a list of Person resources |
-| Read | ReadRequest | PersonList | Read a list of Person resources  |
-| Update | PersonList | PersonList | Update a list of Person resources |
-| Delete | DeleteRequest | Empty | Delete a list of Person resources |
-| Upsert | PersonList | PersonList | Create or Update a list of Person resources |
+| Create | io.restorecommerce.person.PersonList | io.restorecommerce.person.PersonList | Create a list of Person resources |
+| Read | io.restorecommerce.resourcebase.ReadRequest | io.restorecommerce.person.PersonList | Read a list of Person resources  |
+| Update | io.restorecommerce.person.PersonList | io.restorecommerce.person.PersonList | Update a list of Person resources |
+| Delete | io.restorecommerce.resourcebase.DeleteRequest | Empty | Delete a list of Person resources |
+| Upsert | io.restorecommerce.person.PersonList | io.restorecommerce.person.PersonList | Create or Update a list of Person resources |
 
 ## Kafka Events
 
@@ -217,8 +219,8 @@ List of events emitted to Kafka by this microservice for below topics:
   - healthCheckResponse
   - resetResponse
 
-For `sendEmail` event protobuf message structure see [Notification Service](https://github.com/restorecommerce/notification-srv)
-and for `renderRequest` event protobuf message structure see [Rendering Service](https://github.com/restorecommerce/rendering-srv).
+For `sendEmail` event protobuf message structure see [notification-srv](https://github.com/restorecommerce/notification-srv)
+and for `renderRequest` event protobuf message structure see [rendering-srv](https://github.com/restorecommerce/rendering-srv).
 
 ## Shared Interface
 

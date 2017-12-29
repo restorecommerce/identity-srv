@@ -3,19 +3,20 @@
 import * as mocha from 'mocha';
 import * as coMocha from 'co-mocha';
 import * as co from 'co';
-
 coMocha(mocha);
-
 import * as should from 'should';
 import * as grpcClient from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import { Worker } from '../worker';
-const Events = kafkaClient.Events;
-const sconfig = require('@restorecommerce/service-config');
+import * as sconfig from '@restorecommerce/service-config';
 import * as service from './../service';
 
-/* global describe before after it*/
+const Events = kafkaClient.Events;
+
+/*
+ * Note: To run this test, a running ArangoDB and Kafka instance is required.
+ */
 let cfg;
 describe('restore-user-srv blackbox testing', () => {
   let worker;
@@ -27,7 +28,7 @@ describe('restore-user-srv blackbox testing', () => {
   });
 
   after(async function stopServer() {
-    await worker.end();
+    await worker.stop();
   });
   describe('with test client', () => {
     let client;
