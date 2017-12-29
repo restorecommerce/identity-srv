@@ -18,7 +18,7 @@ const Events = kafkaClient.Events;
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
  */
 let cfg;
-describe('restore-user-srv blackbox testing', () => {
+describe('restore-user-srv testing', () => {
   let worker;
 
   before(async function startServer() {
@@ -41,7 +41,7 @@ describe('restore-user-srv blackbox testing', () => {
 
     before(async function connect() {
       logger = Logger(cfg.get('logger'));
-      client = new grpcClient.Client(cfg.get('client:blackbox'), logger);
+      client = new grpcClient.Client(cfg.get('client:service'), logger);
       userService = await client.connect();
 
       events = new Events(cfg.get('events:kafka'), logger);

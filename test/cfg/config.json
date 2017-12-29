@@ -21,7 +21,7 @@
         "layout": "restore_identity/layout.hbs"
       }
     },
-    "blackbox": {
+    "service": {
       "logger": {
         "console": {
           "handleExceptions": false,
@@ -64,7 +64,7 @@
         "upsert": {}
       }
     },
-    "blackbox-notification": {
+    "service-notification": {
       "transports": {
         "grpc": {
           "service": "io.restorecommerce.notification.Service",
@@ -89,7 +89,7 @@
         }
       }
     },
-    "blackbox-relection": {
+    "service-relection": {
       "logger": {
         "console": {
           "handleExceptions": false,
@@ -122,7 +122,7 @@
         "serverReflectionInfo": {}
       }
     },
-    "blackbox-ci": {
+    "service-ci": {
       "logger": {
         "console": {
           "handleExceptions": false,

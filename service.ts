@@ -285,7 +285,7 @@ export class Service extends ServiceBase {
     await this.topics.users.emit('registered', user);
 
     // A notification service sends out an registration confirmation email
-    let client = new grpcClient.Client(this.cfg.get('client:blackbox-notification'), logger);
+    let client = new grpcClient.Client(this.cfg.get('client:service-notification'), logger);
     let clientService = await client.connect();
 
     // Contextual Data for template rendering
@@ -467,7 +467,7 @@ export class Service extends ServiceBase {
     await this.topics.users.emit('emailIdChanged', user);
 
     // A notification service sends out an email for confirming the changed mailID
-    let client = new grpcClient.Client(this.cfg.get('client:blackbox-notification'), logger);
+    let client = new grpcClient.Client(this.cfg.get('client:service-notification'), logger);
     let clientService = await client.connect();
 
     // Contextual Data for rendering on Notification-srv before sending mail

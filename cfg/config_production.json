@@ -12,7 +12,7 @@
     "hbs_templates": {
       "prefix": "http://console:80/"
     },
-    "blackbox-notification": {
+    "service-notification": {
       "transports": {
         "grpc": {
           "service": "io.restorecommerce.notification.Service",
