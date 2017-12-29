@@ -49,7 +49,7 @@
     "pretest": "npm run tsctests && npm run createtopics",
     "test": "npm run lint && npm run mocha",
     "lint": "tslint './client/*.ts' './service.ts' './start.ts'",
-    "mocha": "export NODE_ENV=test mocha -R spec ./test/*.js --full-trace --exit",
+    "mocha": "export NODE_ENV=test; mocha -R spec ./test/*.js --full-trace --exit",
     "tsctests": "tsc test/*.ts --module commonjs -target ES6",
     "test-debug": "mocha -R spec ./test/*.js --inspect-brk",
     "coveralls": "export NODE_ENV=test; istanbul cover ./node_modules/mocha/bin/_mocha --report lcovonly -- -R spec ./test/*.js --exit",
