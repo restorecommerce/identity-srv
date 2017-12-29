@@ -48,7 +48,7 @@ A list of User resources.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| items | [ ]User | required | List of Users |
+| items | [ ]io.restorecommerce.user.User | required | List of Users |
 | total_count | number | optional | number of Users |
 
 #### Register
