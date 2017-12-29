@@ -36,7 +36,7 @@ A User resource.
 | password | string | required | Raw password, not stored |
 | passwordHash | bytes | optional | Encrypted password, stored |
 | guest | bool | optional | A guest user. |
-| Role | []Role | optional | Role |
+| Role | [ ]Role | optional | Role |
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
@@ -48,7 +48,7 @@ A list of User resources.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| items | []User | required | List of Users |
+| items | [ ]User | required | List of Users |
 | total_count | number | optional | number of Users |
 
 #### Register
@@ -64,7 +64,7 @@ of the registered User. `sendEmail` notification event is emitted when registeri
 | name | string | required | user name |
 | email | string | required | user email ID |
 | password | string | required | user password |
-| creator | string | optional |  |
+| creator | string | optional | user id of the creator |
 | Role | Role | optional | Role |
 
 #### Activate
@@ -90,7 +90,7 @@ Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest`
 
 #### ChangeEmailID
 Used to change EmailID of the User (User should be activated to perform this operation). Requests are performed providing `io.restorecommerce.user.ChangeEmailIdRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message.
-After the EmailID is changed user account needs to be activated again with the new
+After the EmailID is changed User account needs to be activated again with the new
 activation code sent via Email to User.
 
 `io.restorecommerce.user.ChangeEmailIdRequest`
@@ -134,7 +134,7 @@ Used to find the User details. Requests are performed providing `io.restorecomme
 | email | string | required | User EmailID |
 
 #### CRUD Operations
-The microservice exposes the below CRUD functions for creating or
+The microservice exposes the below CRUD operations for creating or
 modifying User resource.
 
 `io.restorecommerce.user.Service`
@@ -168,13 +168,13 @@ A list of Persons resource.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| items | []io.restorecommerce.person.Person | required | List of Persons |
+| items | [ ]io.restorecommerce.person.Person | required | List of Persons |
 | total_count | number | optional | number of Persons |
 
 
 #### CRUD Operations
 The microservice for the person resource.
-It exposes the below CRUD functions for creating or
+It exposes the below CRUD operations for creating or
 modifying User resource.
 
 `io.restorecommerce.person.Service`
