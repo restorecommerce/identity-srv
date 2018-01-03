@@ -38,7 +38,6 @@ export interface User {
   email: string; /// Email address
   active: boolean; /// If the user was activated via the activation process
   activation_code: string; /// Activation code used in the activation process
-  person: string; /// Person ID, the person behind this user
   password: string; /// Raw password, not stored
   password_hash: string; /// Encrypted password, stored
   guest: boolean;
@@ -49,18 +48,9 @@ export interface Role {
   type: string;
 }
 
-export interface Person {
-  id: string;
-  created: number;
-  modified: number;
-  creator: string;
-  email: string;
-}
-
 export class Service extends ServiceBase {
   db: any;
   topics: any;
-  person: any;
   logger: any;
   cfg: any;
   subjectTpl: string;
@@ -69,14 +59,13 @@ export class Service extends ServiceBase {
   changeBodyTpl: string;
   emailData: any;
 
-  constructor(cfg: any, topics: any, personService: any, db: any,
-    logger: any, isEventsEnabled: boolean) {
+  constructor(cfg: any, topics: any, db: any, logger: any,
+    isEventsEnabled: boolean) {
     super('users', topics.users, logger, new ResourcesAPIBase(db, 'users'),
       isEventsEnabled);
     this.cfg = cfg;
     this.db = db;
     this.topics = topics;
-    this.person = personService;
     this.logger = logger;
 
     this.emailData = {};
@@ -142,18 +131,6 @@ export class Service extends ServiceBase {
   }
 
   /**
- * creates a person out of a user.
- * @param  {User} user
- * @return {any} person
- */
-  makePerson(user: User): any {
-    return {
-      id: this.makeID('persons', this.idGen()),
-      email: user.email,
-    };
-  }
-
-  /**
    * Returns an ID based on collection name and document name.
    * @param  {string} collectionName
    * @param  {string} documentName
@@ -170,11 +147,11 @@ export class Service extends ServiceBase {
    * @return type is any since it can be guest or user type
    */
   async createUsers(call: any, context: any): Promise<any> {
-     const userListReturn = [];
-     const that = this;
-     const usersList = call.request.items;
-    _.forEach(usersList, async function(user: User): Promise<any> {
-      const callReq: any = {request: user};
+    const userListReturn = [];
+    const that = this;
+    const usersList = call.request.items;
+    _.forEach(usersList, async function (user: User): Promise<any> {
+      const callReq: any = { request: user };
       userListReturn.push(await that.register(callReq, context));
     });
     return userListReturn;
@@ -238,11 +215,6 @@ export class Service extends ServiceBase {
     }
     logger.silly('user does not exist');
 
-    // Create Person
-    const person = this.makePerson(user);
-    await this.person.create({ request: { items: [person] } });
-    logger.info('person created', person);
-
     // Set User created and modified date as same initially
     // date is stored in seconds in arangoDB i.e. numeric time stamp
     user.created = (new Date()).getTime();
@@ -263,9 +235,7 @@ export class Service extends ServiceBase {
     user.password_hash = password.hash(user.password);
     delete user.password;
 
-    // Set personIRI
-    user.person = person.id;
-    // converting the userID to idGen() to elemenate dependency from changing
+    // converting the userID to idGen() to eliminate dependency from changing
     // usernames
     user.id = this.idGen();
 
@@ -530,7 +500,7 @@ export class Service extends ServiceBase {
   }
 
   /**
-   * Endpoint unregister, delete a user and associated person
+   * Endpoint unregister, delete a user
    * belonging to the user.
    * @param  {any} call request containing list of userIds
    * @param {any} context
@@ -550,10 +520,6 @@ export class Service extends ServiceBase {
       throw new errors.NotFound('user not found');
     }
     const user = users.items[0];
-
-    // delete person
-    await this.person.delete({ request: { ids: [user.person] } });
-    logger.info('person deleted', user.person);
 
     // delete user
     const serviceCall = {
@@ -591,32 +557,5 @@ export class Service extends ServiceBase {
 
     response = await fetch(prefix + templates['body_change']);
     this.changeBodyTpl = await response.text();
-  }
-}
-
-export class PersonService extends ServiceBase {
-  cfg: any;
-  db: any;
-  events: any;
-  logger: any;
-  restoreEnabled: boolean;
-  server: Server;
-  restoreProcess: any;
-  constructor(cfg: any, personEvents: kafkaClient.Events, db: any, logger: any,
-    isEventsEnabled: boolean) {
-    super('persons', personEvents, logger, new ResourcesAPIBase(db, 'persons'),
-      isEventsEnabled);
-    this.cfg = cfg;
-    this.db = db;
-    this.events = {
-      entity: personEvents,
-      person: personEvents,
-    };
-    this.logger = logger;
-  }
-
-  enableRestore(server: Server): any {
-    this.restoreEnabled = true;
-    this.server = server;
   }
 }

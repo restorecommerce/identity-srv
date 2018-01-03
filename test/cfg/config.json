@@ -175,12 +175,6 @@
       "provider": "kafka",
       "groupId": "restore-identity-srv-test",
       "clientId": "restore-identity-srv-test",
-      "protos": [
-        "io/restorecommerce/user.proto",
-        "io/restorecommerce/person.proto",
-        "io/restorecommerce/rendering.proto"
-      ],
-      "protoRoot": "node_modules/@restorecommerce/protos/",
       "connectionString": "0.0.0.0:2181",
       "usersModified": {
         "protos": [
@@ -189,26 +183,12 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.User"
       },
-      "personsModified": {
-        "protos": [
-          "io/restorecommerce/person.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.person.PersonList"
-      },
       "usersCreated": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.User"
-      },
-      "personsCreated": {
-        "protos": [
-          "io/restorecommerce/person.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.person.PersonList"
       },
       "usersDeleted": {
         "protos": [
@@ -217,26 +197,12 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.User"
       },
-      "personsDeleted": {
-        "protos": [
-          "io/restorecommerce/person.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.person.Deleted"
-      },
       "usersRead": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.User"
-      },
-      "personsRead": {
-        "protos": [
-          "io/restorecommerce/person.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.person.Person"
       },
       "registered": {
         "protos": [
@@ -291,9 +257,6 @@
         "users": {
           "topic": "io.restorecommerce.users.resource"
         },
-        "persons": {
-          "topic": "io.restorecommerce.persons.resource"
-        },
         "command": {
           "topic": "io.restorecommerce.command",
           "events": [
@@ -314,33 +277,6 @@
   },
   "server": {
     "services": {
-      "io-restorecommerce-person-srv": {
-        "read": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "create": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "delete": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "update": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "upsert": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        }
-      },
       "io-restorecommerce-user-srv": {
         "activate": {
           "transport": [
@@ -444,13 +380,11 @@
         "provider": "grpc",
         "services": {
           "io-restorecommerce-user-srv": "io.restorecommerce.user.Service",
-          "io-restorecommerce-person-srv": "io.restorecommerce.person.Service",
           "io-restorecommerce-identity-reflection": "grpc.reflection.v1alpha.ServerReflection",
           "io-restorecommerce-identity-cis": "io.restorecommerce.commandinterface.Service"
         },
         "protos": [
           "io/restorecommerce/user.proto",
-          "io/restorecommerce/person.proto",
           "grpc/reflection/v1alpha/reflection.proto",
           "io/restorecommerce/commandinterface.proto"
         ],
@@ -461,7 +395,6 @@
   },
   "serviceNames": {
     "user": "io-restorecommerce-user-srv",
-    "person": "io-restorecommerce-person-srv",
     "reflection": "io-restorecommerce-identity-reflection",
     "cis": "io-restorecommerce-identity-cis"
   }

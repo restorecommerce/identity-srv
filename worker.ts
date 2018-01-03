@@ -5,7 +5,7 @@ import * as _ from 'lodash';
 import { Events, Topic } from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import { database, grpc, Server } from '@restorecommerce/chassis-srv';
-import { Service, PersonService } from './service';
+import { Service } from './service';
 import * as rcsi from '@restorecommerce/command-interface';
 
 const RESTORE_CMD_EVENT = 'restoreCommand';
@@ -42,7 +42,6 @@ export class Worker {
     const kafkaCfg = cfg.get('events:kafka');
     const userTopic = kafkaCfg.topics.users.topic;
     const commandTopic = kafkaCfg.topics.command.topic;
-    const personTopic = kafkaCfg.topics.persons.topic;
     const renderingTopic = kafkaCfg.topics.rendering.topic;
 
     // Create a new microservice Server
@@ -71,7 +70,6 @@ export class Worker {
     const validServiceNames = [
       // identit gRPC services
       serviceNamesCfg.user,
-      serviceNamesCfg.person,
       serviceNamesCfg.reflection,
       serviceNamesCfg.cis
     ];
@@ -116,14 +114,9 @@ export class Worker {
       }
     }
 
-    // Person service
-    logger.verbose('Setting up person service');
-    const personService = new PersonService(cfg, this.topics.persons, db, logger, true);
-    await co(server.bind(serviceNamesCfg.person, PersonService));
-
     // user service
     logger.verbose('Setting up user service');
-    service = new Service(cfg, this.topics, personService, db, logger, true);
+    service = new Service(cfg, this.topics, db, logger, true);
     await co(server.bind(serviceNamesCfg.user, service));
 
     // Add CommandInterfaceService
@@ -193,12 +186,6 @@ function makeUserRestoreSetup(db: any): any {
         message);
       return {};
     },
-    personsModified: async function restorePersonsModified(message: any,
-      context: any, config: any, eventName: string): Promise<any> {
-      await co(db.update('perons', { id: message.id }),
-        message);
-      return {};
-    },
     passwordChanged: async function restorePasswordChange(message: any,
       context: any, config: any, eventName: string): Promise<any> {
       await co(db.update('users', { id: message.id }),
@@ -217,11 +204,6 @@ function makeUserRestoreSetup(db: any): any {
     registered: async function restoreUsersRegistered(message: any, context: any,
       config: any, eventName: string): Promise<any> {
       await co(db.insert('users', message));
-      return {};
-    },
-    personsCreated: async function restorePersonsCreated(message: any, context: any,
-      config: any, eventName: string): Promise<any> {
-      await co(db.insert('persons', message));
       return {};
     },
   };
