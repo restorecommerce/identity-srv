@@ -60,7 +60,7 @@ of the registered User. `sendEmail` notification event is emitted when registeri
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| guest | bool | optional | guest user, default value is false |
+| guest | bool | optional | guest user, default value is `false` |
 | name | string | required | user name |
 | email | string | required | user email ID |
 | password | string | required | user password |
