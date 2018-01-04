@@ -7,7 +7,7 @@
 [depend]: https://img.shields.io/david/restorecommerce/identity-srv.svg?style=flat-square
 [cover]: http://img.shields.io/coveralls/restorecommerce/identity-srv/master.svg?style=flat-square
 
-This microservice handles the user and person resources.
+This microservice handles the user resource.
 It provides a [gRPC](https://grpc.io/docs) interface for handling CRUD operations and user-specific functionalities.
 This service directly communicates with an ArangoDB instance and asynchronously with [Apache Kafka](https://kafka.apache.org/),
 using an event-driven approach with message structures defined with [Protocol Buffers](https://developers.google.com/protocol-buffers/) (see [kafka-client](https://github.com/restorecommerce/kafka-client) for more information).
@@ -15,7 +15,7 @@ using an event-driven approach with message structures defined with [Protocol Bu
 
 ## gRPC Interface
 
-This microservice exposes the following gRPC endpoints for User and Person resource.
+This microservice exposes the following gRPC endpoints for User resource.
 
 ### User
 A User resource.
@@ -32,7 +32,6 @@ A User resource.
 | email | string | required | Email address |
 | active | bool | optional | If the user was activated via the activation process |
 | activation_code | string | optional | Activation code used in the activation process |
-| person | string | required | Person ID, the person behind this user |
 | password | string | required | Raw password, not stored |
 | passwordHash | bytes | optional | Encrypted password, stored |
 | guest | bool | optional | A guest user. |
@@ -147,45 +146,7 @@ modifying User resource.
 | Delete | io.restorecommerce.resourcebase.DeleteRequest | Empty | Delete a list of User resources |
 | Upsert | io.restorecommerce.user.UserList | io.restorecommerce.user.UserList | Create or Update a list of User resources |
 
-For the detailed prtobuf message structure of `io.restorecommerce.resourcebase.ReadRequest` and `io.restorecommerce.resourcebase.DeleteRequest` refer [resource-base-interface](https://github.com/restorecommerce/resource-base-interface).
-
-### Person
-A Person resource.
-
-`io.restorecommerce.person.Person`
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| id | string | required | Person ID |
-| created | double | required | created date |
-| modified | double | required | modified date |
-| creator | string | required | creator |
-| email | string | optional | emailID |
-
-A list of Persons resource.
-
-`io.restorecommerce.person.PersonList`
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| items | [ ]io.restorecommerce.person.Person | required | List of Persons |
-| total_count | number | optional | number of Persons |
-
-
-#### CRUD Operations
-The microservice for the person resource.
-It exposes the below CRUD operations for creating or
-modifying User resource.
-
-`io.restorecommerce.person.Service`
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| Create | io.restorecommerce.person.PersonList | io.restorecommerce.person.PersonList | Create a list of Person resources |
-| Read | io.restorecommerce.resourcebase.ReadRequest | io.restorecommerce.person.PersonList | Read a list of Person resources  |
-| Update | io.restorecommerce.person.PersonList | io.restorecommerce.person.PersonList | Update a list of Person resources |
-| Delete | io.restorecommerce.resourcebase.DeleteRequest | Empty | Delete a list of Person resources |
-| Upsert | io.restorecommerce.person.PersonList | io.restorecommerce.person.PersonList | Create or Update a list of Person resources |
+For the detailed protobuf message structure of `io.restorecommerce.resourcebase.ReadRequest` and `io.restorecommerce.resourcebase.DeleteRequest` refer [resource-base-interface](https://github.com/restorecommerce/resource-base-interface).
 
 ## Kafka Events
 
@@ -198,10 +159,6 @@ This microservice subscribes to the following Kafka events by topic:
   - identityRenderResponse
 
 List of events emitted to Kafka by this microservice for below topics:
-- io.restorecommerce.persons.resource
-  - personsCreated
-  - personsModified
-  - personsDeleted
 - io.restorecommerce.users.resource
   - registered
   - activated
