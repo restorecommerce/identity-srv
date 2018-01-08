@@ -178,10 +178,10 @@ List of events emitted to Kafka by this microservice for below topics:
 For `sendEmail` event protobuf message structure see [notification-srv](https://github.com/restorecommerce/notification-srv)
 and for `renderRequest` event protobuf message structure see [rendering-srv](https://github.com/restorecommerce/rendering-srv).
 
-## Shared Interface
+## Microservice operations
 
-This microservice uses [chassis-srv](http://github.com/restorecommerce/chassis-srv), a base engine for microservices, in order to provide the following functionalities:
-- exposure of gRPC endpoints for user-handling operations
+This service uses [chassis-srv](http://github.com/restorecommerce/chassis-srv), a base module for microservice operations, in order to provide the following functionalities:
+- exposure of all previously mentioned gRPC endpoints
 - implementation of a [command-interface](https://github.com/restorecommerce/chassis-srv/command-interface.md) which
 provides endpoints for retrieving the system status and resetting/restoring the system in case of failure. These endpoints can be called via gRPC or Kafka events (through the `io.restorecommerce.command` topic).
 - database access, which is abstracted by the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface)
