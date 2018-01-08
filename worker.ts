@@ -98,7 +98,9 @@ export class Worker {
         }
       }
       else if (eventName === RENDER_RESPONSE_EVENT) {
-        await service.sendEmail(msg);
+        if (service.emailEnabled) {
+          await service.sendEmail(msg);
+        }
       }
     };
 
@@ -139,7 +141,9 @@ export class Worker {
     await co(server.bind(reflectionServiceName, reflectionService));
 
     const hbsTemplates = cfg.get('client:hbs_templates');
-    await service.setRenderRequestConfigs(this[renderingTopic], hbsTemplates);
+    if (hbsTemplates) {
+      await service.setRenderRequestConfigs(this[renderingTopic], hbsTemplates);
+    }
     // Start server
     await co(server.start());
 

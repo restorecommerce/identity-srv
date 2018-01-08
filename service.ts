@@ -58,7 +58,7 @@ export class Service extends ServiceBase {
   registerBodyTpl: string;
   changeBodyTpl: string;
   emailData: any;
-
+  emailEnabled: boolean;
   constructor(cfg: any, topics: any, db: any, logger: any,
     isEventsEnabled: boolean) {
     super('users', topics.users, logger, new ResourcesAPIBase(db, 'users'),
@@ -254,39 +254,37 @@ export class Service extends ServiceBase {
     logger.info('user registered', user);
     await this.topics.users.emit('registered', user);
 
-    // A notification service sends out an registration confirmation email
-    let client = new grpcClient.Client(this.cfg.get('client:service-notification'), logger);
-    let clientService = await client.connect();
+    if (this.emailEnabled) {
+      // Contextual Data for template rendering
+      const contextualData = {
+        email: user.email, name: user.name, id: user.id,
+        activation_code: user.activation_code
+      };
 
-    // Contextual Data for template rendering
-    const contextualData = {
-      email: user.email, name: user.name, id: user.id,
-      activation_code: user.activation_code
-    };
+      this.emailData[user.email] = {
+        data: {
+          notifyee: user.email,
+          body: '',
+          subject: '',
+          transport: 'email',
+          target: user.email
+        }
+      };
 
-    this.emailData[user.email] = {
-      data: {
-        notifyee: user.email,
-        body: '',
-        subject: '',
-        transport: 'email',
-        target: user.email
-      }
-    };
-
-    const renderRequest = {
-      id: user.email,
-      service_name: 'identity-srv',
-      payload: [{
-        templates: JSON.stringify({
-          body: { body: this.registerBodyTpl, layout: this.layoutTpl },
-          subject: { body: this.subjectTpl }
-        }),
-        data: JSON.stringify(contextualData),
-        options: JSON.stringify({ texts: {} })
-      }]
-    };
-    await this.topics.rendering.emit('renderRequest', renderRequest);
+      const renderRequest = {
+        id: user.email,
+        service_name: 'identity-srv',
+        payload: [{
+          templates: JSON.stringify({
+            body: { body: this.registerBodyTpl, layout: this.layoutTpl },
+            subject: { body: this.subjectTpl }
+          }),
+          data: JSON.stringify(contextualData),
+          options: JSON.stringify({ texts: {} })
+        }]
+      };
+      await this.topics.rendering.emit('renderRequest', renderRequest);
+    }
     // Response
     return user;
   }
@@ -436,42 +434,40 @@ export class Service extends ServiceBase {
     logger.info('EmailID changed for user', userID);
     await this.topics.users.emit('emailIdChanged', user);
 
-    // A notification service sends out an email for confirming the changed mailID
-    let client = new grpcClient.Client(this.cfg.get('client:service-notification'), logger);
-    let clientService = await client.connect();
-
     // Contextual Data for rendering on Notification-srv before sending mail
     const usersUpdated = await super.read({ request: { filter } }, context);
-    let userUpdated = usersUpdated.items[0];
-    const contextualData = {
-      email: userUpdated.email, name: userUpdated.name, id: userUpdated.id,
-      activation_code: userUpdated.activation_code
-    };
+    const userUpdated = usersUpdated.items[0];
 
-    this.emailData[user.email] = {
-      service: clientService,
-      data: {
-        notifyee: user.email,
-        body: '',
-        subject: '',
-        transport: 'email',
-        target: user.email
-      }
-    };
+    if (this.emailEnabled) {
+      const contextualData = {
+        email: userUpdated.email, name: userUpdated.name, id: userUpdated.id,
+        activation_code: userUpdated.activation_code
+      };
 
-    const renderRequest = {
-      id: user.email,
-      service_name: 'identity-srv',
-      payload: [{
-        templates: JSON.stringify({
-          body: { body: this.changeBodyTpl, layout: this.layoutTpl },
-          subject: { body: this.subjectTpl }
-        }),
-        data: JSON.stringify(contextualData),
-        options: JSON.stringify({ texts: {} })
-      }]
-    };
-    await this.topics.rendering.emit('renderRequest', renderRequest);
+      this.emailData[user.email] = {
+        data: {
+          notifyee: user.email,
+          body: '',
+          subject: '',
+          transport: 'email',
+          target: user.email
+        }
+      };
+
+      const renderRequest = {
+        id: user.email,
+        service_name: 'identity-srv',
+        payload: [{
+          templates: JSON.stringify({
+            body: { body: this.changeBodyTpl, layout: this.layoutTpl },
+            subject: { body: this.subjectTpl }
+          }),
+          data: JSON.stringify(contextualData),
+          options: JSON.stringify({ texts: {} })
+        }]
+      };
+      await this.topics.rendering.emit('renderRequest', renderRequest);
+    }
     // Response
     return user;
   }
@@ -546,16 +542,28 @@ export class Service extends ServiceBase {
     const prefix = tplConfig.prefix;
 
     let response: any;
-    response = await fetch(prefix + templates['subject']);
-    this.subjectTpl = await response.text();
+    try {
+      response = await fetch(prefix + templates['subject']);
+      this.subjectTpl = await response.text();
 
-    response = await fetch(prefix + templates['layout']);
-    this.layoutTpl = await response.text();
+      response = await fetch(prefix + templates['layout']);
+      this.layoutTpl = await response.text();
 
-    response = await fetch(prefix + templates['body_register']);
-    this.registerBodyTpl = await response.text();
+      response = await fetch(prefix + templates['body_register']);
+      this.registerBodyTpl = await response.text();
 
-    response = await fetch(prefix + templates['body_change']);
-    this.changeBodyTpl = await response.text();
+      response = await fetch(prefix + templates['body_change']);
+      this.changeBodyTpl = await response.text();
+      this.emailEnabled = true;
+    } catch (err) {
+      if (err.code == 'ECONNREFUSED' || err.message == 'ECONNREFUSED') {
+        this.emailEnabled = false;
+        this.sendEmail = null;
+        this.logger.warn('An error occurred while attempting to load email templates from'
+          + ' remote server. Email operations will be disabled.')
+      } else {
+        throw err;
+      }
+    }
   }
 }
