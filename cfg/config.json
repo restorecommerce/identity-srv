@@ -136,7 +136,10 @@
       "database": "identity-srv",
       "autoCreate": true,
       "retries": 6,
-      "delay": 30000
+      "delay": 30000,
+      "collections":[
+        "users"
+      ]
     }
   },
   "events": {

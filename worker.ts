@@ -4,9 +4,8 @@ import * as util from 'util';
 import * as _ from 'lodash';
 import { Events, Topic } from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
-import { database, grpc, Server } from '@restorecommerce/chassis-srv';
+import * as chassis from '@restorecommerce/chassis-srv';
 import { Service } from './service';
-import * as rcsi from '@restorecommerce/command-interface';
 
 const RESTORE_CMD_EVENT = 'restoreCommand';
 const HEALTH_CMD_EVENT = 'healthCheckCommand';
@@ -45,12 +44,11 @@ export class Worker {
     const renderingTopic = kafkaCfg.topics.rendering.topic;
 
     // Create a new microservice Server
-    const server = new Server(cfg.get('server'), logger);
-    server.middleware.push(makeLoggingMiddleware());
+    const server = new chassis.Server(cfg.get('server'), logger);
+    // server.middleware.push(makeLoggingMiddleware());
 
     // database
-    logger.verbose('Connecting to GSS');
-    const db = await co(database.get(cfg.get('database:main'), logger));
+    const db = await co(chassis.database.get(cfg.get('database:main'), logger));
 
     // topics
     logger.verbose('Setting up topics');
@@ -90,6 +88,7 @@ export class Worker {
         }
       }
       else if (eventName === RESET_START_EVENT) {
+        console.log('Received reset!');
         const resetStatus = await cis.reset(msg);
         if (resetStatus) {
           const healthCheckTopic = events.topic(commandTopic);
@@ -121,23 +120,14 @@ export class Worker {
     service = new Service(cfg, this.topics, db, logger, true);
     await co(server.bind(serviceNamesCfg.user, service));
 
-    // Add CommandInterfaceService
-    const CommandInterfaceService = rcsi.CommandInterface;
-    const userRestoreSetup = makeUserRestoreSetup(db);
-    const restoreSetup = {
-      [userTopic]: {
-        topic: this[userTopic],
-        events: userRestoreSetup,
-      },
-    };
-    const cis = new CommandInterfaceService(server, restoreSetup, cfg.get(), logger);
+    const cis = new chassis.CommandInterface(server, cfg.get(), logger, events);
     await co(server.bind(serviceNamesCfg.cis, cis));
 
     // Add reflection service
     const reflectionServiceName = serviceNamesCfg.reflection;
     const transportName = cfg.get(`server:services:${reflectionServiceName}:serverReflectionInfo:transport:0`);
     const transport = server.transport[transportName];
-    const reflectionService = new grpc.ServerReflection(transport.$builder, server.config);
+    const reflectionService = new chassis.grpc.ServerReflection(transport.$builder, server.config);
     await co(server.bind(reflectionServiceName, reflectionService));
 
     const hbsTemplates = cfg.get('client:hbs_templates');
@@ -158,59 +148,46 @@ export class Worker {
   }
 }
 
-/**
- * Simple request/response logging middleware.
- */
-function makeLoggingMiddleware(): any {
-  return async function makeMiddleware(next: any): Promise<any> {
-    return async function middleware(call: any, context: any): Promise<any> {
-      const request = call.request;
-      context.logger.debug(
-        util.format('received request to endpoint %s over transport %s',
-          context.method, context.transport), request);
-      const response = await co(next(call, context));
-      context.logger.debug(
-        util.format('response for request to endpoint %s over transport %s',
-          context.method, context.transport), request, response);
-      return response;
-    };
-  };
-}
+class UserCommandInterface extends chassis.CommandInterface {
+  constructor(server: chassis.Server, cfg, any, logger: any, events: Events) {
+    super(server, cfg, logger, events);
+  }
 
-function makeUserRestoreSetup(db: any): any {
-  return {
-    unregistered: async function restoreUnregistered(message: any, context: any,
-      config: any, eventName: string): Promise<any> {
-      await co(db.delete('users', { id: message.id }));
-      return {};
-    },
-    usersModified: async function restoreUsersModified(message: any,
-      context: any, config: any, eventName: string): Promise<any> {
-      await co(db.update('users', { id: message.id }),
-        message);
-      return {};
-    },
-    passwordChanged: async function restorePasswordChange(message: any,
-      context: any, config: any, eventName: string): Promise<any> {
-      await co(db.update('users', { id: message.id }),
-        { password_hash: message.password_hash });
-      return {};
-    },
-    activated: async function restoreActivated(message: any, context: any,
-      config: any, eventName: string): Promise<any> {
-      const patch = {
-        active: true,
-        activation_code: '',
-      };
-      await co(db.update('users', { id: message.id }, patch));
-      return {};
-    },
-    registered: async function restoreUsersRegistered(message: any, context: any,
-      config: any, eventName: string): Promise<any> {
-      await co(db.insert('users', message));
-      return {};
-    },
-  };
+  makeResourcesRestoreSetup(db: any, collectionName: string) {
+    return {
+      unregistered: async function restoreUnregistered(message: any, context: any,
+        config: any, eventName: string): Promise<any> {
+        await co(db.delete(collectionName, { id: message.id }));
+        return {};
+      },
+      usersModified: async function restoreUsersModified(message: any,
+        context: any, config: any, eventName: string): Promise<any> {
+        await co(db.update(collectionName, { id: message.id }),
+          message);
+        return {};
+      },
+      passwordChanged: async function restorePasswordChange(message: any,
+        context: any, config: any, eventName: string): Promise<any> {
+        await co(db.update(collectionName, { id: message.id }),
+          { password_hash: message.password_hash });
+        return {};
+      },
+      activated: async function restoreActivated(message: any, context: any,
+        config: any, eventName: string): Promise<any> {
+        const patch = {
+          active: true,
+          activation_code: '',
+        };
+        await co(db.update(collectionName, { id: message.id }, patch));
+        return {};
+      },
+      registered: async function restoreUsersRegistered(message: any, context: any,
+        config: any, eventName: string): Promise<any> {
+        await co(db.insert(collectionName, message));
+        return {};
+      },
+    };
+  }
 }
 
 if (require.main === module) {
