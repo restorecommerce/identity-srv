@@ -9,8 +9,7 @@
 
 This microservice handles the user resource.
 It provides a [gRPC](https://grpc.io/docs) interface for handling CRUD operations and user-specific functionalities.
-This service directly communicates with an ArangoDB instance and asynchronously with [Apache Kafka](https://kafka.apache.org/),
-using an event-driven approach with message structures defined with [Protocol Buffers](https://developers.google.com/protocol-buffers/) (see [kafka-client](https://github.com/restorecommerce/kafka-client) for more information).
+This service persists user data within an ArangoDB instance and generic asynchronous communication is performed with [Apache Kafka](https://kafka.apache.org/), using an event-driven approach with message interfaces defined with [Protocol Buffers](https://developers.google.com/protocol-buffers/) (see [kafka-client](https://github.com/restorecommerce/kafka-client) for more information). User-specific operations are implemented and exposed through the [UserService](service.ts), which is a extension of the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface) generic class `ServiceBase`.
 
 
 ## gRPC Interface
@@ -52,8 +51,8 @@ A list of User resources.
 
 #### Register
 Used to register a User.
-Requests are performed providing `io.restorecommerce.user.RegisterRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message. Upon successful registration an userID, activation code is sent to the emailID
-of the registered User. `sendEmail` notification event is emitted when registering the User and this message is consumed by [notification-srv](http://github.com/restorecommerce/notification-srv) which internally uses [mailer](https://github.com/restorecommerce/mailer) to send email.
+Requests are performed providing `io.restorecommerce.user.RegisterRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message. If a valid configuration for retrieving email-related [handlebars](http://handlebarsjs.com/) templates from a remote server is provided, an email request is performed upon a successful registration. The email contains the user's auto-generated activation code. Email requests are done by emitting a`sendEmail` notification event, which is consumed by [notification-srv](http://github.com/restorecommerce/notification-srv). This service internally uses [mailer](https://github.com/restorecommerce/mailer) to send email.
+Please note that this email operation also implies template rendering, which is performed by emitting a `RenderRequest` event, which is consumed by the [rendering-srv](http://github.com/restorecommerce/rendering-srv). Therefore, the email sending step requires both a running instance of the rendering service and the notification service (or similar services which implement the given interfaces) as well as a remote server containing a set of email templates.
 
 `io.restorecommerce.user.RegisterRequest`
 
@@ -90,7 +89,7 @@ Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest`
 #### ChangeEmailID
 Used to change EmailID of the User (User should be activated to perform this operation). Requests are performed providing `io.restorecommerce.user.ChangeEmailIdRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message.
 After the EmailID is changed User account needs to be activated again with the new
-activation code sent via Email to User.
+activation code sent via email to User. For more details about the email operation see `Register`.
 
 `io.restorecommerce.user.ChangeEmailIdRequest`
 
@@ -181,9 +180,11 @@ and for `renderRequest` event protobuf message structure see [rendering-srv](htt
 
 ## Shared Interface
 
-This microservice implements a shared [command-interface](https://github.com/restorecommerce/command-interface-srv) which
+This microservice uses [chassis-srv](http://github.com/restorecommerce/chassis-srv), a base engine for microservices, in order to provide the following functionalities:
+- exposure of gRPC endpoints for user-handling operations
+- implementation of a [command-interface](https://github.com/restorecommerce/chassis-srv/command-interface.md) which
 provides endpoints for retrieving the system status and resetting/restoring the system in case of failure. These endpoints can be called via gRPC or Kafka events (through the `io.restorecommerce.command` topic).
-For usage details please see [command-interface tests](https://github.com/restorecommerce/command-interface-srv/tree/master/test).
+- database access, which is abstracted by the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface)
 
 ## Usage
 
