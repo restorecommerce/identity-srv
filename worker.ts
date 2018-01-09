@@ -72,6 +72,8 @@ export class Worker {
       serviceNamesCfg.cis
     ];
 
+	const cis = new UserCommandInterface(server, cfg.get(), logger, events);
+
     let identityServiceEventListener = async function eventListener(msg: any,
       context: any, config: any, eventName: string): Promise<any> {
       if (eventName === RESTORE_CMD_EVENT) {
@@ -120,7 +122,7 @@ export class Worker {
     service = new Service(cfg, this.topics, db, logger, true);
     await co(server.bind(serviceNamesCfg.user, service));
 
-    const cis = new chassis.CommandInterface(server, cfg.get(), logger, events);
+
     await co(server.bind(serviceNamesCfg.cis, cis));
 
     // Add reflection service
@@ -149,7 +151,7 @@ export class Worker {
 }
 
 class UserCommandInterface extends chassis.CommandInterface {
-  constructor(server: chassis.Server, cfg, any, logger: any, events: Events) {
+  constructor(server: chassis.Server, cfg: any, logger: any, events: Events) {
     super(server, cfg, logger, events);
   }
 
