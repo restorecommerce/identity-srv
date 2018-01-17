@@ -72,37 +72,12 @@ export class Worker {
       serviceNamesCfg.cis
     ];
 
-	const cis = new UserCommandInterface(server, cfg.get(), logger, events);
+    const cis = new UserCommandInterface(server, cfg.get(), logger, events);
 
     let identityServiceEventListener = async function eventListener(msg: any,
       context: any, config: any, eventName: string): Promise<any> {
-      if (eventName === RESTORE_CMD_EVENT) {
-        if (msg && (msg.topics[0].topic === userTopic)) {
-          await cis.restore(msg);
-        }
-      }
-      else if (eventName === HEALTH_CMD_EVENT) {
-        if (msg && (_.includes(validServiceNames, msg.service))) {
-          const serviceStatus = cis.check(msg);
-          const healthCheckTopic = events.topic(commandTopic);
-          await healthCheckTopic.emit(HEALTH_RES_EVENT,
-            serviceStatus);
-        }
-      }
-      else if (eventName === RESET_START_EVENT) {
-        console.log('Received reset!');
-        const resetStatus = await cis.reset(msg);
-        if (resetStatus) {
-          const healthCheckTopic = events.topic(commandTopic);
-          await healthCheckTopic.emit(RESET_DONE_EVENT,
-            resetStatus);
-        }
-      }
-      else if (eventName === RENDER_RESPONSE_EVENT) {
-        if (service.emailEnabled) {
-          await service.sendEmail(msg);
-        }
-      }
+      // command events
+      await cis.command(msg, context);
     };
 
     const topicTypes = _.keys(kafkaCfg.topics);

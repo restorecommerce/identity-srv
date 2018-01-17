@@ -19,7 +19,7 @@
   "dependencies": {
     "@restorecommerce/resource-base-interface": "github:restorecommerce/resource-base-interface",
     "@restorecommerce/cluster-service": "^0.1.0",
-    "@restorecommerce/chassis-srv":"github:restorecommerce/chassis-srv",
+    "@restorecommerce/chassis-srv": "github:restorecommerce/chassis-srv",
     "@restorecommerce/grpc-client": "github:restorecommerce/grpc-client",
     "@restorecommerce/kafka-client": "^0.1.0",
     "@restorecommerce/logger": "^0.1.0",
