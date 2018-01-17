@@ -560,7 +560,7 @@ export class Service extends ServiceBase {
         this.emailEnabled = false;
         this.sendEmail = null;
         this.logger.warn('An error occurred while attempting to load email templates from'
-          + ' remote server. Email operations will be disabled.')
+          + ' remote server. Email operations will be disabled.');
       } else {
         throw err;
       }
