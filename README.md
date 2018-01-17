@@ -188,7 +188,7 @@ provides endpoints for retrieving the system status and resetting/restoring the 
 
 ## Usage
 
-See [tests](#test/).
+See [tests](test/).
 
 
 **Note**: although any kind of gRPC client can be used to connect to these endpoints, the tests make use of the [grpc-client](https://github.com/restorecommerce/grpc-client),

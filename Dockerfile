@@ -1,30 +1,45 @@
-FROM node:9.2.0-wheezy
-
-RUN apt-get update && apt-get install -y libc6-dev
-
+FROM node:9.2.0-wheezy AS base
+## CREATE APP USER ##
+# Create the home directory for the new app user.
+RUN mkdir -p /home/app
+# Create an app user so our application doesn't run as root.
+RUN groupadd -r app &&\
+    useradd -r -g app -d /home/app -s /sbin/nologin -c "Docker image user" app
 # Create app directory
-RUN mkdir -p /usr/share/identity-srv
-RUN mkdir -p /root/.ssh
-WORKDIR /usr/share/identity-srv
-
-# Set config volumes
-VOLUME /usr/share/identity-srv/cfg
-VOLUME /usr/share/identity-srv/protos
-
-# Bundle app source
-COPY . /usr/share/identity-srv
-
+ENV HOME=/home/app
+ENV APP_HOME=/home/app/identity-srv
+## SETTING UP THE APP ##
+RUN mkdir $APP_HOME
+WORKDIR $APP_HOME
+RUN apt-get update && apt-get install -y libc6-dev
 # Install app dependencies
 RUN npm install -g typescript
-
-RUN cd /usr/share/identity-srv
-COPY id_rsa /root/.ssh/
-COPY config /root/.ssh/
-COPY known_hosts /root/.ssh/
-
+# Set config volumes
+VOLUME $APP_HOME/cfg
+VOLUME $APP_HOME/protos
+# Bundle app source
+ADD . $APP_HOME
+# Chown all the files to the app user.
+RUN chown -R app:app $HOME
+RUN cd $APP_HOME
+RUN pwd
+# Change to the app user.
+USER app
 RUN npm install
-RUN npm run postinstall
 
+
+FROM node:alpine
+RUN mkdir -p /home/app
+RUN addgroup -S app &&\
+    adduser -S -g app app
+ENV HOME=/home/app
+ENV APP_HOME=/home/app/identity-srv
+RUN mkdir $APP_HOME
+WORKDIR $APP_HOME
+RUN pwd
+# Copy files from base container by changing the ownership
+COPY --chown=app:app --from=base /home/app/identity-srv/ .
+USER app
 EXPOSE 50051
 CMD [ "npm", "start" ]
 
@@ -32,8 +47,7 @@ CMD [ "npm", "start" ]
 # docker build -t restorecommerce/identity-srv .
 #
 # To create a container:
-# docker create --name identity-srv -v /restore/identity-srv-TypeScript/test/cfg:/usr/share/identity-srv/cfg --net restorecms_default restorecommerce/identity-srv
-#
 # docker create --name identity-srv --net restorecms_default restorecommerce/identity-srv
+#
 # To run the container:
 # docker start identity-srv

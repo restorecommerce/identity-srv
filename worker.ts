@@ -72,7 +72,11 @@ export class Worker {
       serviceNamesCfg.cis
     ];
 
+<<<<<<< HEAD
     const cis = new UserCommandInterface(server, cfg.get(), logger, events);
+=======
+	  const cis = new UserCommandInterface(server, cfg.get(), logger, events);
+>>>>>>> b8fe9b0eedcc73b7f1a90457201272534e1fcc26
 
     let identityServiceEventListener = async function eventListener(msg: any,
       context: any, config: any, eventName: string): Promise<any> {
