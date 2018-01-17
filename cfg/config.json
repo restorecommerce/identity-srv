@@ -413,27 +413,7 @@
         }
       },
       "io-restorecommerce-identity-cis": {
-        "reconfigure": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "reset": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "restore": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "check": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "version": {
+        "command": {
           "transport": [
             "grpcIdentity"
           ]
