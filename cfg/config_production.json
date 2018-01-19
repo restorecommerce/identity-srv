@@ -10,7 +10,7 @@
   },
   "client": {
     "hbs_templates": {
-      "prefix": "http://console:80/"
+      "prefix": "http://xingular-console:80/"
     },
     "service-notification": {
       "transports": {
