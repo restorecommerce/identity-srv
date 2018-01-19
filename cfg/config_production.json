@@ -10,32 +10,7 @@
   },
   "client": {
     "hbs_templates": {
-      "prefix": "http://xingular-console:80/"
-    },
-    "service-notification": {
-      "transports": {
-        "grpc": {
-          "service": "io.restorecommerce.notification.Service",
-          "timeout": 3000,
-          "protos": [
-            "io/restorecommerce/notification.proto"
-          ],
-          "protoRoot": "./protos/"
-        }
-      },
-      "endpoints": {
-        "send": {
-          "loadbalancer": {
-            "name": "roundRobin"
-          },
-          "publisher": {
-            "name": "static",
-            "instances": [
-              "grpc://identity-srv:50051"
-            ]
-          }
-        }
-      }
+      "prefix": "http://console:80/"
     }
   },
   "database": {
