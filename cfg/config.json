@@ -228,7 +228,13 @@
           "transport": [
             "grpcIdentity"
           ]
+        },
+		"read": {
+          "transport": [
+            "grpcIdentity"
+          ]
         }
+
       },
       "io-restorecommerce-identity-reflection": {
         "serverReflectionInfo": {
