@@ -155,13 +155,6 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.UserList"
       },
-      "personsCreated": {
-        "protos": [
-          "io/restorecommerce/person.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.person.PersonList"
-      },
       "usersModified": {
         "protos": [
           "io/restorecommerce/user.proto"
@@ -169,26 +162,12 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.UserList"
       },
-      "personsModified": {
-        "protos": [
-          "io/restorecommerce/person.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.person.PersonList"
-      },
       "usersDeleted": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.Deleted"
-      },
-      "personsDeleted": {
-        "protos": [
-          "io/restorecommerce/person.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.person.Deleted"
       },
       "registered": {
         "protos": [
@@ -246,6 +225,20 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
       },
+      "versionCommand": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
+      },
+      "versionResponse": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
+      },
       "resetCommand": {
         "protos": [
           "io/restorecommerce/commandinterface.proto"
@@ -285,15 +278,13 @@
         "users": {
           "topic": "io.restorecommerce.users.resource"
         },
-        "persons": {
-          "topic": "io.restorecommerce.persons.resource"
-        },
         "command": {
           "topic": "io.restorecommerce.command",
           "events": [
             "healthCheckCommand",
             "restoreCommand",
-            "resetCommand"
+            "resetCommand",
+            "versionCommand"
           ]
         },
         "rendering": {
@@ -311,33 +302,6 @@
   },
   "server": {
     "services": {
-      "io-restorecommerce-person-srv": {
-        "read": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "create": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "delete": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "update": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "upsert": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        }
-      },
       "io-restorecommerce-user-srv": {
         "activate": {
           "transport": [
@@ -374,31 +338,6 @@
             "grpcIdentity"
           ]
         },
-        "read": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "create": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "delete": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "update": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "upsert": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
         "createUsers": {
           "transport": [
             "grpcIdentity"
@@ -426,13 +365,11 @@
         "provider": "grpc",
         "services": {
           "io-restorecommerce-user-srv": "io.restorecommerce.user.Service",
-          "io-restorecommerce-person-srv": "io.restorecommerce.person.Service",
           "io-restorecommerce-identity-reflection": "grpc.reflection.v1alpha.ServerReflection",
           "io-restorecommerce-identity-cis": "io.restorecommerce.commandinterface.Service"
         },
         "protos": [
           "io/restorecommerce/user.proto",
-          "io/restorecommerce/person.proto",
           "grpc/reflection/v1alpha/reflection.proto",
           "io/restorecommerce/commandinterface.proto"
         ],
@@ -443,7 +380,6 @@
   },
   "serviceNames": {
     "user": "io-restorecommerce-user-srv",
-    "person": "io-restorecommerce-person-srv",
     "reflection": "io-restorecommerce-identity-reflection",
     "cis": "io-restorecommerce-identity-cis"
   }

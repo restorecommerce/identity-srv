@@ -7,10 +7,6 @@ import * as Logger from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { Service } from './service';
 
-const RESTORE_CMD_EVENT = 'restoreCommand';
-const HEALTH_CMD_EVENT = 'healthCheckCommand';
-const HEALTH_RES_EVENT = 'healthCheckResponse';
-const RESET_START_EVENT = 'resetCommand';
 const RESET_DONE_EVENT = 'resetResponse';
 const RENDER_RESPONSE_EVENT = 'identityRenderResponse';
 

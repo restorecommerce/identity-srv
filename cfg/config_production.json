@@ -24,17 +24,6 @@
         }
       },
       "endpoints": {
-        "allHooks": {
-          "loadbalancer": {
-            "name": "roundRobin"
-          },
-          "publisher": {
-            "name": "static",
-            "instances": [
-              "grpc://identity-srv:50051"
-            ]
-          }
-        },
         "send": {
           "loadbalancer": {
             "name": "roundRobin"
@@ -43,50 +32,6 @@
             "name": "static",
             "instances": [
               "grpc://identity-srv:50051"
-            ]
-          }
-        },
-        "getHook": {
-          "loadbalancer": {
-            "name": "roundRobin"
-          },
-          "publisher": {
-            "name": "static",
-            "instances": [
-              "grpc://identity-srv:50051"
-            ]
-          }
-        },
-        "addHook": {
-          "loadbalancer": {
-            "name": "roundRobin"
-          },
-          "publisher": {
-            "name": "static",
-            "instances": [
-              "grpc://identity-srv:50051"
-            ]
-          }
-        },
-        "updateHook": {
-          "loadbalancer": {
-            "name": "roundRobin"
-          },
-          "publisher": {
-            "name": "static",
-            "instances": [
-              "grpc://identity-srv:50051"
-            ]
-          }
-        },
-        "removeHook": {
-          "loadbalancer": {
-            "name": "roundRobin"
-          },
-          "publisher": {
-            "name": "static",
-            "instances": [
-              "grpc://identity-srv:50052"
             ]
           }
         }
@@ -114,17 +59,15 @@
         "provider": "grpc",
         "services": {
           "user": "io.restorecommerce.user.Service",
-          "person": "io.restorecommerce.person.Service",
           "reflection": "grpc.reflection.v1alpha.ServerReflection",
           "commandinterface": "io.restorecommerce.commandinterface.Service"
         },
         "protos": [
           "io/restorecommerce/user.proto",
-          "io/restorecommerce/person.proto",
           "grpc/reflection/v1alpha/reflection.proto",
           "io/restorecommerce/commandinterface.proto"
         ],
-        "protoRoot": "protos/",
+        "protoRoot": "node_modules/@restorecommerce/protos/",
         "addr": "identity-srv:50051"
       }
     ]
