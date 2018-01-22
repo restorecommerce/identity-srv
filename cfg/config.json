@@ -161,7 +161,7 @@
         "messageObject": "io.restorecommerce.notification.Notification"
       },
       "topics": {
-        "users": {
+        "users.resource": {
           "topic": "io.restorecommerce.users.resource"
         },
         "command": {

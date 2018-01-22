@@ -46,7 +46,7 @@ describe('restore-user-srv testing', () => {
 
       events = new Events(cfg.get('events:kafka'), logger);
       await (events.start());
-      topic = events.topic('io.restorecommerce.users.resource');
+      topic = events.topic(cfg.get('events:kafka:topics:users.resource:topic'));
     });
     after(async function disconnect() {
       await client.end();

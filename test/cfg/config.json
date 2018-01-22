@@ -254,7 +254,7 @@
         "messageObject": "io.restorecommerce.rendering.RenderResponse"
       },
       "topics": {
-        "users": {
+        "users.resource": {
           "topic": "io.restorecommerce.users.resource"
         },
         "command": {

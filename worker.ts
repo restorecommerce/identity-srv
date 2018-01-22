@@ -35,9 +35,6 @@ export class Worker {
     const cfg = this.cfg;
     const logger = this.logger;
     const kafkaCfg = cfg.get('events:kafka');
-    const userTopic = kafkaCfg.topics.users.topic;
-    const commandTopic = kafkaCfg.topics.command.topic;
-    const renderingTopic = kafkaCfg.topics.rendering.topic;
 
     // Create a new microservice Server
     const server = new chassis.Server(cfg.get('server'), logger);
@@ -105,7 +102,7 @@ export class Worker {
 
     const hbsTemplates = cfg.get('client:hbs_templates');
     if (hbsTemplates) {
-      await service.setRenderRequestConfigs(this[renderingTopic], hbsTemplates);
+      await service.setRenderRequestConfigs(hbsTemplates);
     }
     // Start server
     await co(server.start());
