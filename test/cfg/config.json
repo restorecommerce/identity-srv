@@ -1,6 +1,7 @@
 {
   "service": {
-    "userActivationRequired": true
+    "userActivationRequired": true,
+    "register": true
   },
   "logger": {
     "console": {

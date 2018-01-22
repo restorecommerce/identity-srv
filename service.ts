@@ -69,6 +69,17 @@ export class Service extends ServiceBase {
     this.logger = logger;
 
     this.emailData = {};
+
+    const serviceCfg = cfg.get('service');
+    if (!serviceCfg.register) {
+      // disabling register-related operations
+      // only raw 'create' operations are allowed in this case
+      logger.warn('Register flag is set to false. User registry-related operations are disabled.');
+      this.register = null;
+      this.unregister = null;
+      this.activate = null;
+      this.isUserActivationRequired = () => { return false; }
+    }
   }
 
   idGen(): string {

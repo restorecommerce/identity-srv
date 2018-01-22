@@ -1,6 +1,7 @@
 {
   "service": {
-    "userActivationRequired": true
+    "userActivationRequired": true,
+    "register": true
   },
   "client": {
     "hbs_templates": {
@@ -23,7 +24,7 @@
       "autoCreate": true,
       "retries": 6,
       "delay": 30000,
-      "collections":[
+      "collections": [
         "users"
       ]
     }
@@ -229,12 +230,11 @@
             "grpcIdentity"
           ]
         },
-		"read": {
+        "read": {
           "transport": [
             "grpcIdentity"
           ]
         }
-
       },
       "io-restorecommerce-identity-reflection": {
         "serverReflectionInfo": {
