@@ -17,13 +17,13 @@
     "srv"
   ],
   "dependencies": {
-    "@restorecommerce/resource-base-interface": "github:restorecommerce/resource-base-interface",
-    "@restorecommerce/cluster-service": "^0.1.0",
     "@restorecommerce/chassis-srv": "github:restorecommerce/chassis-srv",
+    "@restorecommerce/cluster-service": "^0.1.0",
     "@restorecommerce/grpc-client": "github:restorecommerce/grpc-client",
     "@restorecommerce/kafka-client": "^0.1.0",
     "@restorecommerce/logger": "^0.1.0",
     "@restorecommerce/protos": "github:restorecommerce/protos",
+    "@restorecommerce/resource-base-interface": "github:restorecommerce/resource-base-interface",
     "@restorecommerce/service-config": "^0.1.0",
     "bcryptjs": "^2.3.0",
     "co": "^4.6.0",
@@ -34,8 +34,6 @@
   "devDependencies": {
     "@types/mocha": "^2.2.39",
     "@types/should": "^11.2.0",
-    "arangojs": "^5.0.2",
-    "co-mocha": "^1.1.2",
     "coveralls": "^3.0.0",
     "istanbul": "^0.4.4",
     "mocha": "^4.0.1",

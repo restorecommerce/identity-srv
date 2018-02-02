@@ -78,7 +78,7 @@ export class Service extends ServiceBase {
       this.register = null;
       this.unregister = null;
       this.activate = null;
-      this.isUserActivationRequired = () => { return false; }
+      this.isUserActivationRequired = () => { return false; };
     }
   }
 
