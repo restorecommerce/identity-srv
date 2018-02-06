@@ -5,27 +5,19 @@ import * as _ from 'lodash';
 import { Events, Topic } from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
-import { Service } from './service';
+import { UserService, RoleService } from './service';
 
 const RESET_DONE_EVENT = 'resetResponse';
 const RENDER_RESPONSE_EVENT = 'identityRenderResponse';
 
-let service: Service;
 export class Worker {
-  loader: any;
   events: Events;
   server: any;
   logger: Logger;
   cfg: any;
   topics: any;
-  constructor(loader?: any, cfg?: any) {
-    this.loader = loader;
-    if (cfg) {
-      this.cfg = cfg
-    } else {
-      this.cfg = sconfig(process.cwd());
-    }
-
+  constructor(cfg?: any) {
+    this.cfg = cfg || sconfig(process.cwd());
     this.logger = new Logger(this.cfg.get('logger'));
     this.topics = {};
   }
@@ -86,11 +78,13 @@ export class Worker {
     }
 
     // user service
-    logger.verbose('Setting up user service');
-    service = new Service(cfg, this.topics, db, logger, true);
-    await co(server.bind(serviceNamesCfg.user, service));
+    logger.verbose('Setting up user and role services');
+    const roleService = new RoleService(db, this.topics['roles.resource'], logger, true);
+    const userService = new UserService(cfg, this.topics, db, logger, true, roleService);
 
 
+    await co(server.bind(serviceNamesCfg.user, userService));
+    await co(server.bind(serviceNamesCfg.role, roleService));
     await co(server.bind(serviceNamesCfg.cis, cis));
 
     // Add reflection service
@@ -102,7 +96,7 @@ export class Worker {
 
     const hbsTemplates = cfg.get('client:hbs_templates');
     if (hbsTemplates) {
-      await service.setRenderRequestConfigs(hbsTemplates);
+      await userService.setRenderRequestConfigs(hbsTemplates);
     }
     // Start server
     await co(server.start());

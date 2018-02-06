@@ -41,14 +41,19 @@ export interface User {
   password: string; /// Raw password, not stored
   password_hash: string; /// Encrypted password, stored
   guest: boolean;
-  roles: Role[];
+  roles: string[];
 }
 
 export interface Role {
-  type: string;
+  id: string;
+  created: number;
+  modified: number;
+  name: string;
+  description: string;
+  attributes: Map<string, string>;
 }
 
-export class Service extends ServiceBase {
+export class UserService extends ServiceBase {
   db: any;
   topics: any;
   logger: any;
@@ -59,8 +64,9 @@ export class Service extends ServiceBase {
   changeBodyTpl: string;
   emailData: any;
   emailEnabled: boolean;
+  roleService: RoleService;
   constructor(cfg: any, topics: any, db: any, logger: any,
-    isEventsEnabled: boolean) {
+    isEventsEnabled: boolean, roleService: RoleService) {
     super('users', topics['users.resource'], logger, new ResourcesAPIBase(db, 'users'),
       isEventsEnabled);
     this.cfg = cfg;
@@ -80,6 +86,8 @@ export class Service extends ServiceBase {
       this.activate = null;
       this.isUserActivationRequired = () => { return false; };
     }
+
+    this.roleService = roleService;
   }
 
   idGen(): string {
@@ -251,10 +259,24 @@ export class Service extends ServiceBase {
     user.id = this.idGen();
 
     // Check if user has any roles if not register as normal_user
-    if (user.roles.length === 0) {
-      const defaultRole = [{ type: 'normal_user' }];
-      user.roles = defaultRole;
+    // if (user.roles.length === 0) {
+    //   const defaultRole = [{ type: 'normal_user' }];
+    //   user.roles = defaultRole;
+    // }
+
+    // checking if user roles are valid
+    for (let roleID of user.roles) {
+      const result = await this.roleService.read({
+        request: {
+          id: roleID
+        }
+      }, {});
+
+      if (!result || !result.items || result.total_count == 0) {
+        throw new errors.InvalidArgument(`Invalid role ID ${roleID}`);
+      }
     }
+
     dataArray.push(user);
     const serviceCall = {
       request: {
@@ -576,5 +598,35 @@ export class Service extends ServiceBase {
         throw err;
       }
     }
+  }
+}
+
+
+export class RoleService extends ServiceBase {
+  constructor(db: any, roleTopic: kafkaClient.Topic, logger: any, isEventsEnabled: boolean) {
+    super('roles', roleTopic, logger, new ResourcesAPIBase(db, 'roles'), isEventsEnabled);
+  }
+
+  async create(call: any, context?: any) {
+    if (!call || !call.request || !call.request.items || call.request.items.length == 0) {
+      throw new errors.InvalidArgument('No role was provided for creation');
+    }
+
+    for (let role of call.request.items) {
+      // check unique constraint for role name
+      const result = await super.read({
+        request: {
+          filter: {
+            name: role.name
+          }
+        }
+      }, context);
+
+      if (result && result.items && result.items.length > 0) {
+        throw new errors.AlreadyExists(`Role ${role.name} already exists`);
+      }
+    }
+
+    return await super.create(call, context);
   }
 }

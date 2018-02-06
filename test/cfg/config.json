@@ -22,15 +22,7 @@
         "layout": "restore_identity/layout.hbs"
       }
     },
-    "service": {
-      "logger": {
-        "console": {
-          "handleExceptions": false,
-          "level": "silly",
-          "colorize": true,
-          "prettyPrint": true
-        }
-      },
+    "service-user": {
       "transports": {
         "grpc": {
           "service": "io.restorecommerce.user.Service",
@@ -58,6 +50,31 @@
         "register": {},
         "unregister": {},
         "verifyPassword": {},
+        "createUsers": {},
+        "read": {}
+      }
+    },
+    "service-role": {
+      "transports": {
+        "grpc": {
+          "service": "io.restorecommerce.role.Service",
+          "protos": [
+            "io/restorecommerce/role.proto"
+          ],
+          "protoRoot": "node_modules/@restorecommerce/protos/",
+          "timeout": 3000
+        }
+      },
+      "loadbalancer": {
+        "name": "roundRobin"
+      },
+      "publisher": {
+        "name": "static",
+        "instances": [
+          "grpc://localhost:50051"
+        ]
+      },
+      "endpoints": {
         "read": {},
         "create": {},
         "delete": {},
@@ -65,40 +82,7 @@
         "upsert": {}
       }
     },
-    "service-notification": {
-      "transports": {
-        "grpc": {
-          "service": "io.restorecommerce.notification.Service",
-          "timeout": 3000,
-          "protos": [
-            "io/restorecommerce/notification.proto"
-          ],
-          "protoRoot": "node_modules/@restorecommerce/protos/"
-        }
-      },
-      "endpoints": {
-        "send": {
-          "loadbalancer": {
-            "name": "roundRobin"
-          },
-          "publisher": {
-            "name": "static",
-            "instances": [
-              "grpc://localhost:50052"
-            ]
-          }
-        }
-      }
-    },
-    "service-relection": {
-      "logger": {
-        "console": {
-          "handleExceptions": false,
-          "level": "silly",
-          "colorize": true,
-          "prettyPrint": true
-        }
-      },
+    "service-reflection": {
       "transports": {
         "grpc": {
           "service": "grpc.reflection.v1alpha.ServerReflection",
@@ -124,14 +108,6 @@
       }
     },
     "service-ci": {
-      "logger": {
-        "console": {
-          "handleExceptions": false,
-          "level": "silly",
-          "colorize": true,
-          "prettyPrint": true
-        }
-      },
       "transports": {
         "grpc": {
           "service": "io.restorecommerce.commandinterface.Service",
@@ -152,7 +128,6 @@
         ]
       },
       "endpoints": {
-        "reconfigure": {},
         "reset": {},
         "restore": {},
         "check": {},
@@ -168,7 +143,11 @@
       "database": "identity-srv-test",
       "autoCreate": true,
       "retries": 6,
-      "delay": 30000
+      "delay": 30000,
+      "collections": [
+        "users",
+        "roles"
+      ]
     }
   },
   "events": {
@@ -198,12 +177,26 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.User"
       },
-      "usersRead": {
+      "rolesCreated": {
         "protos": [
-          "io/restorecommerce/user.proto"
+          "io/restorecommerce/role.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.user.User"
+        "messageObject": "io.restorecommerce.role.RoleList"
+      },
+      "rolesModified": {
+        "protos": [
+          "io/restorecommerce/role.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.role.RoleList"
+      },
+      "rolesDeleted": {
+        "protos": [
+          "io/restorecommerce/role.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.role.Deleted"
       },
       "registered": {
         "protos": [
@@ -257,6 +250,9 @@
       "topics": {
         "users.resource": {
           "topic": "io.restorecommerce.users.resource"
+        },
+        "roles.resource": {
+          "topic": "io.restorecommerce.roles.resource"
         },
         "command": {
           "topic": "io.restorecommerce.command",
@@ -314,6 +310,18 @@
             "grpcIdentity"
           ]
         },
+        "createUsers": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "read": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        }
+      },
+      "io-restorecommerce-role-srv": {
         "read": {
           "transport": [
             "grpcIdentity"
@@ -324,17 +332,12 @@
             "grpcIdentity"
           ]
         },
+        "modify": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
         "delete": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "update": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "upsert": {
           "transport": [
             "grpcIdentity"
           ]
@@ -381,11 +384,13 @@
         "provider": "grpc",
         "services": {
           "io-restorecommerce-user-srv": "io.restorecommerce.user.Service",
+          "io-restorecommerce-role-srv": "io.restorecommerce.role.Service",
           "io-restorecommerce-identity-reflection": "grpc.reflection.v1alpha.ServerReflection",
           "io-restorecommerce-identity-cis": "io.restorecommerce.commandinterface.Service"
         },
         "protos": [
           "io/restorecommerce/user.proto",
+          "io/restorecommerce/role.proto",
           "grpc/reflection/v1alpha/reflection.proto",
           "io/restorecommerce/commandinterface.proto"
         ],
@@ -396,6 +401,7 @@
   },
   "serviceNames": {
     "user": "io-restorecommerce-user-srv",
+    "role": "io-restorecommerce-role-srv",
     "reflection": "io-restorecommerce-identity-reflection",
     "cis": "io-restorecommerce-identity-cis"
   }
