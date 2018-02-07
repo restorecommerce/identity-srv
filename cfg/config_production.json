@@ -34,7 +34,7 @@
         "provider": "grpc",
         "services": {
           "user": "io.restorecommerce.user.Service",
-		  "role": "io.restorecommerce.role.Service",
+		      "role": "io.restorecommerce.role.Service",
           "reflection": "grpc.reflection.v1alpha.ServerReflection",
           "commandinterface": "io.restorecommerce.commandinterface.Service"
         },
