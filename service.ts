@@ -607,7 +607,7 @@ export class RoleService extends ServiceBase {
     super('roles', roleTopic, logger, new ResourcesAPIBase(db, 'roles'), isEventsEnabled);
   }
 
-  async create(call: any, context?: any) {
+  async create(call: any, context?: any): Promise<any> {
     if (!call || !call.request || !call.request.items || call.request.items.length == 0) {
       throw new errors.InvalidArgument('No role was provided for creation');
     }

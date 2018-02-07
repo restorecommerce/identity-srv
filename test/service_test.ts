@@ -22,6 +22,7 @@ let logger;
 let events;
 let topic;
 let roleID;
+let roleService, userService;
 
 async function start() {
   cfg = sconfig(process.cwd() + '/test');
@@ -52,7 +53,6 @@ describe('testing identity-srv', () => {
   });
 
   describe('testing Role service', () => {
-    let roleService;
 
     describe('with test client', () => {
 
@@ -270,6 +270,11 @@ describe('testing identity-srv', () => {
           await userService.unregister({
             id: testUserID,
           });
+
+          await roleService.delete({
+            ids: user.roles
+          });
+
           const result = await userService.find({
             id: testUserID,
           });
