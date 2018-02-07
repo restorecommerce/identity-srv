@@ -41,7 +41,17 @@ export interface User {
   password: string; /// Raw password, not stored
   password_hash: string; /// Encrypted password, stored
   guest: boolean;
-  roles: string[];
+  role_associations: RoleAssociation[];
+}
+
+export interface RoleAssociation {
+  role: string; // role ID
+  attributes?: Attribute[];
+}
+
+export interface Attribute {
+  id: string;
+  value: string;
 }
 
 export interface Role {
@@ -50,7 +60,6 @@ export interface Role {
   modified: number;
   name: string;
   description: string;
-  attributes: Map<string, string>;
 }
 
 export class UserService extends ServiceBase {
@@ -265,7 +274,8 @@ export class UserService extends ServiceBase {
     // }
 
     // checking if user roles are valid
-    for (let roleID of user.roles) {
+    for (let roleAssociation of user.role_associations) {
+      const roleID = roleAssociation.role;
       const result = await this.roleService.read({
         request: {
           id: roleID

@@ -53,7 +53,6 @@ describe('testing identity-srv', () => {
   });
 
   describe('testing Role service', () => {
-
     describe('with test client', () => {
 
       before(async function connectRoleService() {
@@ -109,14 +108,12 @@ describe('testing identity-srv', () => {
         };
       });
 
-      //     after(async function disconnect() {
-      //       await client.end();
-      //       await events.stop();
-      //     });
-
       describe('calling register', function registerUser() {
         it('should create a user and person', async function registerUser() {
-          user.roles = [roleID];
+          user.role_associations = [{
+            id: roleID,
+            attributes: []
+          }];
 
           const listener = function listener(message, context) {
             user.name.should.equal(message.name);
