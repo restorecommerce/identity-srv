@@ -30,12 +30,12 @@ async function start() {
   await worker.start();
 }
 
-async function connect(clientCfg: string) {
+async function connect(clientCfg: string, resourceName: string) {
   logger = worker.logger;
 
   events = new Events(cfg.get('events:kafka'), logger);
   await (events.start());
-  topic = events.topic(cfg.get('events:kafka:topics:users.resource:topic'));
+  topic = events.topic(cfg.get(`events:kafka:topics:${resourceName}:topic`));
 
   client = new grpcClient.Client(cfg.get(clientCfg), logger);
   const service = await client.connect();
@@ -56,7 +56,7 @@ describe('testing identity-srv', () => {
     describe('with test client', () => {
 
       before(async function connectRoleService() {
-        roleService = await connect('client:service-role');
+        roleService = await connect('client:service-role', 'roles.resource');
       });
 
       it('should create roles', async () => {
@@ -100,7 +100,7 @@ describe('testing identity-srv', () => {
       let testUserID;
       let user;
       before(async function connectUserService() {
-        userService = await connect('client:service-user');
+        userService = await connect('client:service-user', 'users.resource');
         user = {
           name: 'testuser',
           password: 'notsecure',
@@ -111,7 +111,7 @@ describe('testing identity-srv', () => {
       describe('calling register', function registerUser() {
         it('should create a user and person', async function registerUser() {
           user.role_associations = [{
-            id: roleID,
+            role: roleID,
             attributes: []
           }];
 
@@ -269,7 +269,7 @@ describe('testing identity-srv', () => {
           });
 
           await roleService.delete({
-            ids: user.roles
+            ids: user.role_associations[0].role
           });
 
           const result = await userService.find({

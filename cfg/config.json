@@ -62,14 +62,14 @@
           "io/restorecommerce/role.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.role.RoleList"
+        "messageObject": "io.restorecommerce.role.Role"
       },
       "rolesModified": {
         "protos": [
           "io/restorecommerce/role.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.role.RoleList"
+        "messageObject": "io.restorecommerce.role.Role"
       },
       "rolesDeleted": {
         "protos": [
