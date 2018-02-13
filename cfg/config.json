@@ -169,7 +169,7 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.rendering.RenderRequest"
       },
-      "identityRenderResponse": {
+      "renderResponse": {
         "protos": [
           "io/restorecommerce/rendering.proto"
         ],
@@ -202,7 +202,7 @@
         "rendering": {
           "topic": "io.restorecommerce.rendering",
           "events": [
-            "identityRenderResponse"
+            "renderResponse"
           ]
         },
         "notification": {

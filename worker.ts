@@ -8,7 +8,7 @@ import * as chassis from '@restorecommerce/chassis-srv';
 import { UserService, RoleService } from './service';
 
 const RESET_DONE_EVENT = 'resetResponse';
-const RENDER_RESPONSE_EVENT = 'identityRenderResponse';
+const RENDER_RESPONSE_EVENT = 'renderResponse';
 
 export class Worker {
   events: Events;

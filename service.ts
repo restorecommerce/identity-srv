@@ -316,7 +316,6 @@ export class UserService extends ServiceBase {
 
       const renderRequest = {
         id: user.email,
-        service_name: 'identity-srv',
         payload: [{
           templates: JSON.stringify({
             body: { body: this.registerBodyTpl, layout: this.layoutTpl },
@@ -499,7 +498,6 @@ export class UserService extends ServiceBase {
 
       const renderRequest = {
         id: user.email,
-        service_name: 'identity-srv',
         payload: [{
           templates: JSON.stringify({
             body: { body: this.changeBodyTpl, layout: this.layoutTpl },
