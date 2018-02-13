@@ -41,14 +41,14 @@
           "io/restorecommerce/user.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.user.UserList"
+        "messageObject": "io.restorecommerce.user.User"
       },
       "usersModified": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.user.UserList"
+        "messageObject": "io.restorecommerce.user.User"
       },
       "usersDeleted": {
         "protos": [
