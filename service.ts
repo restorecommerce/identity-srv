@@ -222,16 +222,12 @@ export class UserService extends ServiceBase {
     if (!user.name) {
       throw new errors.InvalidArgument('argument name is empty');
     }
-    // Check if user does already exist
-    if (_.isNil(user.id)) {
-      user.id = util.format('/%s/%s', 'users', user.name);
-    }
+
     logger.silly(
       util.format('register is checking id:%s name:%s and email:%s',
-        user.id, user.name, user.email));
+        user.name, user.email));
     const filter = toStruct({
       $or: [
-        { id: user.id },
         { name: user.name },
         { email: user.email },
       ]
@@ -263,15 +259,8 @@ export class UserService extends ServiceBase {
     user.password_hash = password.hash(user.password);
     delete user.password;
 
-    // converting the userID to idGen() to eliminate dependency from changing
-    // usernames
+    // generating user ID
     user.id = this.idGen();
-
-    // Check if user has any roles if not register as normal_user
-    // if (user.roles.length === 0) {
-    //   const defaultRole = [{ type: 'normal_user' }];
-    //   user.roles = defaultRole;
-    // }
 
     // checking if user roles are valid
     for (let roleAssociation of user.role_associations) {
@@ -293,6 +282,7 @@ export class UserService extends ServiceBase {
         items: dataArray
       }
     };
+
     await super.create(serviceCall, context);
     logger.info('user registered', user);
     await this.topics['users.resource'].emit('registered', user);
