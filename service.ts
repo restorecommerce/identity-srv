@@ -284,6 +284,10 @@ export class UserService extends ServiceBase {
     delete this.emailData[renderResponse.id];
   }
 
+  idGen(): string {
+    return uuid.v4().replace(/-/g, '');
+  }
+
   /**
    * Endpoint to activate a User
    *  @param  {Call} call request containing user details
@@ -576,7 +580,7 @@ export class RoleService extends ServiceBase {
     // checking if user roles are valid
     for (let roleAssociation of roleAssociations) {
       const roleID = roleAssociation.role;
-      const result = await this.read({
+      const result = await super.read({
         request: {
           id: roleID
         }
