@@ -32,13 +32,23 @@ A User resource.
 | active | bool | optional | If the user was activated via the activation process |
 | activation_code | string | optional | Activation code used in the activation process |
 | password | string | required | Raw password, not stored |
-| passwordHash | bytes | optional | Encrypted password, stored |
+| password_hash | bytes | optional | Encrypted password, stored |
 | guest | bool | optional | A guest user. |
-| Role | [ ]Role | optional | Role |
+| role_associations | [ ] `io.restorecommerce.user.RoleAssociation` | optional | Role associations |
+
+`io.restorecommerce.user.RoleAssociation`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| Role | string | optional | role of user |
+| role | string | required | role identifier |
+| Attribute | [ ] `io.restorecommerce.user.RoleAssociation.Attribute` | optional | attributes associated with User|
+
+`io.restorecommerce.user.RoleAssociation.Attribute`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | string | optional | attribute identifier |
+| id | string | optional | attribute value |
 
 A list of User resources.
 
@@ -46,7 +56,7 @@ A list of User resources.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| items | [ ]io.restorecommerce.user.User | required | List of Users |
+| items | [ ]`io.restorecommerce.user.User` | required | List of Users |
 | total_count | number | optional | number of Users |
 
 #### Register
@@ -131,19 +141,43 @@ Used to find the User details. Requests are performed providing `io.restorecomme
 | name | string | required | User name |
 | email | string | required | User EmailID |
 
+### Role
+A Role resource.
+
+`io.restorecommerce.role.Role`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | string | required | Role identifier |
+| name | string | required | specifies the Role of the User |
+| description | string | optional | Role description |
+| created | double | optional | Role created date |
+| modified | double | optional | Role modified date |
+
+
 #### CRUD Operations
 The microservice exposes the below CRUD operations for creating or
-modifying User resource.
+modifying User and Role resources.
 
 `io.restorecommerce.user.Service`
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| Create | io.restorecommerce.user.UserList | io.restorecommerce.user.UserList | Create a list of User resources |
-| Read | io.restorecommerce.resourcebase.ReadRequest | io.restorecommerce.user.UserList | Read a list of User resources |
-| Update | io.restorecommerce.user.UserList | io.restorecommerce.user.UserList | Update a list of User resources |
-| Delete | io.restorecommerce.resourcebase.DeleteRequest | Empty | Delete a list of User resources |
-| Upsert | io.restorecommerce.user.UserList | io.restorecommerce.user.UserList | Create or Update a list of User resources |
+| Create | `io.restorecommerce.user.UserList` | `io.restorecommerce.user.UserList` | Create a list of User resources |
+| Read | `io.restorecommerce.resourcebase.ReadRequest` | `io.restorecommerce.user.UserList` | Read a list of User resources |
+| Update | `io.restorecommerce.user.UserList` | `io.restorecommerce.user.UserList` | Update a list of User resources |
+| Delete | `io.restorecommerce.resourcebase.DeleteRequest` | Empty | Delete a list of User resources |
+| Upsert | `io.restorecommerce.user.UserList` | `io.restorecommerce.user.UserList` | Create or Update a list of User resources |
+
+`io.restorecommerce.role.Service`
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| Create | `io.restorecommerce.user.RoleList` | `io.restorecommerce.user.RoleList` | Create a list of Role resources |
+| Read | `io.restorecommerce.resourcebase.ReadRequest` | `io.restorecommerce.user.RoleList` | Read a list of Role resources |
+| Update | `io.restorecommerce.user.RoleList` | `io.restorecommerce.user.RoleList` | Update a list of Role resources |
+| Delete | `io.restorecommerce.resourcebase.DeleteRequest` | Empty | Delete a list of Role resources |
+| Upsert | `io.restorecommerce.user.RoleList` | `io.restorecommerce.user.RoleList` | Create or Update a list of Role resources |
 
 For the detailed protobuf message structure of `io.restorecommerce.resourcebase.ReadRequest` and `io.restorecommerce.resourcebase.DeleteRequest` refer [resource-base-interface](https://github.com/restorecommerce/resource-base-interface).
 
@@ -152,10 +186,11 @@ For the detailed protobuf message structure of `io.restorecommerce.resourcebase.
 This microservice subscribes to the following Kafka events by topic:
 - io.restorecommerce.command
   - restoreCommand
-  - healthCheckCommand
   - resetCommand
+  - healthCheckCommand
+  - versionCommand
 - io.restorecommerce.rendering
-  - identityRenderResponse
+  - renderResponse
 
 List of events emitted to Kafka by this microservice for below topics:
 - io.restorecommerce.users.resource
@@ -167,16 +202,22 @@ List of events emitted to Kafka by this microservice for below topics:
   - usersCreated
   - usersModified
   - usersDeleted
+- io.restorecommerce.roles.resource
+  - rolesCreated
+  - rolesModified
+  - rolesDeleted
 - io.restorecommerce.notification
   - sendEmail
 - io.restorecommerce.rendering
   - renderRequest
 - io.restorecommerce.command
-  - healthCheckResponse
+  - restoreResponse
   - resetResponse
+  - healthCheckResponse
+  - versionResponse
 
-For `sendEmail` event protobuf message structure see [notification-srv](https://github.com/restorecommerce/notification-srv)
-and for `renderRequest` event protobuf message structure see [rendering-srv](https://github.com/restorecommerce/rendering-srv).
+For `sendEmail` event protobuf message structure see [notification-srv](https://github.com/restorecommerce/notification-srv),
+for `renderRequest` and `renderResponse` event protobuf message structure see [rendering-srv](https://github.com/restorecommerce/rendering-srv).
 
 ## Chassis Service
 
