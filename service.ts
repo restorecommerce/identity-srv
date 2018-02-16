@@ -145,30 +145,6 @@ export class UserService extends ServiceBase {
   }
 
   /**
-   * converts a user to a guest
-   * @param  {User} user
-   * @return {object} user
-   */
-  makeGuest(user: User): Object {
-    const id: string = this.idGen();
-    return {
-      id: this.makeID('users', id),
-      name: id,
-      guest: true,
-    };
-  }
-
-  /**
-   * Returns an ID based on collection name and document name.
-   * @param  {string} collectionName
-   * @param  {string} documentName
-   * @return {string} id based on collection and document name.
-   */
-  makeID(collectionName: string, documentName: string): string {
-    return util.format('/%s/%s', collectionName, documentName);
-  }
-
-  /**
    * Endpoint createUsers, register a list of users or guest users.
    * @param  {any} call request containing a list of Users
    * @param {context}
@@ -178,10 +154,18 @@ export class UserService extends ServiceBase {
     const userListReturn = [];
     const that = this;
     const usersList = call.request.items;
-    _.forEach(usersList, async function (user: User): Promise<any> {
-      const callReq: any = { request: user };
-      userListReturn.push(await that.register(callReq, context));
-    });
+    for (let i = 0; i < usersList.length; i++) {
+      const user = usersList[i];
+      user.password_hash = password.hash(user.password);
+      delete user.password;
+      user.active = true;
+
+      if (!this.roleService.verifyRoles(user.role_associations)) {
+        throw new errors.InvalidArgument(`Invalid role ID in role associations`);
+      }
+    }
+
+    await this.create(call, context);
     return userListReturn;
   }
 
@@ -199,7 +183,7 @@ export class UserService extends ServiceBase {
     // Guest creation
     if (user.guest) {
       logger.silly('request to register a guest');
-      const guest = this.makeGuest(user);
+
       dataArray.push(user);
       let serviceCall = {
         request: {
@@ -207,9 +191,9 @@ export class UserService extends ServiceBase {
         }
       };
       await super.create(serviceCall, context);
-      logger.info('guest user registered', guest);
-      await (this.topics['users.resource'].emit('registered', guest));
-      return guest;
+      logger.info('guest user registered', user);
+      await (this.topics['users.resource'].emit('registered', user));
+      return user;
     }
     // User creation
     logger.silly('request to register a user');
@@ -239,11 +223,6 @@ export class UserService extends ServiceBase {
     }
     logger.silly('user does not exist');
 
-    // Set User created and modified date as same initially
-    // date is stored in seconds in arangoDB i.e. numeric time stamp
-    user.created = (new Date()).getTime();
-    user.modified = (new Date()).getTime();
-
     // Create User
     const userActivationRequired: Boolean = this.isUserActivationRequired();
     logger.silly('user activation required', userActivationRequired);
@@ -259,21 +238,8 @@ export class UserService extends ServiceBase {
     user.password_hash = password.hash(user.password);
     delete user.password;
 
-    // generating user ID
-    user.id = this.idGen();
-
-    // checking if user roles are valid
-    for (let roleAssociation of user.role_associations) {
-      const roleID = roleAssociation.role;
-      const result = await this.roleService.read({
-        request: {
-          id: roleID
-        }
-      }, {});
-
-      if (!result || !result.items || result.total_count == 0) {
-        throw new errors.InvalidArgument(`Invalid role ID ${roleID}`);
-      }
+    if (!this.roleService.verifyRoles(user.role_associations)) {
+      throw new errors.InvalidArgument(`Invalid role ID in role associations`);
     }
 
     dataArray.push(user);
@@ -626,5 +592,23 @@ export class RoleService extends ServiceBase {
     }
 
     return await super.create(call, context);
+  }
+
+  async verifyRoles(roleAssociations: RoleAssociation[]): Promise<boolean> {
+    // checking if user roles are valid
+    for (let roleAssociation of roleAssociations) {
+      const roleID = roleAssociation.role;
+      const result = await this.read({
+        request: {
+          id: roleID
+        }
+      }, {});
+
+      if (!result || !result.items || result.total_count == 0) {
+        return false;
+      }
+    }
+
+    return true;
   }
 }
