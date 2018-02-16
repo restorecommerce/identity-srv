@@ -84,23 +84,7 @@ export class UserService extends ServiceBase {
     this.logger = logger;
 
     this.emailData = {};
-
-    const serviceCfg = cfg.get('service');
-    if (!serviceCfg.register) {
-      // disabling register-related operations
-      // only raw 'create' operations are allowed in this case
-      logger.warn('Register flag is set to false. User registry-related operations are disabled.');
-      this.register = null;
-      this.unregister = null;
-      this.activate = null;
-      this.isUserActivationRequired = () => { return false; };
-    }
-
     this.roleService = roleService;
-  }
-
-  idGen(): string {
-    return uuid.v4().replace(/-/g, '');
   }
 
   /**
@@ -138,34 +122,28 @@ export class UserService extends ServiceBase {
   isUserActivationRequired(): Boolean {
     const userActivationRequired: boolean = this.cfg.get('service:userActivationRequired');
     if (_.isNil(userActivationRequired)) {
-      this.logger.warn('service:userActivationRequired config does not exist');
+      this.logger.warn('User activation is disabled');
       return false;
     }
     return userActivationRequired;
   }
 
   /**
-   * Endpoint createUsers, register a list of users or guest users.
+   * Extends ServiceBase.create()
    * @param  {any} call request containing a list of Users
    * @param {context}
    * @return type is any since it can be guest or user type
    */
-  async createUsers(call: any, context: any): Promise<any> {
+  async create(call: any, context: any): Promise<any> {
     const userListReturn = [];
     const that = this;
     const usersList = call.request.items;
     for (let i = 0; i < usersList.length; i++) {
       const user = usersList[i];
-      user.password_hash = password.hash(user.password);
-      delete user.password;
+      await this.register(user, context);
       user.active = true;
-
-      if (!this.roleService.verifyRoles(user.role_associations)) {
-        throw new errors.InvalidArgument(`Invalid role ID in role associations`);
-      }
     }
 
-    await this.create(call, context);
     return userListReturn;
   }
 

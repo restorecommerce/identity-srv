@@ -50,7 +50,7 @@
         "register": {},
         "unregister": {},
         "verifyPassword": {},
-        "createUsers": {},
+        "create": {},
         "read": {},
         "delete": {}
       }
@@ -311,7 +311,7 @@
             "grpcIdentity"
           ]
         },
-        "createUsers": {
+        "create": {
           "transport": [
             "grpcIdentity"
           ]

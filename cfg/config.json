@@ -257,7 +257,7 @@
             "grpcIdentity"
           ]
         },
-        "createUsers": {
+        "create": {
           "transport": [
             "grpcIdentity"
           ]
