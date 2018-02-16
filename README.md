@@ -34,7 +34,7 @@ A User resource.
 | password | string | required | Raw password, not stored |
 | password_hash | bytes | optional | Encrypted password, stored |
 | guest | bool | optional | A guest user. |
-| role_associations | []`io.restorecommerce.user.RoleAssociation` | optional | Role associations |
+| role_associations | [ ] `io.restorecommerce.user.RoleAssociation` | optional | Role associations |
 
 `io.restorecommerce.user.RoleAssociation`
 
@@ -162,8 +162,9 @@ For the detailed protobuf message structure of `io.restorecommerce.resourcebase.
 This microservice subscribes to the following Kafka events by topic:
 - io.restorecommerce.command
   - restoreCommand
-  - healthCheckCommand
   - resetCommand
+  - healthCheckCommand
+  - versionCommand
 - io.restorecommerce.rendering
   - renderResponse
 
@@ -182,8 +183,10 @@ List of events emitted to Kafka by this microservice for below topics:
 - io.restorecommerce.rendering
   - renderRequest
 - io.restorecommerce.command
-  - healthCheckResponse
+  - restoreResponse
   - resetResponse
+  - healthCheckResponse
+  - versionResponse
 
 For `sendEmail` event protobuf message structure see [notification-srv](https://github.com/restorecommerce/notification-srv),
 for `renderRequest` and `renderResponse` event protobuf message structure see [rendering-srv](https://github.com/restorecommerce/rendering-srv).
