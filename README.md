@@ -64,7 +64,7 @@ Used to register a User.
 Requests are performed providing `io.restorecommerce.user.RegisterRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message. If a valid configuration for retrieving email-related [handlebars](http://handlebarsjs.com/) templates from a remote server is provided, an email request is performed upon a successful registration. Such config should correspond to the `client/hbs_templates` element in the config files. The email contains the user's activation code. Email requests are done by emitting a`sendEmail` notification event, which is consumed by [notification-srv](http://github.com/restorecommerce/notification-srv) to send an email. 
 Please note that this email operation also implies template rendering, which is performed by emitting a `renderRequest` event, which is consumed by the [rendering-srv](http://github.com/restorecommerce/rendering-srv). Therefore, the email sending step requires both a running instance of the rendering-srv and the notification-srv (or similar services which implement the given interfaces) as well as a remote server containing a set of email templates. This is decoupled from the service's core functionalities and it is automatically disabled if no templates configuration is provided. 
 
-Moreover, the `register` operation itself is optional and one can enable or disable it through the `service.register` configuration value. If disabled, the only endpoint for user creation is `createUsers`.
+Moreover, the `register` operation itself is optional and one can enable or disable it through the `service.register` configuration value. If disabled, the only endpoint for user creation is `create`.
 
 `io.restorecommerce.user.RegisterRequest`
 
