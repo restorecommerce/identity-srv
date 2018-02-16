@@ -202,6 +202,10 @@ List of events emitted to Kafka by this microservice for below topics:
   - usersCreated
   - usersModified
   - usersDeleted
+- io.restorecommerce.roles.resource
+  - rolesCreated
+  - rolesModified
+  - rolesDeleted
 - io.restorecommerce.notification
   - sendEmail
 - io.restorecommerce.rendering
