@@ -141,9 +141,23 @@ Used to find the User details. Requests are performed providing `io.restorecomme
 | name | string | required | User name |
 | email | string | required | User EmailID |
 
+### Role
+A Role resource.
+
+`io.restorecommerce.role.Role`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | string | required | Role identifier |
+| name | string | required | specifies the Role of the User |
+| description | string | optional | Role description |
+| created | double | optional | Role created date |
+| modified | double | optional | Role modified date |
+
+
 #### CRUD Operations
 The microservice exposes the below CRUD operations for creating or
-modifying User resource.
+modifying User and Role resources.
 
 `io.restorecommerce.user.Service`
 
@@ -154,6 +168,16 @@ modifying User resource.
 | Update | `io.restorecommerce.user.UserList` | `io.restorecommerce.user.UserList` | Update a list of User resources |
 | Delete | `io.restorecommerce.resourcebase.DeleteRequest` | Empty | Delete a list of User resources |
 | Upsert | `io.restorecommerce.user.UserList` | `io.restorecommerce.user.UserList` | Create or Update a list of User resources |
+
+`io.restorecommerce.role.Service`
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| Create | `io.restorecommerce.user.RoleList` | `io.restorecommerce.user.RoleList` | Create a list of Role resources |
+| Read | `io.restorecommerce.resourcebase.ReadRequest` | `io.restorecommerce.user.RoleList` | Read a list of Role resources |
+| Update | `io.restorecommerce.user.RoleList` | `io.restorecommerce.user.RoleList` | Update a list of Role resources |
+| Delete | `io.restorecommerce.resourcebase.DeleteRequest` | Empty | Delete a list of Role resources |
+| Upsert | `io.restorecommerce.user.RoleList` | `io.restorecommerce.user.RoleList` | Create or Update a list of Role resources |
 
 For the detailed protobuf message structure of `io.restorecommerce.resourcebase.ReadRequest` and `io.restorecommerce.resourcebase.DeleteRequest` refer [resource-base-interface](https://github.com/restorecommerce/resource-base-interface).
 
