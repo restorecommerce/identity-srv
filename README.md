@@ -34,14 +34,14 @@ A User resource.
 | password | string | required | Raw password, not stored |
 | password_hash | bytes | optional | Encrypted password, stored |
 | guest | bool | optional | A guest user. |
-| role_associations | [ ]`io.restorecommerce.user.RoleAssociation` | optional | Roles with attributes associated with User |
+| role_associations | []`io.restorecommerce.user.RoleAssociation` | optional | Role associations |
 
 `io.restorecommerce.user.RoleAssociation`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | role | string | required | role identifier |
-| Attribute | [ ] `io.restorecommerce.user.RoleAssociation.Attribute` | optional | attributes associated with User |
+| Attribute | [ ] `io.restorecommerce.user.RoleAssociation.Attribute` | optional | attributes associated with User|
 
 `io.restorecommerce.user.RoleAssociation.Attribute`
 
@@ -165,7 +165,7 @@ This microservice subscribes to the following Kafka events by topic:
   - healthCheckCommand
   - resetCommand
 - io.restorecommerce.rendering
-  - identityRenderResponse
+  - renderResponse
 
 List of events emitted to Kafka by this microservice for below topics:
 - io.restorecommerce.users.resource
@@ -185,8 +185,8 @@ List of events emitted to Kafka by this microservice for below topics:
   - healthCheckResponse
   - resetResponse
 
-For `sendEmail` event protobuf message structure see [notification-srv](https://github.com/restorecommerce/notification-srv)
-and for `renderRequest` event protobuf message structure see [rendering-srv](https://github.com/restorecommerce/rendering-srv).
+For `sendEmail` event protobuf message structure see [notification-srv](https://github.com/restorecommerce/notification-srv),
+for `renderRequest` and `renderResponse` event protobuf message structure see [rendering-srv](https://github.com/restorecommerce/rendering-srv).
 
 ## Chassis Service
 
