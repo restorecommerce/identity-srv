@@ -7,9 +7,9 @@
 [depend]: https://img.shields.io/david/restorecommerce/identity-srv.svg?style=flat-square
 [cover]: http://img.shields.io/coveralls/restorecommerce/identity-srv/master.svg?style=flat-square
 
-This microservice handles the user resource.
+This microservice handles the User and Role resources.
 It provides a [gRPC](https://grpc.io/docs) interface for handling CRUD operations and user-specific functionalities.
-This service persists user data within an ArangoDB instance and generic asynchronous communication is performed with [Apache Kafka](https://kafka.apache.org/), using an event-driven approach with message interfaces defined with [Protocol Buffers](https://developers.google.com/protocol-buffers/) (see [kafka-client](https://github.com/restorecommerce/kafka-client) for more information). User-specific operations are implemented and exposed through the [UserService](service.ts), which is a extension of the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface) generic class `ServiceBase`.
+This service persists user data within an ArangoDB instance and generic asynchronous communication is performed with [Apache Kafka](https://kafka.apache.org/), using an event-driven approach with message interfaces defined with [Protocol Buffers](https://developers.google.com/protocol-buffers/) (see [kafka-client](https://github.com/restorecommerce/kafka-client) for more information). Resource-handling operations are implemented and exposed through the [UserService and the RoleService](service.ts), which extend the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface) generic class `ServiceBase`.
 
 
 ## gRPC Interface
@@ -62,7 +62,9 @@ A list of User resources.
 #### Register
 Used to register a User.
 Requests are performed providing `io.restorecommerce.user.RegisterRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message. If a valid configuration for retrieving email-related [handlebars](http://handlebarsjs.com/) templates from a remote server is provided, an email request is performed upon a successful registration. Such config should correspond to the `client/hbs_templates` element in the config files. The email contains the user's activation code. Email requests are done by emitting a`sendEmail` notification event, which is consumed by [notification-srv](http://github.com/restorecommerce/notification-srv) to send an email. 
-Please note that this email operation also implies template rendering, which is performed by emitting a `renderRequest` event, which is consumed by the [rendering-srv](http://github.com/restorecommerce/rendering-srv). Therefore, the email sending step requires both a running instance of the rendering-srv and the notification-srv (or similar services which implement the given interfaces) as well as a remote server containing a set of email templates.
+Please note that this email operation also implies template rendering, which is performed by emitting a `renderRequest` event, which is consumed by the [rendering-srv](http://github.com/restorecommerce/rendering-srv). Therefore, the email sending step requires both a running instance of the rendering-srv and the notification-srv (or similar services which implement the given interfaces) as well as a remote server containing a set of email templates. This is decoupled from the service's core functionalities and it is automatically disabled if no templates configuration is provided. 
+
+Moreover, the `register` operation itself is optional and one can enable or disable it through the `service.register` configuration value. If disabled, the only endpoint for user creation is `createUsers`.
 
 `io.restorecommerce.user.RegisterRequest`
 
@@ -118,9 +120,6 @@ Used to verify the password of the User. Requests are performed providing `io.re
 | user | string | required | User name |
 | password | string | required | Raw password |
 
-#### CreateUsers
-Used for bulk creation of Users. Requests are performed providing `io.restorecommerce.user.UserList` protobuf message as input and responses are a `io.restorecommerce.user.UserList` message.
-
 #### Unregister
 Used to unregister a User. Requests are performed providing `io.restorecommerce.user.UnregisterRequest` protobuf message as input and responses are a `google.protobuf.Empty` message.
 
@@ -131,7 +130,7 @@ Used to unregister a User. Requests are performed providing `io.restorecommerce.
 | id | string | required | User ID |
 
 #### Find
-Used to find the User details. Requests are performed providing `io.restorecommerce.user.FindRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message.
+A simplified version of `read`, which only filters users by username, email and/or ID. Requests are performed providing `io.restorecommerce.user.FindRequest` protobuf message as input and responses contain a list  `io.restorecommerce.user.User` messages.
 
 `io.restorecommerce.user.FindRequest`
 
