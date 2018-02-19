@@ -11,6 +11,11 @@
       "prettyPrint": true
     }
   },
+  "redis": {
+    "host": "localhost",
+    "port": 6379,
+    "interval": 1000
+  },
   "client": {
     "hbs_templates": {
       "url": true,
