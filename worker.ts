@@ -16,6 +16,7 @@ export class Worker {
   logger: Logger;
   cfg: any;
   topics: any;
+  offsetStore: chassis.OffsetStore;
   constructor(cfg?: any) {
     this.cfg = cfg || sconfig(process.cwd());
     this.logger = new Logger(this.cfg.get('logger'));
@@ -62,6 +63,7 @@ export class Worker {
     logger.verbose('Setting up topics');
     const events = new Events(cfg.get('events:kafka'), logger);
     await events.start();
+    this.offsetStore = new chassis.OffsetStore(events, cfg, logger);
 
     // Enable events firing for resource api using config
     let isEventsEnabled = cfg.get('events:enableEvents');
@@ -83,18 +85,23 @@ export class Worker {
     for (let topicType of topicTypes) {
       const topicName = kafkaCfg.topics[topicType].topic;
       this.topics[topicType] = events.topic(topicName);
+      const offSetValue = await this.offsetStore.getOffset(topicName);
+      logger.info('subscribing to topic with offset value', topicName, offSetValue);
       if (kafkaCfg.topics[topicType].events) {
         const eventNames = kafkaCfg.topics[topicType].events;
         for (let eventName of eventNames) {
-          await this.topics[topicType].on(eventName, identityServiceEventListener);
+          await this.topics[topicType].on(eventName,
+            identityServiceEventListener, offSetValue);
         }
       }
     }
 
     // user service
     logger.verbose('Setting up user and role services');
-    const roleService = new RoleService(db, this.topics['roles.resource'], logger, true);
-    const userService = new UserService(cfg, this.topics, db, logger, true, roleService);
+    const roleService = new RoleService(db,
+      this.topics['roles.resource'], logger, true);
+    const userService = new UserService(cfg,
+      this.topics, db, logger, true, roleService);
 
     await co(server.bind(serviceNamesCfg.user, userService));
     await co(server.bind(serviceNamesCfg.role, roleService));
@@ -113,6 +120,9 @@ export class Worker {
     }
     // Start server
     await co(server.start());
+    // delay to avoid updating of the latestOffset to redis instantly
+    // as the current offSetValue needs to be used for subscribing to topic
+    setTimeout(this.offsetStore.updateTopicOffsets.bind(this.offsetStore), 5000);
 
     this.events = events;
     this.server = server;
@@ -122,6 +132,7 @@ export class Worker {
     this.logger.info('Shutting down');
     await co(this.server.end());
     await this.events.stop();
+    await this.offsetStore.stop();
   }
 }
 
@@ -141,6 +152,12 @@ class UserCommandInterface extends chassis.CommandInterface {
         context: any, config: any, eventName: string): Promise<any> {
         await co(db.update(collectionName, { id: message.id }),
           message);
+        return {};
+      },
+      emailIdChanged: async function restorePasswordChange(message: any,
+        context: any, config: any, eventName: string): Promise<any> {
+        await co(db.update(collectionName, { id: message.id }),
+          { email: message.email });
         return {};
       },
       passwordChanged: async function restorePasswordChange(message: any,

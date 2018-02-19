@@ -8,6 +8,9 @@
       "source": "identity-srv"
     }
   },
+  "redis": {
+    "host": "redis"
+  },
   "client": {
     "hbs_templates": {
       "prefix": "http://console:80/"
