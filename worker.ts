@@ -7,7 +7,6 @@ import * as Logger from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { UserService, RoleService } from './service';
 
-const RESET_DONE_EVENT = 'resetResponse';
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 
 export class Worker {
@@ -77,8 +76,14 @@ export class Worker {
 
     let identityServiceEventListener = async function eventListener(msg: any,
       context: any, config: any, eventName: string): Promise<any> {
-      // command events
-      await cis.command(msg, context);
+      if (eventName === RENDER_RESPONSE_EVENT) {
+        if (userService.emailEnabled) {
+          await userService.sendEmail(msg);
+        }
+      } else {
+        // command events
+        await cis.command(msg, context);
+      }
     };
 
     const topicTypes = _.keys(kafkaCfg.topics);
@@ -120,9 +125,6 @@ export class Worker {
     }
     // Start server
     await co(server.start());
-    // delay to avoid updating of the latestOffset to redis instantly
-    // as the current offSetValue needs to be used for subscribing to topic
-    setTimeout(this.offsetStore.updateTopicOffsets.bind(this.offsetStore), 5000);
 
     this.events = events;
     this.server = server;

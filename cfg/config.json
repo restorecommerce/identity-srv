@@ -33,7 +33,8 @@
   "redis": {
     "host": "localhost",
     "port": 6379,
-    "interval": 1000
+    "interval": 1000,
+    "db": 0
   },
   "events": {
     "kafka": {
