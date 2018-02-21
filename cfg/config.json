@@ -34,7 +34,9 @@
     "host": "localhost",
     "port": 6379,
     "interval": 1000,
-    "db": 0
+    "db-indexes": {
+      "db-offsetStore": 0
+    }
   },
   "events": {
     "kafka": {
