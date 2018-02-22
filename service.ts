@@ -153,10 +153,9 @@ export class UserService extends ServiceBase {
    * @param {context}
    * @return type is any since it can be guest or user type
    */
-  async register(call: Call, context: any): Promise<any> {
-    const request = call.request;
+  async register(call: any, context: any): Promise<any> {
     let dataArray = [];
-    const user: User = request;
+    const user: User = call.request || call;
     const logger = context.logger;
     // Guest creation
     if (user.guest) {
