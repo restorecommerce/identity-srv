@@ -12,7 +12,7 @@ import * as sconfig from '@restorecommerce/service-config';
 const Events = kafkaClient.Events;
 
 /*
- * Note: To run this test, a running ArangoDB and Kafka instance is required.
+ * Note: To run this test, a running ArangoDB, Redis and Kafka instance is required.
  */
 let cfg: any;
 let worker: Worker;
