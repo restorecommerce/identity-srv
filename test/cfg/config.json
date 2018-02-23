@@ -165,6 +165,7 @@
       "groupId": "restore-identity-srv-test",
       "clientId": "restore-identity-srv-test",
       "connectionString": "0.0.0.0:2181",
+      "latestOffset": true,
       "usersModified": {
         "protos": [
           "io/restorecommerce/user.proto"
