@@ -270,11 +270,14 @@ export class UserService extends ServiceBase {
    */
   async sendEmail(renderResponse: any): Promise<any> {
     const emailAddress = renderResponse.id;
+    if (!this.emailData[emailAddress]) {
+      this.logger.silly('Unknown rendering response with ID', emailAddress, '; discarding message.');
+      return;
+    }
+
     const response = renderResponse.response[0];
     const data = this.emailData[emailAddress];
-    if (!data) {
-      this.logger.error('No email data for rendering response', JSON.stringify(renderResponse));
-    }
+
     const emailData = data.data;
     const responseObj = JSON.parse(response.content);
     emailData.body = responseObj.body;
