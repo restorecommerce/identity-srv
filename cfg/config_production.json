@@ -36,10 +36,10 @@
         "name": "grpcIdentity",
         "provider": "grpc",
         "services": {
-          "user": "io.restorecommerce.user.Service",
-		      "role": "io.restorecommerce.role.Service",
-          "reflection": "grpc.reflection.v1alpha.ServerReflection",
-          "commandinterface": "io.restorecommerce.commandinterface.Service"
+          "io-restorecommerce-user-srv": "io.restorecommerce.user.Service",
+          "io-restorecommerce-role-srv": "io.restorecommerce.role.Service",
+          "io-restorecommerce-identity-reflection": "grpc.reflection.v1alpha.ServerReflection",
+          "io-restorecommerce-identity-cis": "io.restorecommerce.commandinterface.Service"
         },
         "protos": [
           "io/restorecommerce/user.proto",
