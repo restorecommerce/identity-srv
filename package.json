@@ -50,7 +50,7 @@
     "tsctests": "tsc test/*.ts --module commonjs -target ES6",
     "test-debug": "mocha -R spec ./test/*.js --inspect-brk",
     "coveralls": "export NODE_ENV=test; istanbul cover ./node_modules/mocha/bin/_mocha --report lcovonly -- -R spec ./test/*.js --exit",
-    "createtopics": "node setupTopics.js io.restorecommerce.users.resource io.restorecommerce.rendering io.restorecommerce.command",
+    "createtopics": "node setupTopics.js io.restorecommerce.users.resource io.restorecommerce.roles.resource io.restorecommerce.rendering io.restorecommerce.command",
     "postinstall": "tsc -d"
   },
   "engines": {
