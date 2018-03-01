@@ -48,7 +48,7 @@
           "io/restorecommerce/commandinterface.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
-        "addr": "0.0.0.0:50051"
+        "addr": "identity-srv:50051"
       }
     ]
   }
