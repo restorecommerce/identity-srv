@@ -12,7 +12,7 @@ import * as sconfig from '@restorecommerce/service-config';
 const Events = kafkaClient.Events;
 
 /*
- * Note: To run this test, a running ArangoDB, Redis and Kafka instance is required.
+ * Note: To run this test, running instances of ArangoDB, Redis and Kafka instance are required.
  */
 let cfg: any;
 let worker: Worker;
@@ -134,6 +134,10 @@ describe('testing identity-srv', () => {
           data.email.should.equal(user.email);
           data.active.should.be.false();
           data.activation_code.should.not.be.empty();
+          should.exist(data.locale);
+          should.exist(data.timezone);
+          data.locale.should.equal('de-DE');
+          data.timezone.should.equal('Europe/Berlin');
           const filter = grpcClient.toStruct({
             id: data.id,
           });

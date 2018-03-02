@@ -1,16 +1,22 @@
-import * as util from 'util';
-import * as co from 'co';
 import * as _ from 'lodash';
-import * as uuid from 'uuid';
 import * as bcrypt from 'bcryptjs';
+import * as co from 'co';
+import * as locale from 'locale-code';
+import * as moment from 'moment-timezone';
+import * as util from 'util';
+import * as uuid from 'uuid';
+
 import * as chassis from '@restorecommerce/chassis-srv';
-const errors = chassis.errors;
 import { Server } from '@restorecommerce/chassis-srv';
 import * as grpcClient from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
+
+const Events = kafkaClient.Events;
+const database = chassis.database;
+const errors = chassis.errors;
 
 const password = {
   hash: (pw): string => {
@@ -22,8 +28,6 @@ const password = {
     return bcrypt.compareSync(pw, password_hash);
   }
 };
-const Events = kafkaClient.Events;
-const database = chassis.database;
 
 export interface Call {
   request: User;
@@ -42,6 +46,8 @@ export interface User {
   password_hash: string; /// Encrypted password, stored
   guest: boolean;
   role_associations: RoleAssociation[];
+  locale: string;
+  timezone: string;
 }
 
 export interface RoleAssociation {
@@ -220,6 +226,14 @@ export class UserService extends ServiceBase {
     }
 
     dataArray.push(user);
+    if (!user.timezone || !moment.tz.zone(user.timezone)) {
+      user.timezone = 'Europe/Berlin';  // fallback
+    }
+
+    if (!user.locale || !locale.validate(user.locale)) {
+      user.locale = 'de-DE';  // fallback
+    }
+
     const serviceCall = {
       request: {
         items: dataArray

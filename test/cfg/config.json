@@ -392,6 +392,11 @@
           "transport": [
             "grpcIdentity"
           ]
+        },
+        "delete": {
+          "transport": [
+            "grpcIdentity"
+          ]
         }
       },
       "io-restorecommerce-role-srv": {
