@@ -264,12 +264,12 @@ export class UserService extends ServiceBase {
       const renderRequest = {
         id: user.email,
         payload: [{
-          templates: JSON.stringify({
+          templates: marshallProtobufAny({
             body: { body: this.registerBodyTpl, layout: this.layoutTpl },
             subject: { body: this.subjectTpl }
           }),
-          data: JSON.stringify(contextualData),
-          options: JSON.stringify({ texts: {} })
+          data: marshallProtobufAny(contextualData),
+          options: marshallProtobufAny({ texts: {} })
         }]
       };
       await this.topics.rendering.emit('renderRequest', renderRequest);
@@ -289,13 +289,12 @@ export class UserService extends ServiceBase {
       return;
     }
 
-    const response = renderResponse.response[0];
+    const response = unmarshallProtobufAny(renderResponse.response[0]);
     const data = this.emailData[emailAddress];
-
     const emailData = data.data;
-    const responseObj = JSON.parse(response.content);
-    emailData.body = responseObj.body;
-    emailData.subject = responseObj.subject;
+
+    emailData.body = response.body;
+    emailData.subject = response.subject;
     await this.topics.notification.emit('sendEmail', emailData);
     delete this.emailData[renderResponse.id];
   }
@@ -609,4 +608,15 @@ export class RoleService extends ServiceBase {
 
     return true;
   }
+}
+
+function marshallProtobufAny(msg: any): any {
+  return {
+    type_url: 'identity.rendering.renderRequest',
+    value: Buffer.from(JSON.stringify(msg))
+  };
+}
+
+function unmarshallProtobufAny(msg: any): any {
+  return JSON.parse(msg.value.toString());
 }

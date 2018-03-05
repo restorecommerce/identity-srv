@@ -6,7 +6,7 @@
   "client": {
     "hbs_templates": {
       "url": true,
-      "prefix": "http://localhost:8080/",
+      "prefix": "http://localhost:8080/templates/",
       "templates": {
         "subject": "restore_identity/subject.hbs",
         "body_register": "restore_identity/body_register.hbs",
