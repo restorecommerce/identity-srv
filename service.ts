@@ -467,6 +467,32 @@ export class UserService extends ServiceBase {
   }
 
   /**
+   * Extends the generic update operation in order to update any fields except
+   * "special handling" fields, like email, password, etc
+   * @param call
+   * @param context
+   */
+  async update(call: any, context: any): Promise<any> {
+    if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
+      || _.isEmpty(call.request.items)) {
+      throw new errors.InvalidArgument('No items were provided for update');
+    }
+
+    const items = call.request.items;
+    const invalidFields = ['email', 'password', 'active', 'activation_code', 'creator',
+    'password_hash', 'guest'];
+
+    _.forEach(items, (user) => {
+      _.forEach(invalidFields, (field) => {
+        if (!_.isNil(user[field]) && !_.isEmpty(user[field])) {
+          throw new errors.InvalidArgument(`Generic update operation is not allowed for field ${field}`);
+        }
+      });
+    });
+
+    return super.update(call, context);
+  }
+  /**
    * Endpoint verifyPassword, checks if the provided password and user matches
    * the one found in the database.
    * @param  {Call} call request containing user details

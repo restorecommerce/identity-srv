@@ -280,6 +280,11 @@
           "transport": [
             "grpcIdentity"
           ]
+        },
+        "update": {
+          "transport": [
+            "grpcIdentity"
+          ]
         }
       },
       "io-restorecommerce-role-srv": {

@@ -156,18 +156,6 @@ class UserCommandInterface extends chassis.CommandInterface {
           message);
         return {};
       },
-      emailIdChanged: async function restorePasswordChange(message: any,
-        context: any, config: any, eventName: string): Promise<any> {
-        await co(db.update(collectionName, { id: message.id }),
-          { email: message.email });
-        return {};
-      },
-      passwordChanged: async function restorePasswordChange(message: any,
-        context: any, config: any, eventName: string): Promise<any> {
-        await co(db.update(collectionName, { id: message.id }),
-          { password_hash: message.password_hash });
-        return {};
-      },
       activated: async function restoreActivated(message: any, context: any,
         config: any, eventName: string): Promise<any> {
         const patch = {

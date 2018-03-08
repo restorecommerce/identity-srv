@@ -60,7 +60,8 @@
         "verifyPassword": {},
         "create": {},
         "read": {},
-        "delete": {}
+        "delete": {},
+        "update": {}
       }
     },
     "service-role": {
@@ -394,6 +395,11 @@
           ]
         },
         "delete": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "update": {
           "transport": [
             "grpcIdentity"
           ]

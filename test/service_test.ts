@@ -12,7 +12,7 @@ import * as sconfig from '@restorecommerce/service-config';
 const Events = kafkaClient.Events;
 
 /*
- * Note: To run this test, running instances of ArangoDB, Redis and Kafka instance are required.
+ * Note: To run this test, a running ArangoDB and Kafka instance is required.
  */
 let cfg: any;
 let worker: Worker;
@@ -134,10 +134,6 @@ describe('testing identity-srv', () => {
           data.email.should.equal(user.email);
           data.active.should.be.false();
           data.activation_code.should.not.be.empty();
-          should.exist(data.locale);
-          should.exist(data.timezone);
-          data.locale.should.equal('de-DE');
-          data.timezone.should.equal('Europe/Berlin');
           const filter = grpcClient.toStruct({
             id: data.id,
           });
@@ -264,6 +260,47 @@ describe('testing identity-srv', () => {
           const emailNew = result.data.items[0].email;
           emailNew.should.not.be.null();
           emailOld.should.not.equal(emailNew);
+        });
+      });
+      describe('calling update', function changeEmailId() {
+
+        it('should update generic fields', async function changeEmailId() {
+          this.timeout(3000);
+          const listener = function listener(message, context) {
+            should.exist(result.data);
+            should.exist(result.data.items);
+            result.data.items.should.have.length(1);
+
+            const newUser = result.data.items[0];
+            newUser.timezone.should.equal('Europe/Moscow');
+            newUser.locale.should.equal('de-CH');
+            newUser.timezone.should.not.equal(user.timezone);
+            newUser.locale.should.not.equal(user.locale);
+          };
+          await topic.on('usersModified', listener);
+
+          const offset = await topic.$offset(-1);
+          const result = await userService.update([{
+            id: testUserID,
+            timezone: 'Europe/Moscow',
+            locale: 'de-CH'
+          }]);
+
+          await topic.$offset(offset);
+        });
+
+        it('should not allow to update "special" fields', async function changeEmailId() {
+          this.timeout(3000);
+
+          let result = await userService.update([{
+            id: testUserID,
+            password: 'notsecure2'
+          }]);
+          should.not.exist(result.data);
+          should.exist(result.error);
+          should.exist(result.error.message);
+          result.error.message.should.equal('invalid argument');
+          result.error.details.should.containEql('Generic update operation is not allowed for field password');
         });
       });
       describe('calling unregister', function unregister() {
