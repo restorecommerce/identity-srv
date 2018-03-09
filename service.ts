@@ -479,7 +479,7 @@ export class UserService extends ServiceBase {
     }
 
     const items = call.request.items;
-    const invalidFields = ['email', 'password', 'active', 'activation_code', 'creator',
+    const invalidFields = ['name', 'email', 'password', 'active', 'activation_code', 'creator',
     'password_hash', 'guest'];
 
     _.forEach(items, (user) => {
