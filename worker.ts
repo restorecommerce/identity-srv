@@ -108,23 +108,23 @@ export class Worker {
     const userService = new UserService(cfg,
       this.topics, db, logger, true, roleService);
 
-    await co(server.bind(serviceNamesCfg.user, userService));
-    await co(server.bind(serviceNamesCfg.role, roleService));
-    await co(server.bind(serviceNamesCfg.cis, cis));
+    await server.bind(serviceNamesCfg.user, userService);
+    await server.bind(serviceNamesCfg.role, roleService);
+    await server.bind(serviceNamesCfg.cis, cis);
 
     // Add reflection service
     const reflectionServiceName = serviceNamesCfg.reflection;
     const transportName = cfg.get(`server:services:${reflectionServiceName}:serverReflectionInfo:transport:0`);
     const transport = server.transport[transportName];
     const reflectionService = new chassis.grpc.ServerReflection(transport.$builder, server.config);
-    await co(server.bind(reflectionServiceName, reflectionService));
+    await server.bind(reflectionServiceName, reflectionService);
 
     const hbsTemplates = cfg.get('client:hbs_templates');
     if (hbsTemplates) {
       await userService.setRenderRequestConfigs(hbsTemplates);
     }
     // Start server
-    await co(server.start());
+    await server.start();
 
     this.events = events;
     this.server = server;
