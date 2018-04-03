@@ -132,7 +132,7 @@ export class Worker {
 
   async stop(): Promise<any> {
     this.logger.info('Shutting down');
-    await co(this.server.end());
+    await this.server.stop();
     await this.events.stop();
     await this.offsetStore.stop();
   }
