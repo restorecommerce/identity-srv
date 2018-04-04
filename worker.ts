@@ -145,19 +145,19 @@ class UserCommandInterface extends chassis.CommandInterface {
 
   makeResourcesRestoreSetup(db: any, collectionName: string) {
     return {
-      unregistered: async function restoreUnregistered(message: any, context: any,
-        config: any, eventName: string): Promise<any> {
+      unregistered: async function restoreUnregistered(message: any,
+        eventName: string): Promise<any> {
         await co(db.delete(collectionName, { id: message.id }));
         return {};
       },
       usersModified: async function restoreUsersModified(message: any,
-        context: any, config: any, eventName: string): Promise<any> {
+        eventName: string): Promise<any> {
         await co(db.update(collectionName, { id: message.id }),
           message);
         return {};
       },
-      activated: async function restoreActivated(message: any, context: any,
-        config: any, eventName: string): Promise<any> {
+      activated: async function restoreActivated(message: any,
+        eventName: string): Promise<any> {
         const patch = {
           active: true,
           activation_code: '',
@@ -165,8 +165,8 @@ class UserCommandInterface extends chassis.CommandInterface {
         await co(db.update(collectionName, { id: message.id }, patch));
         return {};
       },
-      registered: async function restoreUsersRegistered(message: any, context: any,
-        config: any, eventName: string): Promise<any> {
+      registered: async function restoreUsersRegistered(message: any,
+        eventName: string): Promise<any> {
         await co(db.insert(collectionName, message));
         return {};
       },
