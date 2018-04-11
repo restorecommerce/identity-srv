@@ -158,10 +158,10 @@ describe('testing identity-srv', () => {
           should.exist(result.data.items);
         });
       });
-      describe('verifyPassword', function verifyPassword() {
-        it('should return true and the user ID for a match', async function verifyPassword() {
-          const result = await (userService.verifyPassword({
-            user: user.name,
+      describe('login', function login() {
+        it('should return verify password and return the user', async function login() {
+          const result = await (userService.login({
+            name: user.name,
             password: user.password,
           }));
           should.exist(result);
@@ -173,6 +173,20 @@ describe('testing identity-srv', () => {
           }));
           const userDBDoc = compareResult.data.items[0];
           result.data.should.deepEqual(userDBDoc);
+        });
+        it('should return an error in case the passwords don`t match', async function login() {
+          const result = await (userService.login({
+            name: user.name,
+            password: 'invalid_pw',
+          }));
+          should.exist(result);
+          should.exist(result.error);
+          should.not.exist(result.data);
+
+
+          should.exist(result.error.message);
+          result.error.message.should.containEql('unauthenticated');
+          result.error.details.should.containEql('password does not match');
         });
       });
       describe('calling activate', function activateUser() {

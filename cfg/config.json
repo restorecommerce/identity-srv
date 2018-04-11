@@ -261,7 +261,7 @@
             "grpcIdentity"
           ]
         },
-        "verifyPassword": {
+        "login": {
           "transport": [
             "grpcIdentity"
           ]

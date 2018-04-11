@@ -57,7 +57,7 @@
         "find": {},
         "register": {},
         "unregister": {},
-        "verifyPassword": {},
+        "login": {},
         "create": {},
         "read": {},
         "delete": {},
@@ -379,7 +379,7 @@
             "grpcIdentity"
           ]
         },
-        "verifyPassword": {
+        "login": {
           "transport": [
             "grpcIdentity"
           ]

@@ -480,7 +480,7 @@ export class UserService extends ServiceBase {
 
     const items = call.request.items;
     const invalidFields = ['name', 'email', 'password', 'active', 'activation_code', 'creator',
-    'password_hash', 'guest'];
+      'password_hash', 'guest'];
 
     _.forEach(items, (user) => {
       _.forEach(invalidFields, (field) => {
@@ -499,10 +499,18 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {User} returns user details
    */
-  async verifyPassword(call: any, context: any): Promise<any> {
+  async login(call: any, context: any): Promise<any> {
+    if (_.isEmpty(call) || _.isEmpty(call.request) ||
+      (_.isEmpty(call.request.name) && _.isEmpty(call.request.email))) {
+        throw new errors.InvalidArgument('Missing credentials');
+    }
+    const field = call.request.name ? 'name' : 'email';
+    const value = call.request.name ? call.request.name : call.request.email;
+
     const filter = toStruct({
-      name: call.request.user
+      [field]: value
     });
+
     const users = await super.read({ request: { filter } }, context);
     if (users.total_count === 0) {
       throw new errors.NotFound('user not found');
