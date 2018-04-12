@@ -110,14 +110,15 @@ activation code sent via email to User. For more details about the email operati
 | id | string | required | User ID |
 | email | string | required | EmailID  |
 
-#### VerifyPassword
-Used to verify the password of the User. Requests are performed providing `io.restorecommerce.user.VerifyPasswordRequest` protobuf message as input and responses are a `google.protobuf.Empty` message.
+#### Login
+Used to verify the a User's password and return its info in case the operation is successful. Requests are performed providing `io.restorecommerce.user.LoginRequest` protobuf message as input and the response is `io.restorecommerce.user.User` message.
 
-`io.restorecommerce.user.VerifyPasswordRequest`
+`io.restorecommerce.user.LoginRequest`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| user | string | required | User name |
+| name | string | optional | User name |
+| email | string | optional | User email |
 | password | string | required | Raw password |
 
 #### Unregister
