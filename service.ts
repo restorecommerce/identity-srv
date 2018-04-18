@@ -385,7 +385,7 @@ export class UserService extends ServiceBase {
     await super.update(serviceCall, context);
     logger.info('password changed for user', userID);
     await this.topics['users.resource'].emit('passwordChanged', user);
-    return users.items[0];
+    return {};
   }
 
   /**
@@ -462,8 +462,7 @@ export class UserService extends ServiceBase {
       };
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
-    // Response
-    return user;
+    return {};
   }
 
   /**
