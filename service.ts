@@ -327,7 +327,7 @@ export class UserService extends ServiceBase {
     if (!users || users.total_count === 0) {
       throw new errors.NotFound('user not found');
     }
-    const user = users.items[0];
+    const user: User = users.items[0];
     if (user.active) {
       logger.debug('activation request to an active user' +
         ' which still has the activation code', user);
@@ -364,6 +364,7 @@ export class UserService extends ServiceBase {
     const logger = context.logger;
     const userID = request.id;
     const pw = request.password;
+
     const filter = toStruct({
       id: userID
     });
@@ -372,9 +373,14 @@ export class UserService extends ServiceBase {
       logger.debug('user does not exist', userID);
       throw new errors.NotFound('user does not exist');
     }
+    const user: User = users.items[0];
+    const userPWhash = user.password_hash;
+    if (!password.verify(userPWhash, pw)) {
+      throw new errors.Unauthenticated('password does not match');
+    }
+
     const password_hash = password.hash(pw);
     let dataArray = [];
-    const user = users.items[0];
     user.password_hash = password_hash;
     dataArray.push(user);
     const serviceCall = {

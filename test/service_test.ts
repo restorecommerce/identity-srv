@@ -238,7 +238,8 @@ describe('testing identity-srv', () => {
           const pwHashA = result.data.items[0].password_hash;
           await (userService.changePassword({
             id: testUserID,
-            password: 'newPassword',
+            password: 'notsecure',
+            new_password: 'newPassword'
           }));
           await topic.$wait(offset);
           result = await (userService.find({
