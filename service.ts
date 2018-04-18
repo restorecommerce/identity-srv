@@ -359,11 +359,13 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {User} returns user details
    */
-  async changePassword(call: Call, context: any): Promise<any> {
+  async changePassword(call: any, context: any): Promise<any> {
     const request = call.request;
     const logger = context.logger;
     const userID = request.id;
+
     const pw = request.password;
+    const newPw = request.new_password;
 
     const filter = toStruct({
       id: userID
@@ -379,7 +381,7 @@ export class UserService extends ServiceBase {
       throw new errors.Unauthenticated('password does not match');
     }
 
-    const password_hash = password.hash(pw);
+    const password_hash = password.hash(newPw);
     let dataArray = [];
     user.password_hash = password_hash;
     dataArray.push(user);
