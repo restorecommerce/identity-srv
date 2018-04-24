@@ -25,8 +25,8 @@
       "retries": 6,
       "delay": 30000,
       "collections": [
-        "users",
-        "roles"
+        "user",
+        "role"
       ]
     }
   },
@@ -45,42 +45,42 @@
       "clientId": "restore-identity-srv",
       "connectionString": "localhost:2181",
       "latestOffset": false,
-      "usersCreated": {
+      "userCreated": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.User"
       },
-      "usersModified": {
+      "userModified": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.User"
       },
-      "usersDeleted": {
+      "userDeleted": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.Deleted"
       },
-      "rolesCreated": {
+      "roleCreated": {
         "protos": [
           "io/restorecommerce/role.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.role.Role"
       },
-      "rolesModified": {
+      "roleModified": {
         "protos": [
           "io/restorecommerce/role.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.role.Role"
       },
-      "rolesDeleted": {
+      "roleDeleted": {
         "protos": [
           "io/restorecommerce/role.proto"
         ],
@@ -200,10 +200,10 @@
         "messageObject": "io.restorecommerce.notification.Notification"
       },
       "topics": {
-        "users.resource": {
+        "user.resource": {
           "topic": "io.restorecommerce.users.resource"
         },
-        "roles.resource": {
+        "role.resource": {
           "topic": "io.restorecommerce.roles.resource"
         },
         "command": {
