@@ -82,7 +82,7 @@ export class UserService extends ServiceBase {
   roleService: RoleService;
   constructor(cfg: any, topics: any, db: any, logger: any,
     isEventsEnabled: boolean, roleService: RoleService) {
-    super('users', topics['users.resource'], logger, new ResourcesAPIBase(db, 'users'),
+    super('user', topics['users.resource'], logger, new ResourcesAPIBase(db, 'users'),
       isEventsEnabled);
     this.cfg = cfg;
     this.db = db;
