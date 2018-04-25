@@ -1,7 +1,8 @@
 {
   "service": {
     "userActivationRequired": true,
-    "register": true
+    "register": true,
+    "enableEmail": true
   },
   "client": {
     "hbs_templates": {
