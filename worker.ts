@@ -120,7 +120,7 @@ export class Worker {
     await server.bind(reflectionServiceName, reflectionService);
 
     const hbsTemplates = cfg.get('client:hbs_templates');
-    if (hbsTemplates) {
+    if (hbsTemplates && cfg.get('service:enableEmail')) {
       await userService.setRenderRequestConfigs(hbsTemplates);
     }
     // Start server
