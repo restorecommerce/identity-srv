@@ -104,7 +104,7 @@ export class Worker {
     // user service
     logger.verbose('Setting up user and role services');
     const roleService = new RoleService(db,
-      this.topics['roles.resource'], logger, true);
+      this.topics['role.resource'], logger, true);
     const userService = new UserService(cfg,
       this.topics, db, logger, true, roleService);
 
