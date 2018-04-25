@@ -82,7 +82,7 @@ export class UserService extends ServiceBase {
   roleService: RoleService;
   constructor(cfg: any, topics: any, db: any, logger: any,
     isEventsEnabled: boolean, roleService: RoleService) {
-    super('user', topics['users.resource'], logger, new ResourcesAPIBase(db, 'users'),
+    super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users'),
       isEventsEnabled);
     this.cfg = cfg;
     this.db = db;
@@ -175,7 +175,7 @@ export class UserService extends ServiceBase {
       };
       await super.create(serviceCall, context);
       logger.info('guest user registered', user);
-      await (this.topics['users.resource'].emit('registered', user));
+      await (this.topics['user.resource'].emit('registered', user));
       return user;
     }
     // User creation
@@ -242,7 +242,7 @@ export class UserService extends ServiceBase {
 
     await super.create(serviceCall, context);
     logger.info('user registered', user);
-    await this.topics['users.resource'].emit('registered', user);
+    await this.topics['user.resource'].emit('registered', user);
 
     if (this.emailEnabled) {
       // Contextual Data for template rendering
@@ -349,7 +349,7 @@ export class UserService extends ServiceBase {
     };
     await super.update(serviceCall, context);
     logger.info('user activated', user);
-    await this.topics['users.resource'].emit('activated', { id: userID });
+    await this.topics['user.resource'].emit('activated', { id: userID });
     return {};
   }
 
@@ -392,7 +392,7 @@ export class UserService extends ServiceBase {
     };
     await super.update(serviceCall, context);
     logger.info('password changed for user', userID);
-    await this.topics['users.resource'].emit('passwordChanged', user);
+    await this.topics['user.resource'].emit('passwordChanged', user);
     return {};
   }
 
@@ -435,7 +435,7 @@ export class UserService extends ServiceBase {
     };
     await super.update(serviceCall, context);
     logger.info('EmailID changed for user', userID);
-    await this.topics['users.resource'].emit('emailIdChanged', user);
+    await this.topics['user.resource'].emit('emailIdChanged', user);
 
     // Contextual Data for rendering on Notification-srv before sending mail
     const usersUpdated = await super.read({ request: { filter } }, context);
@@ -561,7 +561,7 @@ export class UserService extends ServiceBase {
     await super.delete(serviceCall, context);
 
     logger.info('user deleted', userID);
-    await this.topics['users.resource'].emit('unregistered', userID);
+    await this.topics['user.resource'].emit('unregistered', userID);
     return {};
   }
 
@@ -606,7 +606,7 @@ export class UserService extends ServiceBase {
 
 export class RoleService extends ServiceBase {
   constructor(db: any, roleTopic: kafkaClient.Topic, logger: any, isEventsEnabled: boolean) {
-    super('roles', roleTopic, logger, new ResourcesAPIBase(db, 'roles'), isEventsEnabled);
+    super('role', roleTopic, logger, new ResourcesAPIBase(db, 'roles'), isEventsEnabled);
   }
 
   async create(call: any, context?: any): Promise<any> {

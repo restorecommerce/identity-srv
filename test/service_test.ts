@@ -56,7 +56,7 @@ describe('testing identity-srv', () => {
     describe('with test client', () => {
 
       before(async function connectRoleService() {
-        roleService = await connect('client:service-role', 'roles.resource');
+        roleService = await connect('client:service-role', 'role.resource');
       });
 
       it('should create roles', async () => {
@@ -100,7 +100,7 @@ describe('testing identity-srv', () => {
       let testUserID;
       let user;
       before(async function connectUserService() {
-        userService = await connect('client:service-user', 'users.resource');
+        userService = await connect('client:service-user', 'user.resource');
         user = {
           name: 'testuser',
           password: 'notsecure',
