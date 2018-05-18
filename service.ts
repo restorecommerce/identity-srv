@@ -73,12 +73,14 @@ export class UserService extends ServiceBase {
   topics: any;
   logger: any;
   cfg: any;
-  subjectTpl: string;
+  registerSubjectTpl: string;
+  changeSubjectTpl: string;
   layoutTpl: string;
   registerBodyTpl: string;
   changeBodyTpl: string;
   emailData: any;
   emailEnabled: boolean;
+  emailStyle: string;
   roleService: RoleService;
   constructor(cfg: any, topics: any, db: any, logger: any,
     isEventsEnabled: boolean, roleService: RoleService) {
@@ -247,8 +249,8 @@ export class UserService extends ServiceBase {
     if (this.emailEnabled) {
       // Contextual Data for template rendering
       const contextualData = {
-        email: user.email, name: user.name, id: user.id,
-        activation_code: user.activation_code
+        userName: user.name,
+        activationCode: user.activation_code
       };
 
       this.emailData[user.email] = {
@@ -266,9 +268,10 @@ export class UserService extends ServiceBase {
         payload: [{
           templates: marshallProtobufAny({
             body: { body: this.registerBodyTpl, layout: this.layoutTpl },
-            subject: { body: this.subjectTpl }
+            subject: { body: this.registerSubjectTpl }
           }),
           data: marshallProtobufAny(contextualData),
+          style: this.emailStyle,
           options: marshallProtobufAny({ texts: {} })
         }]
       };
@@ -443,8 +446,8 @@ export class UserService extends ServiceBase {
 
     if (this.emailEnabled) {
       const contextualData = {
-        email: userUpdated.email, name: userUpdated.name, id: userUpdated.id,
-        activation_code: userUpdated.activation_code
+        userName: userUpdated.name,
+        activationCode: userUpdated.activation_code
       };
 
       this.emailData[user.email] = {
@@ -460,12 +463,13 @@ export class UserService extends ServiceBase {
       const renderRequest = {
         id: user.email,
         payload: [{
-          templates: JSON.stringify({
+          templates: marshallProtobufAny({
             body: { body: this.changeBodyTpl, layout: this.layoutTpl },
-            subject: { body: this.subjectTpl }
+            subject: { body: this.changeSubjectTpl }
           }),
-          data: JSON.stringify(contextualData),
-          options: JSON.stringify({ texts: {} })
+          data: marshallProtobufAny(contextualData),
+          style: this.emailStyle,
+          options: marshallProtobufAny({ texts: {} })
         }]
       };
       await this.topics.rendering.emit('renderRequest', renderRequest);
@@ -509,7 +513,7 @@ export class UserService extends ServiceBase {
   async login(call: any, context: any): Promise<any> {
     if (_.isEmpty(call) || _.isEmpty(call.request) ||
       (_.isEmpty(call.request.name) && _.isEmpty(call.request.email))) {
-        throw new errors.InvalidArgument('Missing credentials');
+      throw new errors.InvalidArgument('Missing credentials');
     }
     const field = call.request.name ? 'name' : 'email';
     const value = call.request.name ? call.request.name : call.request.email;
@@ -578,8 +582,11 @@ export class UserService extends ServiceBase {
 
     let response: any;
     try {
-      response = await fetch(prefix + templates['subject']);
-      this.subjectTpl = await response.text();
+      response = await fetch(prefix + templates['subject_register']);
+      this.registerSubjectTpl = await response.text();
+
+      response = await fetch(prefix + templates['subject_change']);
+      this.changeSubjectTpl = await response.text();
 
       response = await fetch(prefix + templates['layout']);
       this.layoutTpl = await response.text();
@@ -589,6 +596,11 @@ export class UserService extends ServiceBase {
 
       response = await fetch(prefix + templates['body_change']);
       this.changeBodyTpl = await response.text();
+
+      response = await fetch(prefix + templates['resources'], {});
+      const externalRrc = JSON.parse(await response.text());
+      this.emailStyle = prefix + externalRrc.style;
+
       this.emailEnabled = true;
     } catch (err) {
       if (err.code == 'ECONNREFUSED' || err.message == 'ECONNREFUSED') {
