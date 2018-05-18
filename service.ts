@@ -315,16 +315,16 @@ export class UserService extends ServiceBase {
   async activate(call: Call, context: any): Promise<any> {
     const request = call.request;
     const logger = context.logger;
-    const userID = request.id;
+    const userName = request.name;
     const activation_code = request.activation_code;
-    if (!userID) {
+    if (!userName) {
       throw new errors.InvalidArgument('argument id is empty');
     }
     if (!activation_code) {
       throw new errors.InvalidArgument('argument activation_code is empty');
     }
     const filter = toStruct({
-      id: userID
+      name: userName
     });
     const users = await super.read({ request: { filter } }, context);
     if (!users || users.total_count === 0) {
@@ -352,7 +352,7 @@ export class UserService extends ServiceBase {
     };
     await super.update(serviceCall, context);
     logger.info('user activated', user);
-    await this.topics['user.resource'].emit('activated', { id: userID });
+    await this.topics['user.resource'].emit('activated', { id: user.id });
     return {};
   }
 
