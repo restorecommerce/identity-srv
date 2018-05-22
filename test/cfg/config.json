@@ -1,7 +1,18 @@
 {
   "service": {
     "userActivationRequired": true,
-    "register": true
+    "register": true,
+    "hbs_templates": {
+      "url": true,
+      "prefix": "http://localhost:8080/",
+      "templates": {
+        "subject": "restore_identity/subject.hbs",
+        "body_register": "restore_identity/body_register.hbs",
+        "body_change": "restore_identity/body_change.hbs",
+        "layout": "restore_identity/layout.hbs"
+      }
+    },
+    "activationLink": "http://restorecommerce.io/activate_user/"
   },
   "logger": {
     "console": {
@@ -20,16 +31,6 @@
     }
   },
   "client": {
-    "hbs_templates": {
-      "url": true,
-      "prefix": "http://localhost:8080/",
-      "templates": {
-        "subject": "restore_identity/subject.hbs",
-        "body_register": "restore_identity/body_register.hbs",
-        "body_change": "restore_identity/body_change.hbs",
-        "layout": "restore_identity/layout.hbs"
-      }
-    },
     "service-user": {
       "transports": {
         "grpc": {

@@ -2,9 +2,7 @@
   "service": {
     "userActivationRequired": true,
     "register": true,
-    "enableEmail": true
-  },
-  "client": {
+    "enableEmail": true,
     "hbs_templates": {
       "url": true,
       "prefix": "http://localhost:8080/templates/",
@@ -14,7 +12,8 @@
         "body_change": "restore_identity/body_change.hbs",
         "layout": "restore_identity/layout.hbs"
       }
-    }
+    },
+    "activationLink": "http://restorecommerce.io/activate_user/"
   },
   "database": {
     "main": {

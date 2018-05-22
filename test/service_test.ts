@@ -1,5 +1,3 @@
-'use strict';
-
 import * as mocha from 'mocha';
 import * as co from 'co';
 import * as should from 'should';
@@ -24,13 +22,13 @@ let topic;
 let roleID;
 let roleService, userService;
 
-async function start() {
+async function start(): Promise<void> {
   cfg = sconfig(process.cwd() + '/test');
   worker = new Worker(cfg);
   await worker.start();
 }
 
-async function connect(clientCfg: string, resourceName: string) {
+async function connect(clientCfg: string, resourceName: string): Promise<any> { // returns a gRPC service
   logger = worker.logger;
 
   events = new Events(cfg.get('events:kafka'), logger);
@@ -43,19 +41,19 @@ async function connect(clientCfg: string, resourceName: string) {
 }
 
 describe('testing identity-srv', () => {
-  before(async function startServer() {
+  before(async function startServer(): Promise<void> {
     await start();
   });
 
 
-  after(async function stopServer() {
+  after(async function stopServer(): Promise<void> {
     await worker.stop();
   });
 
   describe('testing Role service', () => {
     describe('with test client', () => {
 
-      before(async function connectRoleService() {
+      before(async function connectRoleService(): Promise<void> {
         roleService = await connect('client:service-role', 'role.resource');
       });
 
@@ -65,13 +63,6 @@ describe('testing identity-srv', () => {
           description: 'Normal user'
         };
 
-        const listener = function listener(message, context) {
-          role.name.should.equal(message.name);
-          role.description.should.equal(message.description);
-        };
-
-        const offset = await topic.$offset(-1);
-        await topic.on('rolesCreated', listener);
         const result = await roleService.create({
           items: [
             {
@@ -80,8 +71,6 @@ describe('testing identity-srv', () => {
             }
           ]
         });
-
-        await topic.$wait(offset);
 
         should.not.exist(result.error);
         should.exist(result);
@@ -99,7 +88,7 @@ describe('testing identity-srv', () => {
       let userService;
       let testUserID;
       let user;
-      before(async function connectUserService() {
+      before(async function connectUserService(): Promise<void> {
         userService = await connect('client:service-user', 'user.resource');
         user = {
           name: 'testuser',
@@ -108,14 +97,14 @@ describe('testing identity-srv', () => {
         };
       });
 
-      describe('calling register', function registerUser() {
-        it('should create a user and person', async function registerUser() {
+      describe('calling register', function registerUser(): void {
+        it('should create a user and person', async function registerUser(): Promise<void> {
           user.role_associations = [{
             role: roleID,
             attributes: []
           }];
 
-          const listener = function listener(message, context) {
+          const listener = function listener(message: any, context: any): void {
             user.name.should.equal(message.name);
             user.email.should.equal(message.email);
           };
@@ -147,8 +136,8 @@ describe('testing identity-srv', () => {
 
         });
       });
-      describe('calling find', function findUser() {
-        it('should return a user', async function findUser() {
+      describe('calling find', function findUser(): void {
+        it('should return a user', async function findUser(): Promise<void> {
           const result = await (userService.find({
             id: testUserID,
           }));
@@ -158,8 +147,8 @@ describe('testing identity-srv', () => {
           should.exist(result.data.items);
         });
       });
-      describe('login', function login() {
-        it('should return verify password and return the user', async function login() {
+      describe('login', function login(): void {
+        it('should return verify password and return the user', async function login(): Promise<void> {
           const result = await (userService.login({
             name: user.name,
             password: user.password,
@@ -174,7 +163,7 @@ describe('testing identity-srv', () => {
           const userDBDoc = compareResult.data.items[0];
           result.data.should.deepEqual(userDBDoc);
         });
-        it('should return an error in case the passwords don`t match', async function login() {
+        it('should return an error in case the passwords don`t match', async function login(): Promise<void> {
           const result = await (userService.login({
             name: user.name,
             password: 'invalid_pw',
@@ -189,10 +178,10 @@ describe('testing identity-srv', () => {
           result.error.details.should.containEql('password does not match');
         });
       });
-      describe('calling activate', function activateUser() {
-        it('should activate the user', async function activateUser() {
+      describe('calling activate', function activateUser(): void {
+        it('should activate the user', async function activateUser(): Promise<void> {
           const offset = await topic.$offset(-1);
-          const listener = function listener(message, context) {
+          const listener = function listener(message: any, context: any): void {
             result.data.items[0].id.should.equal(message.id);
           };
           await topic.on('activated', listener);
@@ -206,7 +195,7 @@ describe('testing identity-srv', () => {
 
           const u = result.data.items[0];
           await (userService.activate({
-            id: u.id,
+            name: u.name,
             activation_code: u.activation_code,
           }));
 
@@ -223,10 +212,10 @@ describe('testing identity-srv', () => {
           result.data.items[0].activation_code.should.be.empty();
         });
       });
-      describe('calling changePassword', function changePassword() {
-        it('should change the password', async function changePassword() {
+      describe('calling changePassword', function changePassword(): void {
+        it('should change the password', async function changePassword(): Promise<void> {
           const offset = await topic.$offset(-1);
-          const listener = function listener(message, context) {
+          const listener = function listener(message: any, context: any): void {
             pwHashA.should.not.equal(message.password_hash);
           };
           await topic.on('passwordChanged', listener);
@@ -250,10 +239,10 @@ describe('testing identity-srv', () => {
           pwHashA.should.not.equal(pwHashB);
         });
       });
-      describe('calling changeEmailId', function changeEmailId() {
-        it('should change the Email ID', async function changeEmailId() {
+      describe('calling changeEmailId', function changeEmailId(): void {
+        it('should change the Email ID', async function changeEmailId(): Promise<void> {
           this.timeout(3000);
-          const listener = function listener(message, context) {
+          const listener = function listener(message: any, context: any): void {
             emailOld.should.not.equal(message.email);
           };
           await topic.on('emailIdChanged', listener);
@@ -277,11 +266,11 @@ describe('testing identity-srv', () => {
           emailOld.should.not.equal(emailNew);
         });
       });
-      describe('calling update', function changeEmailId() {
+      describe('calling update', function changeEmailId(): void {
 
-        it('should update generic fields', async function changeEmailId() {
+        it('should update generic fields', async function changeEmailId(): Promise<void> {
           this.timeout(3000);
-          const listener = function listener(message, context) {
+          const listener = function listener(message: any, context: any): void {
             should.exist(result.data);
             should.exist(result.data.items);
             result.data.items.should.have.length(1);
@@ -304,7 +293,7 @@ describe('testing identity-srv', () => {
           await topic.$offset(offset);
         });
 
-        it('should not allow to update "special" fields', async function changeEmailId() {
+        it('should not allow to update "special" fields', async function changeEmailId(): Promise<void> {
           this.timeout(3000);
 
           let result = await userService.update([{
@@ -318,14 +307,14 @@ describe('testing identity-srv', () => {
           result.error.details.should.containEql('Generic update operation is not allowed for field password');
         });
       });
-      describe('calling unregister', function unregister() {
-        it('should remove the user and person', async function unregister() {
+      describe('calling unregister', function unregister(): void {
+        it('should remove the user and person', async function unregister(): Promise<void> {
           await userService.unregister({
             id: testUserID,
           });
 
           await roleService.delete({
-            ids: user.role_associations[0].role
+            collection: true
           });
 
           const result = await userService.find({
@@ -338,5 +327,4 @@ describe('testing identity-srv', () => {
       });
     });
   });
-
 });

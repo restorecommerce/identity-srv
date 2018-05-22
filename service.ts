@@ -637,7 +637,7 @@ export class RoleService extends ServiceBase {
       }
     }
 
-    return await super.create(call, context);
+    return super.create(call, context);
   }
 
   async verifyRoles(roleAssociations: RoleAssociation[]): Promise<boolean> {

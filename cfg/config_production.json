@@ -11,7 +11,7 @@
   "redis": {
     "host": "redis"
   },
-  "client": {
+  "service": {
     "hbs_templates": {
       "prefix": "http://console/templates/"
     }
