@@ -119,7 +119,7 @@ export class Worker {
     const reflectionService = new chassis.grpc.ServerReflection(transport.$builder, server.config);
     await server.bind(reflectionServiceName, reflectionService);
 
-    const hbsTemplates = cfg.get('client:hbs_templates');
+    const hbsTemplates = cfg.get('service:hbs_templates');
     if (hbsTemplates && cfg.get('service:enableEmail')) {
       await userService.setRenderRequestConfigs(hbsTemplates);
     } else {
@@ -145,7 +145,7 @@ class UserCommandInterface extends chassis.CommandInterface {
     super(server, cfg, logger, events);
   }
 
-  makeResourcesRestoreSetup(db: any, resource: string) {
+  makeResourcesRestoreSetup(db: any, resource: string): any {
     return {
       unregistered: async function restoreUnregistered(message: any,
         eventName: string): Promise<any> {

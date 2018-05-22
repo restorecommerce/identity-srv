@@ -68,6 +68,8 @@ export interface Role {
   description: string;
 }
 
+type EmailType = 'register' | 'emailChange';
+
 export class UserService extends ServiceBase {
   db: any;
   topics: any;
@@ -247,34 +249,10 @@ export class UserService extends ServiceBase {
     await this.topics['user.resource'].emit('registered', user);
 
     if (this.emailEnabled) {
-      // Contextual Data for template rendering
-      const contextualData = {
-        userName: user.name,
-        activationCode: user.activation_code
-      };
 
-      this.emailData[user.email] = {
-        data: {
-          notifyee: user.email,
-          body: '',
-          subject: '',
-          transport: 'email',
-          target: user.email
-        }
-      };
+      this.emailData[user.email] = this.makeNotificationData(user);
 
-      const renderRequest = {
-        id: user.email,
-        payload: [{
-          templates: marshallProtobufAny({
-            body: { body: this.registerBodyTpl, layout: this.layoutTpl },
-            subject: { body: this.registerSubjectTpl }
-          }),
-          data: marshallProtobufAny(contextualData),
-          style: this.emailStyle,
-          options: marshallProtobufAny({ texts: {} })
-        }]
-      };
+      const renderRequest = this.makeActivationEmailData(user, 'register');
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
     // Response
@@ -445,33 +423,8 @@ export class UserService extends ServiceBase {
     const userUpdated = usersUpdated.items[0];
 
     if (this.emailEnabled) {
-      const contextualData = {
-        userName: userUpdated.name,
-        activationCode: userUpdated.activation_code
-      };
-
-      this.emailData[user.email] = {
-        data: {
-          notifyee: user.email,
-          body: '',
-          subject: '',
-          transport: 'email',
-          target: user.email
-        }
-      };
-
-      const renderRequest = {
-        id: user.email,
-        payload: [{
-          templates: marshallProtobufAny({
-            body: { body: this.changeBodyTpl, layout: this.layoutTpl },
-            subject: { body: this.changeSubjectTpl }
-          }),
-          data: marshallProtobufAny(contextualData),
-          style: this.emailStyle,
-          options: marshallProtobufAny({ texts: {} })
-        }]
-      };
+      this.emailData[user.email] = this.makeNotificationData(user);
+      const renderRequest = this.makeActivationEmailData(user, 'emailChange');
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
     return {};
@@ -612,6 +565,49 @@ export class UserService extends ServiceBase {
         throw err;
       }
     }
+  }
+
+  private makeActivationEmailData(user: User, type: EmailType): any {
+    let activationLink = this.cfg.get('service:activationLink');
+    activationLink = new URL(user.name + '/' + user.activation_code, activationLink);
+
+    const data = {
+      userName: user.name,
+      activationLink
+    };
+
+    let emailBody: any, emailSubject: any;
+    if (type == 'register') {
+      emailBody = this.registerBodyTpl;
+      emailSubject = this.registerSubjectTpl;
+    } else if (type == 'emailChange') {
+      emailBody = this.changeBodyTpl;
+      emailSubject = this.changeSubjectTpl;
+    }
+    return {
+      id: user.email,
+      payload: [{
+        templates: marshallProtobufAny({
+          body: { body: emailBody, layout: this.layoutTpl },
+          subject: { body: emailSubject }
+        }),
+        data: marshallProtobufAny(data),
+        style: this.emailStyle, // URL to a style
+        options: marshallProtobufAny({ texts: {} })
+      }]
+    };
+  }
+
+  private makeNotificationData(user: User): any {
+    return {
+      data: {
+        notifyee: user.email,
+        body: '',
+        subject: '',
+        transport: 'email',
+        target: user.email
+      }
+    };
   }
 }
 
