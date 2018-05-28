@@ -12,7 +12,9 @@
         "layout": "restore_identity/layout.hbs"
       }
     },
-    "activationLink": "http://restorecommerce.io/activate_user/"
+    "activationLink": "http://restorecommerce.io/activate_user/",
+    "minUsernameLength": 8,
+    "maxUsernameLength": 20
   },
   "logger": {
     "console": {

@@ -1,11 +1,12 @@
 import * as mocha from 'mocha';
-import * as co from 'co';
 import * as should from 'should';
+import * as _ from 'lodash';
 import * as grpcClient from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import { Worker } from '../worker';
 import * as sconfig from '@restorecommerce/service-config';
+import { equal } from 'assert';
 
 const Events = kafkaClient.Events;
 
@@ -91,19 +92,20 @@ describe('testing identity-srv', () => {
       before(async function connectUserService(): Promise<void> {
         userService = await connect('client:service-user', 'user.resource');
         user = {
-          name: 'testuser',
+          name: 'test.user1',
+          first_name: 'test',
+          last_name: 'user',
           password: 'notsecure',
-          email: 'test@ms.restorecommerce.io'
+          email: 'test@ms.restorecommerce.io',
+          role_associations: [{
+            role: roleID,
+            attributes: []
+          }]
         };
       });
 
       describe('calling register', function registerUser(): void {
-        it('should create a user and person', async function registerUser(): Promise<void> {
-          user.role_associations = [{
-            role: roleID,
-            attributes: []
-          }];
-
+        it('should create a user', async function registerUser(): Promise<void> {
           const listener = function listener(message: any, context: any): void {
             user.name.should.equal(message.name);
             user.email.should.equal(message.email);
@@ -134,6 +136,24 @@ describe('testing identity-srv', () => {
           should.not.exist(getResult.error);
           getResult.data.items[0].should.deepEqual(data);
 
+        });
+        it('should not create a user with an invalid username format', async function registerUser(): Promise<void> {
+          const invalidUser = _.cloneDeep(user);
+          invalidUser.name = 'Test User';
+          const result = await userService.register(invalidUser);
+          should.exist(result);
+          should.not.exist(result.data);
+          should.exist(result.error);
+          result.error.name.should.equal('InvalidArgument');
+        });
+        it('should not create a user with no first or last name', async function registerUser(): Promise<void> {
+          const invalidUser = _.cloneDeep(user);
+          delete invalidUser.first_name;
+          const result = await userService.register(invalidUser);
+          should.exist(result);
+          should.not.exist(result.data);
+          should.exist(result.error);
+          result.error.name.should.equal('InvalidArgument');
         });
       });
       describe('calling find', function findUser(): void {

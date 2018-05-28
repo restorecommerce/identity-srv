@@ -39,6 +39,8 @@ export interface User {
   modified: number; /// Last time the user was modified
   creator: string; /// User ID of the creator
   name: string; // The name of the user, can be used for login
+  first_name: string;
+  last_name: string;
   email: string; /// Email address
   active: boolean; /// If the user was activated via the activation process
   activation_code: string; /// Activation code used in the activation process
@@ -164,24 +166,10 @@ export class UserService extends ServiceBase {
    * @return type is any since it can be guest or user type
    */
   async register(call: any, context: any): Promise<any> {
-    let dataArray = [];
-    const user: User = call.request || call;
-    const logger = context.logger;
-    // Guest creation
-    if (user.guest) {
-      logger.silly('request to register a guest');
 
-      dataArray.push(user);
-      let serviceCall = {
-        request: {
-          items: dataArray
-        }
-      };
-      await super.create(serviceCall, context);
-      logger.info('guest user registered', user);
-      await (this.topics['user.resource'].emit('registered', user));
-      return user;
-    }
+    const user: User = call.request || call;
+    const logger = this.logger;
+
     // User creation
     logger.silly('request to register a user');
     if (!user.password) {
@@ -192,6 +180,20 @@ export class UserService extends ServiceBase {
     }
     if (!user.name) {
       throw new errors.InvalidArgument('argument name is empty');
+    }
+
+    const serviceCfg = this.cfg.get('service');
+
+    const minLength = serviceCfg.minUsernameLength;
+    const maxLength = serviceCfg.maxUsernameLength;
+
+    if (!this.validUsername(user.name, minLength, maxLength)) {
+      throw new errors.InvalidArgument(`the user name is invalid - it should have a length between ${minLength} and ${maxLength}
+        and it can contain alphanumeric characters or any character of the following: ?!.*-_`);
+    }
+
+    if (_.isEmpty(user.first_name) || _.isEmpty(user.last_name)) {
+      throw new errors.InvalidArgument('User register requires both first and last name');
     }
 
     logger.silly(
@@ -209,6 +211,21 @@ export class UserService extends ServiceBase {
       throw new errors.AlreadyExists('user does already exist');
     }
     logger.silly('user does not exist');
+
+    // Guest creation
+    if (user.guest) {
+      logger.silly('request to register a guest');
+
+      let serviceCall = {
+        request: {
+          items: [user]
+        }
+      };
+      await super.create(serviceCall, context);
+      logger.info('guest user registered', user);
+      await (this.topics['user.resource'].emit('registered', user));
+      return user;
+    }
 
     // Create User
     const userActivationRequired: Boolean = this.isUserActivationRequired();
@@ -229,7 +246,6 @@ export class UserService extends ServiceBase {
       throw new errors.InvalidArgument(`Invalid role ID in role associations`);
     }
 
-    dataArray.push(user);
     if (!user.timezone || !moment.tz.zone(user.timezone)) {
       user.timezone = 'Europe/Berlin';  // fallback
     }
@@ -240,7 +256,7 @@ export class UserService extends ServiceBase {
 
     const serviceCall = {
       request: {
-        items: dataArray
+        items: [user]
       }
     };
 
@@ -280,8 +296,14 @@ export class UserService extends ServiceBase {
     delete this.emailData[renderResponse.id];
   }
 
-  idGen(): string {
+  private idGen(): string {
     return uuid.v4().replace(/-/g, '');
+  }
+
+  private validUsername(username: string, minLength: number, maxLength: number): boolean {
+    const regex = `^(?!.*\\.\\.)[a-z0-9_.-]{${minLength},${maxLength}}$`;
+    const match = username.match(new RegExp(regex));
+    return !!match && match.length > 0;
   }
 
   /**
