@@ -5,6 +5,7 @@ import * as locale from 'locale-code';
 import * as moment from 'moment-timezone';
 import * as util from 'util';
 import * as uuid from 'uuid';
+import * as url from 'url';
 
 import * as chassis from '@restorecommerce/chassis-srv';
 import { Server } from '@restorecommerce/chassis-srv';
@@ -591,7 +592,7 @@ export class UserService extends ServiceBase {
 
   private makeActivationEmailData(user: User, type: EmailType): any {
     let activationLink = this.cfg.get('service:activationLink');
-    activationLink = new URL(user.name + '/' + user.activation_code, activationLink);
+    activationLink = new url.URL(user.name + '/' + user.activation_code, activationLink);
 
     const data = {
       userName: user.name,
