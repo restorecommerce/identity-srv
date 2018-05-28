@@ -11,10 +11,16 @@ This microservice handles the User and Role resources.
 It provides a [gRPC](https://grpc.io/docs) interface for handling CRUD operations and user-specific functionalities.
 This service persists user data within an ArangoDB instance and generic asynchronous communication is performed with [Apache Kafka](https://kafka.apache.org/), using an event-driven approach with message interfaces defined with [Protocol Buffers](https://developers.google.com/protocol-buffers/) (see [kafka-client](https://github.com/restorecommerce/kafka-client) for more information). Resource-handling operations are implemented and exposed through the [UserService and the RoleService](service.ts), which extend the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface) generic class `ServiceBase`.
 
+Several features are meant to be configurable and disabled, if they are not necessary. Within the service's configuration file. under `service/` there is a set of flags that can be enabled or disabled:
+- `userActivationRequired`: if set to `false`, users do not require account activation to be able to log in and use their account
+- `register`: if set to `false`, the `Register` endpoint is disabled and users can only be created through the bulk creation method `createUsers`, which can be seen as an admin-only operation
+- `enableEmail`: if set to `true`, emails are sent out upon specific events, like account creation and email change
+- `activationLink`: contains the URL prefix for the activation link which is generated upon account creation or email change
+- `hbs_templates`: contains all data necessary for retrieving HBS templates from a remote server; such templates can be used to request email data rendering in order to send out all necessary emails (this is ignored if `enableEmail` is set to false).
 
 ## gRPC Interface
 
-This microservice exposes the following gRPC endpoints for User resource.
+This microservice exposes the following gRPC endpoints:
 
 ### User
 A User resource.
@@ -41,7 +47,7 @@ A User resource.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | role | string | required | role identifier |
-| Attribute | [ ] `io.restorecommerce.user.RoleAssociation.Attribute` | optional | attributes associated with User|
+| Attribute | [ ] `io.restorecommerce.user.RoleAssociation.Attribute` | optional | attributes associated with the User's role |
 
 `io.restorecommerce.user.RoleAssociation.Attribute`
 
@@ -61,7 +67,7 @@ A list of User resources.
 
 #### Register
 Used to register a User.
-Requests are performed providing `io.restorecommerce.user.RegisterRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message. If a valid configuration for retrieving email-related [handlebars](http://handlebarsjs.com/) templates from a remote server is provided, an email request is performed upon a successful registration. Such config should correspond to the `client/hbs_templates` element in the config files. The email contains the user's activation code. Email requests are done by emitting a`sendEmail` notification event, which is consumed by [notification-srv](http://github.com/restorecommerce/notification-srv) to send an email. 
+Requests are performed providing `io.restorecommerce.user.RegisterRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message. If a valid configuration for retrieving email-related [handlebars](http://handlebarsjs.com/) templates from a remote server is provided, an email request is performed upon a successful registration. Such config should correspond to the `service/hbs_templates` element in the config files. The email contains the user's activation code. Email requests are done by emitting a`sendEmail` notification event, which is consumed by [notification-srv](http://github.com/restorecommerce/notification-srv) to send an email. 
 Please note that this email operation also implies template rendering, which is performed by emitting a `renderRequest` event, which is consumed by the [rendering-srv](http://github.com/restorecommerce/rendering-srv). Therefore, the email sending step requires both a running instance of the rendering-srv and the notification-srv (or similar services which implement the given interfaces) as well as a remote server containing a set of email templates. This is decoupled from the service's core functionalities and it is automatically disabled if no templates configuration is provided. 
 
 Moreover, the `register` operation itself is optional and one can enable or disable it through the `service.register` configuration value. If disabled, the only endpoint for user creation is `create`.
@@ -70,12 +76,14 @@ Moreover, the `register` operation itself is optional and one can enable or disa
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| guest | bool | optional | guest user, default value is `false` |
-| name | string | required | user name |
-| email | string | required | user email ID |
-| password | string | required | user password |
-| creator | string | optional | user id of the creator |
-| Role | Role | optional | Role |
+| guest | bool | optional | Guest user, default value is `false` |
+| name | string | required | User name |
+| email | string | required | User email ID |
+| password | string | required | User password |
+| creator | string | required | User id of the creator |
+| timezone | string | optional | The User's timezone setting (defaults to 'Europe/Berlin') |
+| locale | string | optional | The User's locale setting (defaults to 'de-DE') |
+| role_associations | `io.restorecommerce.user.RoleAssociation`[] | required | A list of roles with their associated attributes |
 
 #### Activate
 Used to activate a User. The ``service.userActivationRequired`` config value turns the user activation process on or off. Requests are performed providing `io.restorecommerce.user.ActiveRequest` protobuf message as input and responses are a `google.protobuf.Empty` message.
@@ -216,8 +224,8 @@ List of events emitted to Kafka by this microservice for below topics:
   - healthCheckResponse
   - versionResponse
 
-For `sendEmail` event protobuf message structure see [notification-srv](https://github.com/restorecommerce/notification-srv),
-for `renderRequest` and `renderResponse` event protobuf message structure see [rendering-srv](https://github.com/restorecommerce/rendering-srv).
+For `renderRequest` and `renderResponse` the message structures are defined in [rendering-srv](https://github.com/restorecommerce/rendering-srv) and for `sendEmail` it is defined in [notification-srv](https://github.com/restorecommerce/notification-srv),
+
 
 ## Chassis Service
 
