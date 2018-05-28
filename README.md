@@ -20,7 +20,7 @@ Several features are meant to be configurable and disabled, if they are not nece
 
 ## gRPC Interface
 
-This microservice exposes the following gRPC endpoints for User resource.
+This microservice exposes the following gRPC endpoints:
 
 ### User
 A User resource.
@@ -224,8 +224,8 @@ List of events emitted to Kafka by this microservice for below topics:
   - healthCheckResponse
   - versionResponse
 
-For `sendEmail` event protobuf message structure see [notification-srv](https://github.com/restorecommerce/notification-srv),
-for `renderRequest` and `renderResponse` event protobuf message structure see [rendering-srv](https://github.com/restorecommerce/rendering-srv).
+For `renderRequest` and `renderResponse` the message structures are defined in [rendering-srv](https://github.com/restorecommerce/rendering-srv) and for `sendEmail` it is defined in [notification-srv](https://github.com/restorecommerce/notification-srv),
+
 
 ## Chassis Service
 
