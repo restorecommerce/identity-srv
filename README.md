@@ -33,13 +33,17 @@ A User resource.
 | created | double | required | Date when user was created |
 | modified | double | required | Date when user was modified |
 | creator | string | optional | User ID of the creator |
-| name | string | required | User name |
+| name | string | required | Username |
+| first_name | string | required | User's first name |
+| last_name | string | required | User's last name |
 | email | string | required | Email address |
-| active | bool | optional | If the user was activated via the activation process |
-| activation_code | string | optional | Activation code used in the activation process |
+| active | bool | optional | Value is `true` if the user was successfully activated |
+| activation_code | string | optional | Activation code used in the activation process (cleared after successful activation) |
 | password | string | required | Raw password, not stored |
+| timezone | string | optional | The User's timezone setting (defaults to 'Europe/Berlin') |
+| locale | string | optional | The User's locale setting (defaults to 'de-DE') |
 | password_hash | bytes | optional | Encrypted password, stored |
-| guest | bool | optional | A guest user. |
+| guest | bool | optional | If user is guest |
 | role_associations | [ ] `io.restorecommerce.user.RoleAssociation` | optional | Role associations |
 
 `io.restorecommerce.user.RoleAssociation`
@@ -77,7 +81,9 @@ Moreover, the `register` operation itself is optional and one can enable or disa
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | guest | bool | optional | Guest user, default value is `false` |
-| name | string | required | User name |
+| name | string | required | Username |
+| first_name | string | required | User's first name |
+| last_name | string | required | User's last name |
 | email | string | required | User email ID |
 | password | string | required | User password |
 | creator | string | required | User id of the creator |
