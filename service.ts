@@ -153,7 +153,7 @@ export class UserService extends ServiceBase {
     const usersList = call.request.items;
     for (let i = 0; i < usersList.length; i++) {
       const user = usersList[i];
-      await this.createUser(user);
+      await this.createUser(user, context);
     }
 
     return userListReturn;
@@ -163,7 +163,7 @@ export class UserService extends ServiceBase {
    * Validates User and creates it in DB,
    * @param user
    */
-  private async createUser(user: User): Promise<any> {
+  private async createUser(user: User, context: any): Promise<any> {
     const logger = this.logger;
 
     // User creation
@@ -268,7 +268,7 @@ export class UserService extends ServiceBase {
   async register(call: any, context: any): Promise<any> {
 
     const user: User = call.request || call;
-    const createdUser = await this.createUser(user);
+    const createdUser = await this.createUser(user, context);
 
     this.logger.info('user registered', user);
     await this.topics['user.resource'].emit('registered', user);
