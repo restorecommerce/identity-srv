@@ -153,22 +153,17 @@ export class UserService extends ServiceBase {
     const usersList = call.request.items;
     for (let i = 0; i < usersList.length; i++) {
       const user = usersList[i];
-      await this.register(user, context);
-      user.active = true;
+      await this.createUser(user);
     }
 
     return userListReturn;
   }
 
   /**
-   * Endpoint register, register a user or guest user.
-   * @param  {any} call request containing a  User
-   * @param {context}
-   * @return type is any since it can be guest or user type
+   * Validates User and creates it in DB,
+   * @param user
    */
-  async register(call: any, context: any): Promise<any> {
-
-    const user: User = call.request || call;
+  private async createUser(user: User): Promise<any> {
     const logger = this.logger;
 
     // User creation
@@ -261,18 +256,29 @@ export class UserService extends ServiceBase {
       }
     };
 
-    await super.create(serviceCall, context);
-    logger.info('user registered', user);
+    return super.create(serviceCall, context);
+  }
+
+  /**
+   * Endpoint register, register a user or guest user.
+   * @param  {any} call request containing a  User
+   * @param {context}
+   * @return type is any since it can be guest or user type
+   */
+  async register(call: any, context: any): Promise<any> {
+
+    const user: User = call.request || call;
+    const createdUser = await this.createUser(user);
+
+    this.logger.info('user registered', user);
     await this.topics['user.resource'].emit('registered', user);
 
     if (this.emailEnabled) {
-
       this.emailData[user.email] = this.makeNotificationData(user);
-
       const renderRequest = this.makeActivationEmailData(user, 'register');
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
-    // Response
+
     return user;
   }
 
