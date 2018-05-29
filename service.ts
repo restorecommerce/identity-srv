@@ -580,18 +580,20 @@ export class UserService extends ServiceBase {
       this.changeBodyTpl = await response.text();
 
       response = await fetch(prefix + templates['resources'], {});
-      const externalRrc = JSON.parse(await response.text());
-      this.emailStyle = prefix + externalRrc.style;
+      if (response.status == 200) {
+        const externalRrc = JSON.parse(await response.text());
+        this.emailStyle = prefix + externalRrc.style;
+      }
 
       this.emailEnabled = true;
     } catch (err) {
+      this.emailEnabled = false;
+      this.sendEmail = null;
       if (err.code == 'ECONNREFUSED' || err.message == 'ECONNREFUSED') {
-        this.emailEnabled = false;
-        this.sendEmail = null;
         this.logger.warn('An error occurred while attempting to load email templates from'
           + ' remote server. Email operations will be disabled.');
       } else {
-        throw err;
+        this.logger.error('Unexpected error occurred while loading email templates', err.message);
       }
     }
   }
