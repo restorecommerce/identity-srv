@@ -155,6 +155,17 @@ A simplified version of `read`, which only filters users by username, email and/
 | name | string | required | User name |
 | email | string | required | User EmailID |
 
+#### FindByRole
+
+A custom endpoint in order to filter a user by its role and any attributes associated with it. Requests are performed providing `io.restorecommerce.user.FindByRoleRequest` protobuf message as input and responses contain a list  `io.restorecommerce.user.User` messages.
+
+`io.restorecommerce.user.FindRequest`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| role | string | required | Role name |
+| attributes | `io.restorecommerce.user.RoleAssociation.Attribute`[] | optional | Role attributes |
+
 ### Role
 A Role resource.
 
