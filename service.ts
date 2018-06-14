@@ -14,6 +14,7 @@ import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
+import { SSL_OP_CRYPTOPRO_TLSEXT_BUG } from 'constants';
 
 const Events = kafkaClient.Events;
 const database = chassis.database;
@@ -558,14 +559,17 @@ export class UserService extends ServiceBase {
    */
   async findByRole(call: any, context: any): Promise<User[]> {
     const role: string = call.role || call.request.role || undefined;
-    const reqAttributes: any[] = call.attributes || call.request.attributes || [];
+    if (!role) {
+      throw new errors.InvalidArgument('missing role name');
+    }
 
+    const reqAttributes: any[] = call.attributes || call.request.attributes || [];
 
     const result = await this.roleService.read({
       request: {
-        filter: {
+        filter: toStruct({
           name: role
-        }, field: [{
+        }), field: [{
           name: 'id',
           include: 1
         }]
