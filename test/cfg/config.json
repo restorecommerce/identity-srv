@@ -61,6 +61,7 @@
         "register": {},
         "unregister": {},
         "login": {},
+        "findByRole": {},
         "create": {},
         "read": {},
         "delete": {},
@@ -383,6 +384,11 @@
           ]
         },
         "login": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "findByRole": {
           "transport": [
             "grpcIdentity"
           ]

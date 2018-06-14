@@ -167,6 +167,18 @@ describe('testing identity-srv', () => {
           should.exist(result.data.items);
         });
       });
+      describe('find by role', function findUserByRole(): void {
+        it('should return a user', async function findUser(): Promise<void> {
+          const result = await (userService.findByRole({
+            role: 'normal_user',
+          }));
+          should.exist(result);
+          should.not.exist(result.error);
+          should.exist(result.data);
+          should.exist(result.data.items);
+        });
+      });
+
       describe('login', function login(): void {
         it('should return verify password and return the user', async function login(): Promise<void> {
           const result = await (userService.login({

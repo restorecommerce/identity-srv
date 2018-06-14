@@ -552,6 +552,73 @@ export class UserService extends ServiceBase {
   }
 
   /**
+   *
+   * @param call
+   * @param context
+   */
+  async findByRole(call: any, context: any): Promise<User[]> {
+    const role: string = call.role || call.request.role || undefined;
+    const reqAttributes: any[] = call.attributes || call.request.attributes || [];
+
+
+    const result = await this.roleService.read({
+      request: {
+        filter: {
+          name: role
+        }, field: [{
+          name: 'id',
+          include: 1
+        }]
+      }
+    }, {});
+
+    if (_.isEmpty(result) || _.isEmpty(result.items) || result.items.total_count == 0) {
+      throw new errors.NotFound(`Role ${role} does not exist`);
+    }
+
+    const roleObj = result.items[0];
+    const id = roleObj.id;
+
+    // note: inefficient, a custom AQL query should be the final solution
+    const userResult = await this.read({
+      request: {}
+    }, {});
+    if (_.isEmpty(userResult) || _.isEmpty(userResult.items) || userResult.items.total_count == 0) {
+      throw new errors.NotFound('No users were found in the system');
+    }
+
+    const users: User[] = userResult.items;
+
+    let usersWithRole = [];
+
+    for (let user of users) {
+      let found = false;
+      if (user.role_associations) {
+        for (let roleAssoc of user.role_associations) {
+          if (roleAssoc.role == id) {
+            found = true;
+            if (roleAssoc.attributes && reqAttributes) {
+              for (let attribute of reqAttributes) {
+                if (!_.find(roleAssoc.attributes, attribute)) {
+                  found = false;
+                  break;
+                }
+              }
+            }
+
+            if (found) {
+              usersWithRole.push(user);
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    return usersWithRole;
+  }
+
+  /**
    * Initializes useful data for rendering requests
    * before sending emails (user registration / change).
    * @param {kafkaClient.Topic} renderingTopic Kafka topic with
