@@ -1,7 +1,6 @@
 import * as _ from 'lodash';
 import * as bcrypt from 'bcryptjs';
 import * as co from 'co';
-import * as locale from 'locale-code';
 import * as moment from 'moment-timezone';
 import * as util from 'util';
 import * as uuid from 'uuid';
@@ -50,7 +49,7 @@ export interface User {
   password_hash: string; /// Encrypted password, stored
   guest: boolean;
   role_associations: RoleAssociation[];
-  locale: string;
+  locale_id: string;
   timezone: string;
 }
 
@@ -245,10 +244,6 @@ export class UserService extends ServiceBase {
 
     if (!user.timezone || !moment.tz.zone(user.timezone)) {
       user.timezone = 'Europe/Berlin';  // fallback
-    }
-
-    if (!user.locale || !locale.validate(user.locale)) {
-      user.locale = 'de-DE';  // fallback
     }
 
     const serviceCall = {

@@ -309,17 +309,14 @@ describe('testing identity-srv', () => {
 
             const newUser = result.data.items[0];
             newUser.timezone.should.equal('Europe/Moscow');
-            newUser.locale.should.equal('de-CH');
             newUser.timezone.should.not.equal(user.timezone);
-            newUser.locale.should.not.equal(user.locale);
           };
           await topic.on('usersModified', listener);
 
           const offset = await topic.$offset(-1);
           const result = await userService.update([{
             id: testUserID,
-            timezone: 'Europe/Moscow',
-            locale: 'de-CH'
+            timezone: 'Europe/Moscow'
           }]);
 
           await topic.$offset(offset);
