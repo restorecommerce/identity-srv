@@ -665,8 +665,12 @@ export class UserService extends ServiceBase {
   }
 
   private makeActivationEmailData(user: User, type: EmailType): any {
-    let activationLink = this.cfg.get('service:activationLink');
-    activationLink = new url.URL(user.name + '/' + user.activation_code, activationLink);
+    let activationLink: string = this.cfg.get('service:activationLink');
+    if (!activationLink.endsWith('/')) {
+      activationLink += '/';
+    }
+
+    activationLink = `${activationLink}${user.name}/${user.activation_code}`;
 
     const data = {
       userName: user.name,
