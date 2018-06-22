@@ -564,12 +564,13 @@ export class UserService extends ServiceBase {
       request: {
         filter: toStruct({
           name: role
-        }), field: [{
+        }),
+        field: [{
           name: 'id',
           include: 1
         }]
       }
-    }, {});
+    });
 
     if (_.isEmpty(result) || _.isEmpty(result.items) || result.items.total_count == 0) {
       throw new errors.NotFound(`Role ${role} does not exist`);
@@ -747,7 +748,9 @@ export class RoleService extends ServiceBase {
       const roleID = roleAssociation.role;
       const result = await super.read({
         request: {
-          id: roleID
+          filter: {
+            id: roleID
+          }
         }
       }, {});
 
