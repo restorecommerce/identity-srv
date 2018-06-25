@@ -1,4 +1,3 @@
-import * as co from 'co';
 import * as sconfig from '@restorecommerce/service-config';
 import * as util from 'util';
 import * as _ from 'lodash';
@@ -56,7 +55,7 @@ export class Worker {
     const server = new chassis.Server(cfg.get('server'), logger);
 
     // database
-    const db = await co(chassis.database.get(cfg.get('database:main'), logger));
+    const db = await chassis.database.get(cfg.get('database:main'), logger);
 
     // topics
     logger.verbose('Setting up topics');
@@ -149,27 +148,18 @@ class UserCommandInterface extends chassis.CommandInterface {
     return {
       unregistered: async function restoreUnregistered(message: any,
         eventName: string): Promise<any> {
-        await co(db.delete(`${resource}s`, { id: message.id }));
+        await db.delete(`${resource}s`, { id: message.id });
         return {};
       },
       usersModified: async function restoreUsersModified(message: any,
         eventName: string): Promise<any> {
-        await co(db.update(`${resource}s`, { id: message.id }),
+        await db.update(`${resource}s`, { id: message.id },
           message);
-        return {};
-      },
-      activated: async function restoreActivated(message: any,
-        eventName: string): Promise<any> {
-        const patch = {
-          active: true,
-          activation_code: '',
-        };
-        await co(db.update(`${resource}s`, { id: message.id }, patch));
         return {};
       },
       registered: async function restoreUsersRegistered(message: any,
         eventName: string): Promise<any> {
-        await co(db.insert(`${resource}s`, message));
+        await db.insert(`${resource}s`, message);
         return {};
       },
     };
