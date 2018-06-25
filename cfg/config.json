@@ -16,6 +16,7 @@
       }
     },
     "activationLink": "http://restorecommerce.io/activate_user/",
+    "emailConfirmationLink": "http://restorecommerce.io/confirm_email_change/",
     "minUsernameLength": 8,
     "maxUsernameLength": 20
   },
@@ -112,12 +113,19 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.PasswordChanged"
       },
-      "emailIdChanged": {
+      "emailChangeConfirmed": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.user.EmailIdChanged"
+        "messageObject": "io.restorecommerce.user.EmailChanged"
+      },
+      "emailChangedRequested": {
+        "protos": [
+          "io/restorecommerce/user.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.user.EmailChangeRequested"
       },
       "unregistered": {
         "protos": [
@@ -245,7 +253,12 @@
             "grpcIdentity"
           ]
         },
-        "changeEmailId": {
+        "requestEmailChange": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "confirmEmailChange": {
           "transport": [
             "grpcIdentity"
           ]

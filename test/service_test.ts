@@ -7,6 +7,7 @@ import * as Logger from '@restorecommerce/logger';
 import { Worker } from '../worker';
 import * as sconfig from '@restorecommerce/service-config';
 import { equal } from 'assert';
+import { UserService, RoleService, User } from '../service';
 
 const Events = kafkaClient.Events;
 
@@ -21,7 +22,7 @@ let logger;
 let events;
 let topic;
 let roleID;
-let roleService, userService;
+let roleService: any, userService: any;
 
 async function start(): Promise<void> {
   cfg = sconfig(process.cwd() + '/test');
@@ -125,11 +126,10 @@ describe('testing identity-srv', () => {
           data.email.should.equal(user.email);
           data.active.should.be.false();
           data.activation_code.should.not.be.empty();
-          const filter = grpcClient.toStruct({
-            id: data.id,
-          });
           const getResult = await userService.read({
-            filter,
+            filter: grpcClient.toStruct({
+              id: data.id
+            })
           });
           should.exist(getResult);
           should.exist(getResult.data);
@@ -271,13 +271,25 @@ describe('testing identity-srv', () => {
           pwHashA.should.not.equal(pwHashB);
         });
       });
-      describe('calling changeEmailId', function changeEmailId(): void {
-        it('should change the Email ID', async function changeEmailId(): Promise<void> {
+      describe('calling changeEmail', function changeEmailId(): void {
+        it('should request the email change and persist it without overriding the old email', async function requestEmailChange(): Promise<void> {
           this.timeout(3000);
-          const listener = function listener(message: any, context: any): void {
-            emailOld.should.not.equal(message.email);
+          const validate = (user: User) => {
+            const emailNew = user.emailNew;
+            const email = user.email;
+            const activationCode = user.activation_code;
+
+            emailNew.should.not.be.null();
+            emailOld.should.not.equal(emailNew);
+            emailNew.should.equal('newmail@newmail.com');
+            activationCode.should.not.be.null();
           };
-          await topic.on('emailIdChanged', listener);
+
+          const listener = function listener(message: any, context: any): void {
+            validate(message);
+          };
+
+          await topic.on('emailChangeRequested', listener);
           const offset = await topic.$offset(-1);
           let result = await userService.find({
             id: testUserID,
@@ -285,21 +297,59 @@ describe('testing identity-srv', () => {
           should.exist(result.data);
           should.exist(result.data.items);
           const emailOld = result.data.items[0].email;
-          await (userService.changeEmailId({
+          await (userService.requestEmailChange({
             id: testUserID,
             email: 'newmail@newmail.com',
           }));
-          await topic.$offset(offset);
-          result = await (userService.find({
-            id: testUserID,
+
+          await topic.$wait(offset);
+
+          result = await (userService.read({
+            filter: grpcClient.toStruct({
+              id: testUserID
+            })
           }));
-          const emailNew = result.data.items[0].email;
-          emailNew.should.not.be.null();
-          emailOld.should.not.equal(emailNew);
+
+          const dbUser: User = result.data.items[0];
+          validate(dbUser);
+        });
+
+        it('should change the user email upon confirmation', async function confirmEmailChange(): Promise<void> {
+          this.timeout(3000);
+          const validate = (user: User) => {
+            const email = user.email;
+            email.should.equal('newmail@newmail.com');
+          };
+
+          const listener = function listener(message: any, context: any): void {
+            validate(message);
+          };
+          await topic.on('emailChangeConfirmed', listener);
+          const offset = await topic.$offset(-1);
+          let result = await userService.find({
+            id: testUserID,
+          });
+          should.exist(result.data);
+          should.exist(result.data.items);
+          const activationCode = result.data.items[0].activation_code;
+          result = await (userService.confirmEmailChange({
+            activation_code: activationCode,
+            name: user.name
+          }));
+
+          await topic.$wait(offset);
+          result = await (userService.read({
+            filter: grpcClient.toStruct({
+              id: testUserID
+            })
+          }));
+          const dbUser: User = result.data.items[0];
+          validate(dbUser);
+          dbUser.emailNew.should.be.empty();
+          dbUser.activation_code.should.be.empty();
         });
       });
       describe('calling update', function changeEmailId(): void {
-
         it('should update generic fields', async function changeEmailId(): Promise<void> {
           this.timeout(3000);
           const listener = function listener(message: any, context: any): void {
@@ -311,7 +361,7 @@ describe('testing identity-srv', () => {
             newUser.timezone.should.equal('Europe/Moscow');
             newUser.timezone.should.not.equal(user.timezone);
           };
-          await topic.on('usersModified', listener);
+          await topic.on('userModified', listener);
 
           const offset = await topic.$offset(-1);
           const result = await userService.update([{
@@ -319,7 +369,7 @@ describe('testing identity-srv', () => {
             timezone: 'Europe/Moscow'
           }]);
 
-          await topic.$offset(offset);
+          await topic.$wait(offset);
         });
 
         it('should not allow to update "special" fields', async function changeEmailId(): Promise<void> {

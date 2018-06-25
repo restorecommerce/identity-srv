@@ -30,8 +30,10 @@ const password = {
   }
 };
 
-export interface Call {
-  request: User;
+export type TUser = User | FindUser | ActivateUser;
+export interface Call<TUser> {
+  request?: TUser;
+  [key: string]: any;
 }
 
 export interface User {
@@ -43,6 +45,7 @@ export interface User {
   first_name: string;
   last_name: string;
   email: string; /// Email address
+  emailNew: string; /// Email address
   active: boolean; /// If the user was activated via the activation process
   activation_code: string; /// Activation code used in the activation process
   password: string; /// Raw password, not stored
@@ -51,6 +54,17 @@ export interface User {
   role_associations: RoleAssociation[];
   locale_id: string;
   timezone: string;
+}
+
+export interface FindUser {
+  id?: string;
+  email?: string;
+  name?: string;
+}
+
+export interface ActivateUser {
+  name: string;
+  activation_code: string;
 }
 
 export interface RoleAssociation {
@@ -63,6 +77,11 @@ export interface Attribute {
   value: string;
 }
 
+export interface EmailChange {
+  email: string;
+  id: string;
+}
+
 export interface Role {
   id: string;
   created: number;
@@ -70,8 +89,6 @@ export interface Role {
   name: string;
   description: string;
 }
-
-type EmailType = 'register' | 'emailChange';
 
 export class UserService extends ServiceBase {
   db: any;
@@ -83,7 +100,6 @@ export class UserService extends ServiceBase {
   layoutTpl: string;
   registerBodyTpl: string;
   changeBodyTpl: string;
-  emailData: any;
   emailEnabled: boolean;
   emailStyle: string;
   roleService: RoleService;
@@ -95,8 +111,6 @@ export class UserService extends ServiceBase {
     this.db = db;
     this.topics = topics;
     this.logger = logger;
-
-    this.emailData = {};
     this.roleService = roleService;
   }
 
@@ -105,9 +119,9 @@ export class UserService extends ServiceBase {
    * @param {call} call request containing either userid, username or email
    * @return the list of users found
    */
-  async find(call: Call, context: any): Promise<any> {
+  async find(call: Call<FindUser>, context?: any): Promise<any> {
     const request = call.request;
-    const logger = context.logger;
+    const logger = this.logger;
     let userID = request.id || '';
     let userName = request.name || '';
     let mailID = request.email || '';
@@ -147,7 +161,7 @@ export class UserService extends ServiceBase {
    * @param {context}
    * @return type is any since it can be guest or user type
    */
-  async create(call: any, context: any): Promise<any> {
+  async create(call: any, context?: any): Promise<any> {
     const userListReturn = [];
     const that = this;
     const usersList = call.request.items;
@@ -163,7 +177,7 @@ export class UserService extends ServiceBase {
    * Validates User and creates it in DB,
    * @param user
    */
-  private async createUser(user: User, context: any): Promise<any> {
+  private async createUser(user: User, context?: any): Promise<any> {
     const logger = this.logger;
 
     // User creation
@@ -261,7 +275,7 @@ export class UserService extends ServiceBase {
    * @param {context}
    * @return type is any since it can be guest or user type
    */
-  async register(call: any, context: any): Promise<any> {
+  async register(call: any, context?: any): Promise<any> {
 
     const user: User = call.request || call;
     const createdUser = await this.createUser(user, context);
@@ -270,8 +284,7 @@ export class UserService extends ServiceBase {
     await this.topics['user.resource'].emit('registered', user);
 
     if (this.emailEnabled) {
-      this.emailData[user.email] = this.makeNotificationData(user);
-      const renderRequest = this.makeActivationEmailData(user, 'register');
+      const renderRequest = this.makeActivationEmailData(user);
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
 
@@ -282,21 +295,36 @@ export class UserService extends ServiceBase {
    * Endpoint sendEmail to trigger sending mail notification.
    * @param  {any} renderResponse
    */
-  async sendEmail(renderResponse: any): Promise<any> {
-    const emailAddress = renderResponse.id;
-    if (!this.emailData[emailAddress]) {
-      this.logger.silly('Unknown rendering response with ID', emailAddress, '; discarding message.');
+  async sendEmail(renderResponse: any): Promise<void> {
+    const responseID: string = renderResponse.id;
+    if (!responseID.startsWith('identity')) {
+      this.logger.verbose(`Discarding render response ${responseID}`);
+      return;
+    }
+
+    const split = responseID.split('#');
+    if (split.length != 2) {
+      this.logger.verbose(`Unknown render response ID format: ${responseID}`);
+      return;
+    }
+
+    const emailAddress = split[1];
+    const user = await super.read({
+      request: {
+        filter: toStruct({
+          email: emailAddress
+        })
+      }
+    });
+
+    if (_.isEmpty(user.items)) {
+      this.logger.silly(`Received rendering response from unknown email address ${emailAddress}; discarding`);
       return;
     }
 
     const response = unmarshallProtobufAny(renderResponse.response[0]);
-    const data = this.emailData[emailAddress];
-    const emailData = data.data;
-
-    emailData.body = response.body;
-    emailData.subject = response.subject;
+    const emailData = this.makeNotificationData(emailAddress, response);
     await this.topics.notification.emit('sendEmail', emailData);
-    delete this.emailData[renderResponse.id];
   }
 
   private idGen(): string {
@@ -315,15 +343,15 @@ export class UserService extends ServiceBase {
    *  @param {any} context
    *  @return empty response
    */
-  async activate(call: Call, context: any): Promise<any> {
+  async activate(call: Call<ActivateUser>, context?: any): Promise<any> {
     const request = call.request;
-    const logger = context.logger;
+    const logger = this.logger;
     const userName = request.name;
-    const activation_code = request.activation_code;
+    const activationCode = request.activation_code;
     if (!userName) {
       throw new errors.InvalidArgument('argument id is empty');
     }
-    if (!activation_code) {
+    if (!activationCode) {
       throw new errors.InvalidArgument('argument activation_code is empty');
     }
     const filter = toStruct({
@@ -340,7 +368,7 @@ export class UserService extends ServiceBase {
       throw new errors.FailedPrecondition('activation request to an active user' +
         ' which still has the activation code');
     }
-    if ((!user.activation_code) || user.activation_code !== activation_code) {
+    if ((!user.activation_code) || user.activation_code !== activationCode) {
       logger.debug('wrong activation code', user);
       throw new errors.FailedPrecondition('wrong activation code');
     }
@@ -365,9 +393,9 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {User} returns user details
    */
-  async changePassword(call: any, context: any): Promise<any> {
+  async changePassword(call: any, context?: any): Promise<any> {
     const request = call.request;
-    const logger = context.logger;
+    const logger = this.logger;
     const userID = request.id;
 
     const pw = request.password;
@@ -408,9 +436,9 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {User} returns user details
    */
-  async changeEmailId(call: Call, context: any): Promise<any> {
+  async requestEmailChange(call: Call<EmailChange>, context?: any): Promise<any> {
     const request = call.request;
-    const logger = context.logger;
+    const logger = this.logger;
     const userID = request.id;
     const email = request.email;
     const filter = toStruct({
@@ -421,37 +449,74 @@ export class UserService extends ServiceBase {
       logger.debug('user does not exist', userID);
       throw new errors.NotFound('user does not exist');
     }
-    const user = users.items[0];
-    // Deactivate the user since mailID has changed
-    const userActivationRequired: Boolean = this.isUserActivationRequired();
-    logger.silly('user activation required', userActivationRequired);
-    if (userActivationRequired) {
-      user.active = false;
-      user.activation_code = this.idGen();
-    } else {
-      user.active = true;
-    }
-    let dataArray = [];
-    user.email = email;
-    dataArray.push(user);
+    const user: User = users.items[0];
+
+    user.emailNew = email;
+    user.activation_code = this.idGen();
     const serviceCall = {
       request: {
-        items: dataArray
+        items: [user]
       }
     };
     await super.update(serviceCall, context);
-    logger.info('EmailID changed for user', userID);
-    await this.topics['user.resource'].emit('emailIdChanged', user);
+    logger.info('Email change requested for user', userID);
+    await this.topics['user.resource'].emit('emailChangeRequested', user);
 
     // Contextual Data for rendering on Notification-srv before sending mail
     const usersUpdated = await super.read({ request: { filter } }, context);
     const userUpdated = usersUpdated.items[0];
 
     if (this.emailEnabled) {
-      this.emailData[user.email] = this.makeNotificationData(user);
-      const renderRequest = this.makeActivationEmailData(user, 'emailChange');
+      const renderRequest = this.makeEmailConfirmationData(user);
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
+    return {};
+  }
+
+  /**
+   * Endpoint to confirm email change.
+   * @param  {Call} call request containing new email Id of User
+   * @param {any} context
+   * @return {User} returns user details
+   */
+  async confirmEmailChange(call: Call<ActivateUser>, context?: any): Promise<any> {
+    const request = call.request;
+    const logger = this.logger;
+    const name = request.name;
+    const activationCode = request.activation_code;
+
+
+    const users = await this.find({
+      request: {
+        name
+      }
+    });
+    if (users.total_count === 0) {
+      logger.debug('user does not exist', name);
+      throw new errors.NotFound('user does not exist');
+    }
+
+    const user: User = users.items[0];
+
+    if (user.activation_code !== activationCode) {
+      logger.debug('wrong activation code', user);
+      throw new errors.FailedPrecondition('wrong activation code');
+    }
+
+    user.email = user.emailNew;
+    user.emailNew = '';
+    user.activation_code = '';
+
+    const serviceCall = {
+      request: {
+        items: [user]
+      }
+    };
+
+    await super.update(serviceCall, context);
+    logger.info('Email address changed for user', user.id);
+
+    await this.topics['user.resource'].emit('emailChangeConfirmed', user);
     return {};
   }
 
@@ -461,7 +526,7 @@ export class UserService extends ServiceBase {
    * @param call
    * @param context
    */
-  async update(call: any, context: any): Promise<any> {
+  async update(call: any, context?: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
       throw new errors.InvalidArgument('No items were provided for update');
@@ -488,7 +553,7 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {User} returns user details
    */
-  async login(call: any, context: any): Promise<any> {
+  async login(call: any, context?: any): Promise<any> {
     if (_.isEmpty(call) || _.isEmpty(call.request) ||
       (_.isEmpty(call.request.name) && _.isEmpty(call.request.email))) {
       throw new errors.InvalidArgument('Missing credentials');
@@ -519,9 +584,9 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {} returns empty response
    */
-  async unregister(call: any, context: any): Promise<any> {
+  async unregister(call: any, context?: any): Promise<any> {
     const request = call.request;
-    const logger = context.logger;
+    const logger = this.logger;
     const userID = request.id;
     logger.silly('unregister', userID);
     const filter = toStruct({
@@ -552,7 +617,7 @@ export class UserService extends ServiceBase {
    * @param call
    * @param context
    */
-  async findByRole(call: any, context: any): Promise<User[]> {
+  async findByRole(call: any, context?: any): Promise<any> {
     const role: string = call.role || call.request.role || undefined;
     if (!role) {
       throw new errors.InvalidArgument('missing role name');
@@ -580,7 +645,7 @@ export class UserService extends ServiceBase {
     const id = roleObj.id;
 
     // note: inefficient, a custom AQL query should be the final solution
-    const userResult = await this.read({
+    const userResult = await super.read({
       request: {}
     }, {});
     if (_.isEmpty(userResult) || _.isEmpty(userResult.items) || userResult.items.total_count == 0) {
@@ -665,7 +730,7 @@ export class UserService extends ServiceBase {
     }
   }
 
-  private makeActivationEmailData(user: User, type: EmailType): any {
+  private makeActivationEmailData(user: User): any {
     let activationLink: string = this.cfg.get('service:activationLink');
     if (!activationLink.endsWith('/')) {
       activationLink += '/';
@@ -674,24 +739,42 @@ export class UserService extends ServiceBase {
     activationLink = `${activationLink}${user.name}/${user.activation_code}`;
 
     const data = {
-      userName: user.name,
+      firstName: user.first_name,
+      lastName: user.last_name,
       activationLink
     };
 
-    let emailBody: any, emailSubject: any;
-    if (type == 'register') {
-      emailBody = this.registerBodyTpl;
-      emailSubject = this.registerSubjectTpl;
-    } else if (type == 'emailChange') {
-      emailBody = this.changeBodyTpl;
-      emailSubject = this.changeSubjectTpl;
+    const emailBody = this.registerBodyTpl;
+    const emailSubject = this.registerSubjectTpl;
+    return this.makeRenderRequestMsg(user, emailSubject, emailBody, data);
+  }
+
+  private makeEmailConfirmationData(user: User): any {
+    const emailBody = this.changeBodyTpl;
+    const emailSubject = this.changeSubjectTpl;
+
+    let link: string = this.cfg.get('service:emailConfirmationLink'); // prefix
+    if (!link.endsWith('/')) {
+      link += '/';
     }
+
+    link = `${link}${user.name}/${user.email}`; // actual email
+
+    const data = {
+      firstName: user.first_name,
+      lastName: user.last_name,
+      confirmationLink: link
+    };
+    return this.makeRenderRequestMsg(user, emailSubject, emailBody, data);
+  }
+
+  private makeRenderRequestMsg(user: User, subject: any, body: any, data: any): any {
     return {
-      id: user.email,
+      id: `identity#${user.email}`,
       payload: [{
         templates: marshallProtobufAny({
-          body: { body: emailBody, layout: this.layoutTpl },
-          subject: { body: emailSubject }
+          body: { body, layout: this.layoutTpl },
+          subject: { body: subject }
         }),
         data: marshallProtobufAny(data),
         style: this.emailStyle, // URL to a style
@@ -700,15 +783,13 @@ export class UserService extends ServiceBase {
     };
   }
 
-  private makeNotificationData(user: User): any {
+  private makeNotificationData(emailAddress: string, response: any): any {
     return {
-      data: {
-        notifyee: user.email,
-        body: '',
-        subject: '',
-        transport: 'email',
-        target: user.email
-      }
+      notifyee: emailAddress,
+      body: response.body,
+      subject: response.subject,
+      transport: 'email',
+      target: emailAddress
     };
   }
 }

@@ -56,7 +56,8 @@
       "endpoints": {
         "activate": {},
         "changePassword": {},
-        "changeEmailId": {},
+        "requestEmailChange": {},
+        "confirmEmailChange": {},
         "find": {},
         "register": {},
         "unregister": {},
@@ -234,12 +235,19 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.PasswordChanged"
       },
-      "emailIdChanged": {
+      "emailChangeRequested": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.user.EmailIdChanged"
+        "messageObject": "io.restorecommerce.user.EmailChangeRequested"
+      },
+      "emailChangeConfirmed": {
+        "protos": [
+          "io/restorecommerce/user.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.user.EmailChangeConfirmed"
       },
       "unregistered": {
         "protos": [
@@ -363,7 +371,12 @@
             "grpcIdentity"
           ]
         },
-        "changeEmailId": {
+        "requestEmailChange": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "confirmEmailChange": {
           "transport": [
             "grpcIdentity"
           ]
