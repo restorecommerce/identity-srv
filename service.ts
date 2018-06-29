@@ -14,6 +14,7 @@ import * as Logger from '@restorecommerce/logger';
 import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
 import { SSL_OP_CRYPTOPRO_TLSEXT_BUG } from 'constants';
+import { BaseDocument } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 
 const Events = kafkaClient.Events;
 const database = chassis.database;
@@ -36,11 +37,7 @@ export interface Call<TUser> {
   [key: string]: any;
 }
 
-export interface User {
-  id: string;
-  created: number; /// Date of the user creation
-  modified: number; /// Last time the user was modified
-  creator: string; /// User ID of the creator
+export interface User extends BaseDocument {
   name: string; // The name of the user, can be used for login
   first_name: string;
   last_name: string;
@@ -82,10 +79,7 @@ export interface EmailChange {
   id: string;
 }
 
-export interface Role {
-  id: string;
-  created: number;
-  modified: number;
+export interface Role extends BaseDocument {
   name: string;
   description: string;
 }
