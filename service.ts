@@ -752,7 +752,7 @@ export class UserService extends ServiceBase {
       link += '/';
     }
 
-    link = `${link}${user.name}/${user.email}`; // actual email
+    link = `${link}${user.name}/${user.activation_code}`; // actual email
 
     const data = {
       firstName: user.first_name,
