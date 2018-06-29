@@ -42,6 +42,11 @@ async function connect(clientCfg: string, resourceName: string): Promise<any> { 
   return service;
 }
 
+let meta = {
+  modified_by: 'SYSTEM',
+  owner: [{ owner_entity: 'urn:restorecommerce:acs:model:User', owner_id: 'UserID'}]
+};
+
 describe('testing identity-srv', () => {
   before(async function startServer(): Promise<void> {
     await start();
@@ -62,16 +67,12 @@ describe('testing identity-srv', () => {
       it('should create roles', async () => {
         const role = {
           name: 'normal_user',
-          description: 'Normal user'
+          description: 'Normal user',
+          meta
         };
 
         const result = await roleService.create({
-          items: [
-            {
-              name: 'normal_user',
-              description: 'Normal user'
-            }
-          ]
+          items: [role]
         });
 
         should.not.exist(result.error);
@@ -113,9 +114,9 @@ describe('testing identity-srv', () => {
           };
           await topic.on('registered', listener);
           const result = await (userService.register(user));
+          should.not.exist(result.error);
           should.exist(result);
           should.exist(result.data);
-          should.not.exist(result.error);
           const data = result.data;
           should.exist(data.id);
           testUserID = result.data.id;
@@ -257,12 +258,15 @@ describe('testing identity-srv', () => {
           should.exist(result.data);
           should.exist(result.data.items);
           const pwHashA = result.data.items[0].password_hash;
-          await (userService.changePassword({
+          result = await (userService.changePassword({
             id: testUserID,
             password: 'notsecure',
             new_password: 'newPassword'
           }));
+          should.exist(result);
+          should.not.exist(result.error);
           await topic.$wait(offset);
+
           result = await (userService.find({
             id: testUserID,
           }));
@@ -297,10 +301,12 @@ describe('testing identity-srv', () => {
           should.exist(result.data);
           should.exist(result.data.items);
           const emailOld = result.data.items[0].email;
-          await (userService.requestEmailChange({
+          result = await (userService.requestEmailChange({
             id: testUserID,
             email: 'newmail@newmail.com',
           }));
+          should.exist(result);
+          should.not.exist(result.error);
 
           await topic.$wait(offset);
 
@@ -336,6 +342,8 @@ describe('testing identity-srv', () => {
             activation_code: activationCode,
             name: user.name
           }));
+          should.exist(result);
+          should.not.exist(result.error);
 
           await topic.$wait(offset);
           result = await (userService.read({
@@ -366,8 +374,11 @@ describe('testing identity-srv', () => {
           const offset = await topic.$offset(-1);
           const result = await userService.update([{
             id: testUserID,
-            timezone: 'Europe/Moscow'
+            timezone: 'Europe/Moscow',
+            meta
           }]);
+          should.exist(result);
+          should.not.exist(result.error);
 
           await topic.$wait(offset);
         });

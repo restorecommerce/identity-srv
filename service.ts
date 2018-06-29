@@ -31,6 +31,10 @@ const password = {
   }
 };
 
+function idGen(): string {
+  return uuid.v4().replace(/-/g, '');
+}
+
 export type TUser = User | FindUser | ActivateUser;
 export interface Call<TUser> {
   request?: TUser;
@@ -176,6 +180,8 @@ export class UserService extends ServiceBase {
 
     // User creation
     logger.silly('request to register a user');
+
+    this.setUserDefaults(user);
     if (!user.password) {
       throw new errors.InvalidArgument('argument password is empty');
     }
@@ -270,7 +276,6 @@ export class UserService extends ServiceBase {
    * @return type is any since it can be guest or user type
    */
   async register(call: any, context?: any): Promise<any> {
-
     const user: User = call.request || call;
     const createdUser = await this.createUser(user, context);
 
@@ -366,13 +371,12 @@ export class UserService extends ServiceBase {
       logger.debug('wrong activation code', user);
       throw new errors.FailedPrecondition('wrong activation code');
     }
-    let dataArray = [];
+
     user.active = true;
     user.activation_code = '';
-    dataArray.push(user);
     const serviceCall = {
       request: {
-        items: dataArray
+        items: [user]
       }
     };
     await super.update(serviceCall, context);
@@ -387,7 +391,7 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {User} returns user details
    */
-  async changePassword(call: any, context?: any): Promise<any> {
+  async changePassword(call: Call<any>, context?: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
     const userID = request.id;
@@ -410,12 +414,10 @@ export class UserService extends ServiceBase {
     }
 
     const password_hash = password.hash(newPw);
-    let dataArray = [];
     user.password_hash = password_hash;
-    dataArray.push(user);
     const serviceCall = {
       request: {
-        items: dataArray
+        items: [user]
       }
     };
     await super.update(serviceCall, context);
@@ -527,7 +529,7 @@ export class UserService extends ServiceBase {
     }
 
     const items = call.request.items;
-    const invalidFields = ['name', 'email', 'password', 'active', 'activation_code', 'creator',
+    const invalidFields = ['name', 'email', 'password', 'active', 'activation_code',
       'password_hash', 'guest'];
 
     _.forEach(items, (user) => {
@@ -785,6 +787,29 @@ export class UserService extends ServiceBase {
       transport: 'email',
       target: emailAddress
     };
+  }
+
+  private setUserDefaults(user: User): User {
+    if (_.isEmpty(user.meta)) {
+      user.meta = {};
+    }
+
+    if (!user.id) {
+      user.id = idGen();
+    }
+
+    if (_.isNil(user.meta.modified_by)) {
+      user.meta.modified_by = user.id;
+    }
+
+    if (_.isEmpty(user.meta.owner)) {
+      user.meta.owner = [
+        {
+          owner_entity: 'urn:restorecommerce:acs:model:User'
+        }
+      ];
+    }
+    return user;
   }
 }
 
