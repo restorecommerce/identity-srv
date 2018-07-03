@@ -160,15 +160,14 @@ export class UserService extends ServiceBase {
    * @return type is any since it can be guest or user type
    */
   async create(call: any, context?: any): Promise<any> {
-    const userListReturn = [];
-    const that = this;
     const usersList = call.request.items;
+    const insertedUsers = [];
     for (let i = 0; i < usersList.length; i++) {
       const user = usersList[i];
-      await this.createUser(user, context);
+      insertedUsers.push(await this.createUser(user, context));
     }
 
-    return userListReturn;
+    return insertedUsers;
   }
 
   /**

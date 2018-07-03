@@ -361,11 +361,9 @@ describe('testing identity-srv', () => {
         it('should update generic fields', async function changeEmailId(): Promise<void> {
           this.timeout(3000);
           const listener = function listener(message: any, context: any): void {
-            should.exist(result.data);
-            should.exist(result.data.items);
-            result.data.items.should.have.length(1);
+            should.exist(message);
 
-            const newUser = result.data.items[0];
+            const newUser = message;
             newUser.timezone.should.equal('Europe/Moscow');
             newUser.timezone.should.not.equal(user.timezone);
           };
@@ -377,10 +375,9 @@ describe('testing identity-srv', () => {
             timezone: 'Europe/Moscow',
             meta
           }]);
+          await topic.$wait(offset);
           should.exist(result);
           should.not.exist(result.error);
-
-          await topic.$wait(offset);
         });
 
         it('should not allow to update "special" fields', async function changeEmailId(): Promise<void> {
