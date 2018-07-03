@@ -163,7 +163,9 @@ export class UserService extends ServiceBase {
     const usersList = call.request.items;
     const insertedUsers = [];
     for (let i = 0; i < usersList.length; i++) {
-      const user = usersList[i];
+      let user: User = usersList[i];
+      user.activation_code = '';
+      user.active = true;
       insertedUsers.push(await this.createUser(user, context));
     }
 
@@ -174,7 +176,7 @@ export class UserService extends ServiceBase {
    * Validates User and creates it in DB,
    * @param user
    */
-  private async createUser(user: User, context?: any): Promise<any> {
+  private async createUser(user: User, context?: any): Promise<User> {
     const logger = this.logger;
 
     // User creation
@@ -236,17 +238,6 @@ export class UserService extends ServiceBase {
       return user;
     }
 
-    // Create User
-    const userActivationRequired: Boolean = this.isUserActivationRequired();
-    logger.silly('user activation required', userActivationRequired);
-    if (userActivationRequired) {
-      // New users must be activated
-      user.active = false;
-      user.activation_code = this.idGen();
-    } else {
-      user.active = true;
-    }
-
     // Hash password
     user.password_hash = password.hash(user.password);
     delete user.password;
@@ -265,7 +256,8 @@ export class UserService extends ServiceBase {
       }
     };
 
-    return super.create(serviceCall, context);
+    const result = await super.create(serviceCall, context);
+    return result.items[0];
   }
 
   /**
@@ -276,6 +268,17 @@ export class UserService extends ServiceBase {
    */
   async register(call: any, context?: any): Promise<any> {
     const user: User = call.request || call;
+    // Create User
+    const userActivationRequired: Boolean = this.isUserActivationRequired();
+    this.logger.silly('user activation required', userActivationRequired);
+    if (userActivationRequired) {
+      // New users must be activated
+      user.active = false;
+      user.activation_code = this.idGen();
+    } else {
+      user.active = true;
+    }
+
     const createdUser = await this.createUser(user, context);
 
     this.logger.info('user registered', user);
