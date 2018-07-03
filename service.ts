@@ -265,7 +265,8 @@ export class UserService extends ServiceBase {
       }
     };
 
-    return super.create(serviceCall, context);
+    const result = await super.create(serviceCall, context);
+    return result.items[0];
   }
 
   /**
