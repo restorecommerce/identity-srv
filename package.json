@@ -1,6 +1,6 @@
 {
   "name": "@restorecommerce/identity-srv",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Restore Commerce identity microservice",
   "main": "index.js",
   "author": "Invend GmbH",
