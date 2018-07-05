@@ -14,7 +14,7 @@ import * as Logger from '@restorecommerce/logger';
 import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
 import { SSL_OP_CRYPTOPRO_TLSEXT_BUG } from 'constants';
-import { BaseDocument } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
+import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 
 const Events = kafkaClient.Events;
 const database = chassis.database;
@@ -30,10 +30,6 @@ const password = {
     return bcrypt.compareSync(pw, password_hash);
   }
 };
-
-function idGen(): string {
-  return uuid.v4().replace(/-/g, '');
-}
 
 export type TUser = User | FindUser | ActivateUser;
 export interface Call<TUser> {
@@ -792,25 +788,20 @@ export class UserService extends ServiceBase {
   }
 
   private setUserDefaults(user: User): User {
-    if (_.isEmpty(user.meta)) {
-      user.meta = {};
-    }
+    const userID = user.id || this.idGen();
 
-    if (!user.id) {
-      user.id = idGen();
-    }
-
-    if (_.isNil(user.meta.modified_by)) {
-      user.meta.modified_by = user.id;
-    }
-
-    if (_.isEmpty(user.meta.owner)) {
-      user.meta.owner = [
+    const meta: DocumentMetadata = {
+      owner: !!user.meta && !_.isEmpty(user.meta.owner) ? user.meta.owner : [
         {
-          owner_entity: 'urn:restorecommerce:acs:model:User'
+          owner_entity: 'urn:restorecommerce:acs:model:User',
+          owner_id: user.id
         }
-      ];
-    }
+      ],
+      modified_by: !!user.meta && !_.isEmpty(user.meta.modified_by) ? user.meta.modified_by : user.id
+    };
+
+    user.id = userID;
+    user.meta = meta;
     return user;
   }
 }
