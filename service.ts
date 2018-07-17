@@ -55,6 +55,7 @@ export interface User extends BaseDocument {
   role_associations: RoleAssociation[];
   locale_id: string;
   timezone: string;
+  unauthenticated: boolean;
 }
 
 export interface FindUser {
@@ -275,8 +276,10 @@ export class UserService extends ServiceBase {
       // New users must be activated
       user.active = false;
       user.activation_code = this.idGen();
+      user.unauthenticated = true;
     } else {
       user.active = true;
+      user.unauthenticated = false;
     }
 
     const createdUser = await this.createUser(user, context);
@@ -375,6 +378,8 @@ export class UserService extends ServiceBase {
     }
 
     user.active = true;
+    user.unauthenticated = false;
+
     user.activation_code = '';
     const serviceCall = {
       request: {
