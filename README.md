@@ -15,8 +15,11 @@ Several features are meant to be configurable and disabled, if they are not nece
 - `userActivationRequired`: if set to `false`, users do not require account activation to be able to log in and use their account
 - `register`: if set to `false`, the `Register` endpoint is disabled and users can only be created through the bulk creation method `createUsers`, which can be seen as an admin-only operation
 - `enableEmail`: if set to `true`, emails are sent out upon specific events, like account creation and email change
-- `activationLink`: contains the URL prefix for the activation link which is generated upon account creation or email change
-- `hbs_templates`: contains all data necessary for retrieving HBS templates from a remote server; such templates can be used to request email data rendering in order to send out all necessary emails (this is ignored if `enableEmail` is set to false).
+- `activationLink`: contains the URL prefix for the activation link which is generated upon account creation
+- `emailConfirmationLink`: contains the URL prefix for the confirmation link which is generated upon an email change request
+- `hbs_templates`: contains all data necessary for retrieving HBS templates from a remote server; such templates can be used to request email data rendering in order to send out all necessary emails (this is ignored if `enableEmail` is set to false).\
+- `minUsernameLength`: minimum length for the user's `name`
+- `maxUsernameLength`: maximum length for the user's `name`
 
 ## gRPC Interface
 
@@ -30,19 +33,19 @@ A User resource.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | id | string | required | User ID, unique, key |
-| created | double | required | Date when user was created |
-| modified | double | required | Date when user was modified |
-| creator | string | optional | User ID of the creator |
+| meta | [`io.restorecommerce.meta.Meta`](https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto) | required | Meta info |
 | name | string | required | Username |
 | first_name | string | required | User's first name |
 | last_name | string | required | User's last name |
 | email | string | required | Email address |
+| emailNew | string | optional | Property in which the email is stored upon an email change request until its confirmation  |
 | active | bool | optional | Value is `true` if the user was successfully activated |
 | activation_code | string | optional | Activation code used in the activation process (cleared after successful activation) |
 | password | string | required | Raw password, not stored |
 | timezone | string | optional | The User's timezone setting (defaults to 'Europe/Berlin') |
-| locale | string | optional | The User's locale setting (defaults to 'de-DE') |
+| locale | string | optional | The User's locale ID |
 | password_hash | bytes | optional | Encrypted password, stored |
+| unauthenticated | boolean | optional | Set automatically to `true` upon user registry until its account is activated for the first time |
 | guest | bool | optional | If user is guest |
 | role_associations | [ ] `io.restorecommerce.user.RoleAssociation` | optional | Role associations |
 
@@ -50,15 +53,15 @@ A User resource.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| role | string | required | role identifier |
-| Attribute | [ ] `io.restorecommerce.user.RoleAssociation.Attribute` | optional | attributes associated with the User's role |
+| role | string | required | Role ID |
+| Attribute | [ ] `io.restorecommerce.user.RoleAssociation.Attribute` | optional | Attributes associated with the User's role |
 
 `io.restorecommerce.user.RoleAssociation.Attribute`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | id | string | optional | attribute identifier |
-| id | string | optional | attribute value |
+| value | string | optional | attribute value |
 
 A list of User resources.
 
@@ -112,19 +115,31 @@ Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest`
 | id | string | required | User ID |
 | password | string | required | new password |
 
-#### ChangeEmailID
-Used to change EmailID of the User (User should be activated to perform this operation). Requests are performed providing `io.restorecommerce.user.ChangeEmailIdRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message.
-After the EmailID is changed User account needs to be activated again with the new
-activation code sent via email to User. For more details about the email operation see `Register`.
+#### RequestEmaiLchange
 
-`io.restorecommerce.user.ChangeEmailIdRequest`
+Used to change the user's email. Requests are performed providing the `io.restorecommerce.user.RequestEmailChange` protobuf message as input and responses is a `google.protobuf.Empty` message. 
+when receiving this request, the service assigns the new email value to the user's `emailNew` property and issues an email with a confirmation link containing a newly-generated activation code.
+
+`io.restorecommerce.user.ChangeEmailRequest`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | id | string | required | User ID |
-| email | string | required | EmailID  |
+| email | string | required | New email  |
+
+#### ConfirmEmailChange
+
+Used to confirm the user's email change request. The input is a `io.restorecommerce.user.ConfirmEmailChange` message and the response is a `google.protobuf.Empty` message. If the received activation code matches the previously generated activation code, the value assigned to the `emailNew` property is then assigned to the `email` property and `emailNew` is set to null.
+
+`io.restorecommerce.user.ConfirmEmailChange`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | string | required | User name |
+| activation_code | string | required | Activation code  |
 
 #### Login
+
 Used to verify the a User's password and return its info in case the operation is successful. Requests are performed providing `io.restorecommerce.user.LoginRequest` protobuf message as input and the response is `io.restorecommerce.user.User` message.
 
 `io.restorecommerce.user.LoginRequest`
@@ -222,15 +237,16 @@ List of events emitted to Kafka by this microservice for below topics:
   - registered
   - activated
   - passwordChanged
-  - emailIdChanged
+  - emailChangeRequested
+  - emailChangeConfirmed
   - unregistered
-  - usersCreated
-  - usersModified
-  - usersDeleted
+  - userCreated
+  - userModified
+  - userDeleted
 - io.restorecommerce.roles.resource
-  - rolesCreated
-  - rolesModified
-  - rolesDeleted
+  - roleCreated
+  - roleModified
+  - roleDeleted
 - io.restorecommerce.notification
   - sendEmail
 - io.restorecommerce.rendering
@@ -241,7 +257,7 @@ List of events emitted to Kafka by this microservice for below topics:
   - healthCheckResponse
   - versionResponse
 
-For `renderRequest` and `renderResponse` the message structures are defined in [rendering-srv](https://github.com/restorecommerce/rendering-srv) and for `sendEmail` it is defined in [notification-srv](https://github.com/restorecommerce/notification-srv),
+For `renderRequest` and `renderResponse` the message structures are defined in [rendering-srv](https://github.com/restorecommerce/rendering-srv) and for `sendEmail` they are defined in [notification-srv](https://github.com/restorecommerce/notification-srv),
 
 
 ## Chassis Service
