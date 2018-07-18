@@ -5,6 +5,7 @@ import { Events, Topic } from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { UserService, RoleService } from './service';
+import { Func } from 'mocha';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 
@@ -146,20 +147,47 @@ class UserCommandInterface extends chassis.CommandInterface {
 
   makeResourcesRestoreSetup(db: any, resource: string): any {
     return {
-      unregistered: async function restoreUnregistered(message: any,
-        eventName: string): Promise<any> {
-        await db.delete(`${resource}s`, { id: message.id });
+      unregistered: async function restoreUnregistered(message: any, context: any,
+        config: any, eventName: string, done: Function): Promise<any> {
+        try {
+          await db.delete(`${resource}s`, { id: message.id });
+          if (done) {
+            done();
+          }
+        } catch (err) {
+          if (done) {
+            done(err);
+          }
+        }
         return {};
       },
-      usersModified: async function restoreUsersModified(message: any,
-        eventName: string): Promise<any> {
-        await db.update(`${resource}s`, { id: message.id },
-          message);
+      usersModified: async function restoreUsersModified(message: any, context: any,
+        config: any, eventName: string, done: Function): Promise<any> {
+        try {
+          await db.update(`${resource}s`, { id: message.id },
+            message);
+          if (done) {
+            done();
+          }
+        } catch (err) {
+          if (done) {
+            done(err);
+          }
+        }
         return {};
       },
-      registered: async function restoreUsersRegistered(message: any,
-        eventName: string): Promise<any> {
-        await db.insert(`${resource}s`, message);
+      registered: async function restoreUsersRegistered(message: any, context: any,
+        config: any, eventName: string, done: Function): Promise<any> {
+        try {
+          await db.insert(`${resource}s`, message);
+          if (done) {
+            done();
+          }
+        } catch (err) {
+          if (done) {
+            done(err);
+          }
+        }
         return {};
       },
     };
