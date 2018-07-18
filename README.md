@@ -42,9 +42,9 @@ A User resource.
 | active | bool | optional | Value is `true` if the user was successfully activated |
 | activation_code | string | optional | Activation code used in the activation process (cleared after successful activation) |
 | password | string | required | Raw password, not stored |
+| password_hash | bytes | optional | Hashed password, stored |
 | timezone | string | optional | The User's timezone setting (defaults to 'Europe/Berlin') |
 | locale | string | optional | The User's locale ID |
-| password_hash | bytes | optional | Encrypted password, stored |
 | unauthenticated | boolean | optional | Set automatically to `true` upon user registry until its account is activated for the first time |
 | guest | bool | optional | If user is guest |
 | role_associations | [ ] `io.restorecommerce.user.RoleAssociation` | optional | Role associations |
