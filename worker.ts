@@ -5,7 +5,6 @@ import { Events, Topic } from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { UserService, RoleService } from './service';
-import { Func } from 'mocha';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 
@@ -146,6 +145,7 @@ class UserCommandInterface extends chassis.CommandInterface {
   }
 
   makeResourcesRestoreSetup(db: any, resource: string): any {
+    const that = this;
     return {
       unregistered: async function restoreUnregistered(message: any, context: any,
         config: any, eventName: string, done: Function): Promise<any> {
@@ -155,6 +155,8 @@ class UserCommandInterface extends chassis.CommandInterface {
             done();
           }
         } catch (err) {
+          that.logger.error('Exception caught while restoring unregistered User',
+            message);
           if (done) {
             done(err);
           }
@@ -170,6 +172,8 @@ class UserCommandInterface extends chassis.CommandInterface {
             done();
           }
         } catch (err) {
+          that.logger.error('Exception caught while restoring modified User',
+            message);
           if (done) {
             done(err);
           }
@@ -184,6 +188,8 @@ class UserCommandInterface extends chassis.CommandInterface {
             done();
           }
         } catch (err) {
+          that.logger.error('Exception caught while restoring registered User',
+            message);
           if (done) {
             done(err);
           }
