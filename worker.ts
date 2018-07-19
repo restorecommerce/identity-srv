@@ -163,7 +163,7 @@ class UserCommandInterface extends chassis.CommandInterface {
         }
         return {};
       },
-      usersModified: async function restoreUsersModified(message: any, context: any,
+      userModified: async function restoreUsersModified(message: any, context: any,
         config: any, eventName: string, done: Function): Promise<any> {
         try {
           await db.update(`${resource}s`, { id: message.id },
@@ -181,6 +181,22 @@ class UserCommandInterface extends chassis.CommandInterface {
         return {};
       },
       registered: async function restoreUsersRegistered(message: any, context: any,
+        config: any, eventName: string, done: Function): Promise<any> {
+        try {
+          await db.insert(`${resource}s`, message);
+          if (done) {
+            done();
+          }
+        } catch (err) {
+          that.logger.error('Exception caught while restoring registered User',
+            message);
+          if (done) {
+            done(err);
+          }
+        }
+        return {};
+      },
+      userCreated: async function restoreUsersCreated(message: any, context: any,
         config: any, eventName: string, done: Function): Promise<any> {
         try {
           await db.insert(`${resource}s`, message);

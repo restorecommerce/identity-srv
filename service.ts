@@ -254,7 +254,6 @@ export class UserService extends ServiceBase {
     };
 
     const result = await super.create(serviceCall, context);
-    await this.topics['user.resource'].emit('registered', user);
     return result.items[0];
   }
 
@@ -282,6 +281,7 @@ export class UserService extends ServiceBase {
     const createdUser = await this.createUser(user, context);
 
     this.logger.info('user registered', user);
+    await this.topics['user.resource'].emit('registered', user);
 
     if (this.emailEnabled) {
       const renderRequest = this.makeActivationEmailData(user);
