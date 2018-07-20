@@ -148,67 +148,43 @@ class UserCommandInterface extends chassis.CommandInterface {
     const that = this;
     return {
       unregistered: async function restoreUnregistered(message: any, context: any,
-        config: any, eventName: string, done: Function): Promise<any> {
+        config: any, eventName: string): Promise<any> {
         try {
           await db.delete(`${resource}s`, { id: message.id });
-          if (done) {
-            done();
-          }
         } catch (err) {
           that.logger.error('Exception caught while restoring unregistered User',
             message);
-          if (done) {
-            done(err);
-          }
         }
         return {};
       },
       userModified: async function restoreUsersModified(message: any, context: any,
-        config: any, eventName: string, done: Function): Promise<any> {
+        config: any, eventName: string): Promise<any> {
         try {
           await db.update(`${resource}s`, { id: message.id },
             message);
-          if (done) {
-            done();
-          }
         } catch (err) {
           that.logger.error('Exception caught while restoring modified User',
             message);
-          if (done) {
-            done(err);
-          }
         }
         return {};
       },
       registered: async function restoreUsersRegistered(message: any, context: any,
-        config: any, eventName: string, done: Function): Promise<any> {
+        config: any, eventName: string): Promise<any> {
         try {
           await db.insert(`${resource}s`, message);
-          if (done) {
-            done();
-          }
         } catch (err) {
           that.logger.error('Exception caught while restoring registered User',
             message);
-          if (done) {
-            done(err);
-          }
         }
         return {};
       },
       userCreated: async function restoreUsersCreated(message: any, context: any,
-        config: any, eventName: string, done: Function): Promise<any> {
+        config: any, eventName: string): Promise<any> {
         try {
           await db.insert(`${resource}s`, message);
-          if (done) {
-            done();
-          }
         } catch (err) {
           that.logger.error('Exception caught while restoring registered User',
             message);
-          if (done) {
-            done(err);
-          }
         }
         return {};
       },
