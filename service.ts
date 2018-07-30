@@ -532,9 +532,8 @@ export class UserService extends ServiceBase {
     }
 
     const items = call.request.items;
-    const invalidFields = ['name', 'email', 'password', 'active', 'activation_code',
+    const invalidFields = ['name', 'email', 'password', 'activation_code',
       'password_hash', 'guest'];
-
     _.forEach(items, (user) => {
       _.forEach(invalidFields, (field) => {
         if (!_.isNil(user[field]) && !_.isEmpty(user[field])) {
@@ -542,7 +541,6 @@ export class UserService extends ServiceBase {
         }
       });
     });
-
     return super.update(call, context);
   }
   /**
@@ -780,6 +778,51 @@ export class UserService extends ServiceBase {
         options: marshallProtobufAny({ texts: {} })
       }]
     };
+  }
+
+  async deactivateUsers(orgIds: string[]): Promise<User[]> {
+    let deactivateUsersList = [];
+    let usersList = await this.read({ request: {} });
+    usersList = usersList.items;
+    if (orgIds.length > 0) {
+      const ROLE_SCOPING_ENTITY = this.cfg.get('scopingAttributeKeys:roleScopingEntity');
+      const ORGANIZATION_URN = this.cfg.get('scopingAttributeKeys:organizationUrn');
+      const ROLE_SCOPING_INSTANCE = this.cfg.get('scopingAttributeKeys:roleScopingInstance');
+      for (let i = 0; i < usersList.length; i += 1) {
+        const user: User = _.cloneDeep(usersList[i]);
+        const userRoleAscs = _.cloneDeep(user.role_associations);
+        for (let k = userRoleAscs.length - 1; k >= 0; k -= 1) {
+          const attributes = userRoleAscs[k].attributes;
+          const attributesExist = attributes.length > 0;
+          if (attributesExist) {
+            let currentEntity: string;
+            for (let j = attributes.length - 1; j > 0; j -= 1) {
+              const attribute = attributes[j];
+              if (attribute.id == ROLE_SCOPING_ENTITY
+                && attribute.value == ORGANIZATION_URN) {
+                currentEntity = attribute.value;
+              } else if (!!currentEntity && attribute.id == ROLE_SCOPING_INSTANCE
+                && orgIds.indexOf(attribute.value) > -1) {
+                attributes.splice(j - 1, 2);
+                currentEntity = null;
+              }
+            }
+            if (attributesExist && attributes.length == 0) {
+              user.role_associations.splice(k, 1);
+            }
+          }
+        }
+        if (user.role_associations.length == 0) {
+          user.active = false;
+          deactivateUsersList.push(user);
+          this.logger.info('Deactivating user:', user.name);
+        }
+      }
+      if (deactivateUsersList.length > 0) {
+        await super.update({ request: { items: deactivateUsersList } });
+      }
+    }
+    return deactivateUsersList;
   }
 
   private makeNotificationData(emailAddress: string, response: any): any {

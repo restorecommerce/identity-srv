@@ -4,9 +4,11 @@ import * as _ from 'lodash';
 import { Events, Topic } from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
-import { UserService, RoleService } from './service';
+import { UserService, RoleService, User } from './service';
+import { toStruct } from '@restorecommerce/resource-base-interface';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
+const CONTRACT_CANCELLED = 'contractCancelled';
 
 export class Worker {
   events: Events;
@@ -79,7 +81,15 @@ export class Worker {
         if (userService.emailEnabled) {
           await userService.sendEmail(msg);
         }
-      } else {
+      } else if (eventName === CONTRACT_CANCELLED) {
+        const contractID = msg.id;
+        const organization_ids = msg.organization_ids;
+        logger.info('Deactivating users for Contract ID:',
+          { id: contractID });
+        // Update users to deactive
+        await userService.deactivateUsers(organization_ids)
+      }
+      else {
         // command events
         await cis.command(msg, context);
       }

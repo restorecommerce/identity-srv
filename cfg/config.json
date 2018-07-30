@@ -240,6 +240,11 @@
     },
     "enableEvents": "true"
   },
+  "scopingAttributekeys": {
+    "roleScopingEntity": "urn:restorecommerce:acs:names:model:entity",
+    "roleScopingInstance": "urn:oasis:names:tc:xacml:1.0:resource:resource-id",
+    "organizationUrn": "urn:restorecommerce:model:organization.Organization"
+  },
   "server": {
     "services": {
       "io-restorecommerce-user-srv": {
@@ -325,7 +330,7 @@
             "grpcIdentity"
           ]
         },
-		    "upsert": {
+        "upsert": {
           "transport": [
             "grpcIdentity"
           ]
