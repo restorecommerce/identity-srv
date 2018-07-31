@@ -629,7 +629,7 @@ export class UserService extends ServiceBase {
         }),
         field: [{
           name: 'id',
-          include: 1
+          include: true
         }]
       }
     });
