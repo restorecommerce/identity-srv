@@ -44,7 +44,14 @@ async function connect(clientCfg: string, resourceName: string): Promise<any> { 
 
 let meta = {
   modified_by: 'SYSTEM',
-  owner: [{ owner_entity: 'urn:restorecommerce:acs:model:User', owner_id: 'UserID'}]
+  owner: [{
+    id: 'urn:restorecommerce:acs:names:ownerIndicatoryEntity',
+    value: 'urn:restorecommerce:acs:model:user.User'
+  },
+  {
+    id: 'urn:restorecommerce:acs:names:ownerInstance',
+    value: 'UserID'
+  }]
 };
 
 describe('testing identity-srv', () => {

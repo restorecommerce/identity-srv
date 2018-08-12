@@ -837,12 +837,23 @@ export class UserService extends ServiceBase {
 
   private setUserDefaults(user: User): User {
     const userID = user.id || this.idGen();
+    const OWNER_INDICATOR_ENTITY = this.cfg.get('scopingAttributeKeys:ownerIndicatoryEntity');
+    const USER_URN = this.cfg.get('scopingAttributeKeys:userUrn');
+    const OWNER_SCOPING_INSTANCE = this.cfg.get('scopingAttributeKeys:ownerIndicatoryInstance');
 
     const meta: DocumentMetadata = {
       owner: !!user.meta && !_.isEmpty(user.meta.owner) ? user.meta.owner : [
+        // {
+        //   owner_entity: 'urn:restorecommerce:acs:model:User',
+        //   owner_id: user.id
+        // }urns.ownerIndicatoryEntity, urns.user
         {
-          owner_entity: 'urn:restorecommerce:acs:model:User',
-          owner_id: user.id
+          id: OWNER_INDICATOR_ENTITY,
+          value: USER_URN
+        },
+        {
+          id: OWNER_SCOPING_INSTANCE,
+          value: userID
         }
       ],
       modified_by: !!user.meta && !_.isEmpty(user.meta.modified_by) ? user.meta.modified_by : user.id
