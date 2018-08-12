@@ -120,7 +120,7 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.EmailChanged"
       },
-      "emailChangedRequested": {
+      "emailChangeRequested": {
         "protos": [
           "io/restorecommerce/user.proto"
         ],
@@ -240,10 +240,13 @@
     },
     "enableEvents": "true"
   },
-  "scopingAttributekeys": {
+  "scopingAttributeKeys": {
     "roleScopingEntity": "urn:restorecommerce:acs:names:model:entity",
     "roleScopingInstance": "urn:oasis:names:tc:xacml:1.0:resource:resource-id",
-    "organizationUrn": "urn:restorecommerce:model:organization.Organization"
+    "organizationUrn": "urn:restorecommerce:acs:model:organization.Organization",
+    "ownerIndicatoryEntity": "urn:restorecommerce:acs:names:ownerIndicatoryEntity",
+    "userUrn": "urn:restorecommerce:acs:model:user.User",
+    "ownerIndicatoryInstance": "urn:restorecommerce:acs:names:ownerInstance"
   },
   "server": {
     "services": {
