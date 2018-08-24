@@ -609,6 +609,12 @@ export class UserService extends ServiceBase {
     return {};
   }
 
+  async deleteUsersByOrg(call: any, context?: any): Promise<string[]> {
+    const orgIDs = call.request.org_ids;
+    const deletedUserIDs = await this.modifyUsers(orgIDs, false) as string[];
+    return deletedUserIDs;
+  }
+
   /**
    *
    * @param call
@@ -780,8 +786,9 @@ export class UserService extends ServiceBase {
     };
   }
 
-  async deactivateUsers(orgIds: string[]): Promise<User[]> {
+  async modifyUsers(orgIds: string[], deactivate: boolean): Promise<User[] | string[]> {
     let deactivateUsersList = [];
+    let deleteUsersListIds = [];
     let usersList = await this.read({ request: {} });
     usersList = usersList.items;
     if (orgIds.length > 0) {
@@ -796,15 +803,15 @@ export class UserService extends ServiceBase {
           const attributesExist = attributes.length > 0;
           if (attributesExist) {
             let currentEntity: string;
-            for (let j = attributes.length - 1; j > 0; j -= 1) {
+            for (let j = attributes.length - 1; j >= 0; j -= 1) {
               const attribute = attributes[j];
-              if (attribute.id == ROLE_SCOPING_ENTITY
-                && attribute.value == ORGANIZATION_URN) {
-                currentEntity = attribute.value;
-              } else if (!!currentEntity && attribute.id == ROLE_SCOPING_INSTANCE
+              if (attribute && attribute.id == ROLE_SCOPING_INSTANCE
                 && orgIds.indexOf(attribute.value) > -1) {
-                attributes.splice(j - 1, 2);
-                currentEntity = null;
+                const prevAttribute = attributes[j - 1];
+                if (prevAttribute.id == ROLE_SCOPING_ENTITY
+                  && prevAttribute.value == ORGANIZATION_URN) {
+                  attributes.splice(j - 1, 2);
+                }
               }
             }
             if (attributesExist && attributes.length == 0) {
@@ -815,14 +822,26 @@ export class UserService extends ServiceBase {
         if (user.role_associations.length == 0) {
           user.active = false;
           deactivateUsersList.push(user);
-          this.logger.info('Deactivating user:', user.name);
+          deleteUsersListIds.push(user.id);
+          if (deactivate) {
+            this.logger.info('Deactivating user:', { name: user.name });
+          }
         }
       }
       if (deactivateUsersList.length > 0) {
-        await super.update({ request: { items: deactivateUsersList } });
+        if (deactivate) {
+          await super.update({ request: { items: deactivateUsersList } });
+        } else {
+          this.logger.info('Deleting users:', { ids: deleteUsersListIds });
+          await super.delete({ request: { ids: deleteUsersListIds } });
+        }
       }
     }
-    return deactivateUsersList;
+    if (deactivate) {
+      return deactivateUsersList;
+    } else {
+      return deleteUsersListIds;
+    }
   }
 
   private makeNotificationData(emailAddress: string, response: any): any {
