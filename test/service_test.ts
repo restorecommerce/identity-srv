@@ -281,6 +281,68 @@ describe('testing identity-srv', () => {
           pwHashB.should.not.be.null();
           pwHashA.should.not.equal(pwHashB);
         });
+
+        it('should generate a UUID when requesting a password change', async function requestPasswordChange(): Promise<void> {
+          const offset = await topic.$offset(-1);
+          // const listener = function listener(message: any, context: any): void {
+          //   // pwHashA.should.not.equal(message.password_hash);
+          // };
+          await topic.on('passwordChangeRequested', () => {});
+          let result = await userService.find({
+            id: testUserID,
+          });
+          should.exist(result.data);
+          should.exist(result.data.items);
+          const activationCode = result.data.items[0].activation_code;
+          activationCode.should.be.length(0);
+
+          result = await userService.requestPasswordChange({
+            name: user.name
+          });
+          should.exist(result);
+          should.not.exist(result.error);
+          await topic.$wait(offset);
+
+          result = await (userService.find({
+            id: testUserID,
+          }));
+          const upUser = result.data.items[0];
+          upUser.activation_code.should.not.be.empty();
+        });
+
+        it('should confirm a password change by providing the UUID', async function requestPasswordChange(): Promise<void> {
+          const offset = await topic.$offset(-1);
+          // const listener = function listener(message: any, context: any): void {
+          //   // pwHashA.should.not.equal(message.password_hash);
+          // };
+          await topic.on('passwordChanged', () => {});
+          let result = await userService.find({
+            id: testUserID,
+          });
+          should.exist(result.data);
+          should.exist(result.data.items);
+          const activationCode = result.data.items[0].activation_code;
+          activationCode.should.not.be.null();
+          const pwHashA = result.data.items[0].password_hash;
+
+          result = await userService.confirmPasswordChange({
+            name: user.name,
+            password: 'newPassword2',
+            activation_code: activationCode
+          });
+
+          should.exist(result);
+          should.not.exist(result.error);
+
+          await topic.$wait(offset);
+
+          result = await (userService.find({
+            id: testUserID,
+          }));
+          const upUser = result.data.items[0];
+          upUser.activation_code.should.be.empty();
+          upUser.password_hash.should.not.equal(pwHashA);
+        });
       });
       describe('calling changeEmail', function changeEmailId(): void {
         it('should request the email change and persist it without overriding the old email', async function requestEmailChange(): Promise<void> {

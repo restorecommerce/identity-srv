@@ -17,6 +17,7 @@
     },
     "activationLink": "http://restorecommerce.io/activate_user/",
     "emailConfirmationLink": "http://restorecommerce.io/confirm_email_change/",
+    "passwordChangeConfirmationLink": "http://restorecommerce.io/confirm_password_change/",
     "minUsernameLength": 8,
     "maxUsernameLength": 20
   },
@@ -112,6 +113,13 @@
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.PasswordChanged"
+      },
+      "passwordChangeRequested": {
+        "protos": [
+          "io/restorecommerce/user.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.user.PasswordChangeRequested"
       },
       "emailChangeConfirmed": {
         "protos": [
@@ -267,6 +275,16 @@
           ]
         },
         "confirmEmailChange": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "requestPasswordChange": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "confirmPasswordChange": {
           "transport": [
             "grpcIdentity"
           ]

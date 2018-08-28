@@ -85,6 +85,23 @@ export interface Role extends BaseDocument {
   description: string;
 }
 
+export interface ForgotPassword {
+  name?: string; // username
+  password?: string;
+}
+
+export interface ChangePassword {
+  id: string;
+  password: string;
+  new_password?: string;
+}
+
+export interface ConfirmPasswordChange {
+  name: string;
+  password: string;
+  activation_code: string;
+}
+
 export class UserService extends ServiceBase {
   db: any;
   topics: any;
@@ -394,7 +411,7 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {User} returns user details
    */
-  async changePassword(call: Call<any>, context?: any): Promise<any> {
+  async changePassword(call: Call<ChangePassword>, context?: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
     const userID = request.id;
@@ -425,6 +442,75 @@ export class UserService extends ServiceBase {
     };
     await super.update(serviceCall, context);
     logger.info('password changed for user', userID);
+    await this.topics['user.resource'].emit('passwordChanged', user);
+    return {};
+  }
+
+  /**
+   * Endpoint to request password change.
+   * A UUID is generated and a confirmation email is
+   * sent out to the user's defined email address.
+   *
+   * @param call
+   * @param context
+   */
+  async requestPasswordChange(call: Call<ForgotPassword>, context?: any): Promise<any> {
+    const request = call.request;
+    const logger = this.logger;
+
+    const user: User = (await this.find({
+      request: call.request
+    })).items[0]; // NotFound exception is thrown when length is 0
+
+    logger.verbose('Received a password change request for user', user.id);
+
+    // generating activation code
+    user.activation_code = this.idGen();
+    await super.update({
+      request: {
+        items: [user]
+      }
+    });
+    await this.topics['user.resource'].emit('passwordChangeRequested', user);
+
+    // sending activation code via email
+    if (this.emailEnabled) {
+      const renderRequest = this.makeConfirmationData(user, true);
+      await this.topics.rendering.emit('renderRequest', renderRequest);
+    }
+    return {};
+  }
+
+  /**
+   * Endpoint which is called after the user confirms a password change request.
+   *
+   * @param call Activation code, new password, user name
+   * @param context
+   */
+  async confirmPasswordChange(call: Call<ConfirmPasswordChange>, context?: any): Promise<any> {
+    const logger = this.logger;
+    const { name, activation_code } = call.request;
+    const newPassword = call.request.password;
+
+    const user: User = (await this.find({
+      request: {
+        name
+      }
+    })).items[0];
+
+    if (!user.activation_code || user.activation_code !== activation_code) {
+      logger.debug('wrong activation code upon password change confirmation for user', user.name);
+      throw new errors.FailedPrecondition('wrong activation code');
+    }
+
+    user.activation_code = '';
+    user.password_hash = password.hash(newPassword);
+    await super.update({
+      request: {
+        items: [user]
+      }
+    });
+    logger.info('password changed for user', user.id);
     await this.topics['user.resource'].emit('passwordChanged', user);
     return {};
   }
@@ -463,10 +549,9 @@ export class UserService extends ServiceBase {
 
     // Contextual Data for rendering on Notification-srv before sending mail
     const usersUpdated = await super.read({ request: { filter } }, context);
-    const userUpdated = usersUpdated.items[0];
 
     if (this.emailEnabled) {
-      const renderRequest = this.makeEmailConfirmationData(user);
+      const renderRequest = this.makeConfirmationData(user, false);
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
     return {};
@@ -498,7 +583,7 @@ export class UserService extends ServiceBase {
     const user: User = users.items[0];
 
     if (user.activation_code !== activationCode) {
-      logger.debug('wrong activation code', user);
+      logger.debug('wrong activation code upon email confirmation for user', user);
       throw new errors.FailedPrecondition('wrong activation code');
     }
 
@@ -594,7 +679,6 @@ export class UserService extends ServiceBase {
       logger.debug('user does not exist', userID);
       throw new errors.NotFound('user not found');
     }
-    const user = users.items[0];
 
     // delete user
     const serviceCall = {
@@ -752,11 +836,13 @@ export class UserService extends ServiceBase {
     return this.makeRenderRequestMsg(user, emailSubject, emailBody, data);
   }
 
-  private makeEmailConfirmationData(user: User): any {
+  private makeConfirmationData(user: User, passwordChange: boolean): any {
     const emailBody = this.changeBodyTpl;
     const emailSubject = this.changeSubjectTpl;
 
-    let link: string = this.cfg.get('service:emailConfirmationLink'); // prefix
+    let link: string = passwordChange ? this.cfg.get('service:passwordChangeConfirmationLink')
+      : this.cfg.get('service:emailConfirmationLink'); // prefix
+
     if (!link.endsWith('/')) {
       link += '/';
     }
@@ -764,6 +850,7 @@ export class UserService extends ServiceBase {
     link = `${link}${user.name}/${user.activation_code}`; // actual email
 
     const data = {
+      passwordChange,
       firstName: user.first_name,
       lastName: user.last_name,
       confirmationLink: link
