@@ -105,6 +105,7 @@ Used to activate a User. The ``service.userActivationRequired`` config value tur
 | activation_code | string | required | activation code for User |
 
 #### ChangePassword
+
 Used to change password for the User (User should be activated to perform this operation).
 Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message.
 
@@ -115,7 +116,32 @@ Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest`
 | id | string | required | User ID |
 | password | string | required | new password |
 
-#### RequestEmaiLchange
+#### RequestPasswordChange
+
+Used to change password for the User in case he/she forgets it.
+It generates and persists an activation code for the user and issues an email with a confirmation link.
+Requests are performed providing `io.restorecommerce.user.ForgotPasswordRequest` protobuf message as input and responses are `google.protobuf.Empty` messages. Either user name or email should be specified upon the request.
+
+`io.restorecommerce.user.ForgotPasswordRequest`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | string | optional | User name |
+| email | string | optional | User email |
+
+#### ConfirmPasswordChange
+
+Used to confirm the user's password change request. The input is a `io.restorecommerce.user.ConfirmPasswordChangeRequest` message and the response is a `google.protobuf.Empty` message. If the received activation code matches the previously generated activation code, the stored password hash value is replaced by a hash derived from the new password and the activation code is reset.
+
+`io.restorecommerce.user.ConfirmPasswordChangeRequest`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | string | required | User name |
+| activation_code | string | required | Activation code  |
+| password | string | required | New password |
+
+#### RequestEmailChange
 
 Used to change the user's email. Requests are performed providing the `io.restorecommerce.user.RequestEmailChange` protobuf message as input and responses is a `google.protobuf.Empty` message. 
 when receiving this request, the service assigns the new email value to the user's `emailNew` property and issues an email with a confirmation link containing a newly-generated activation code.
@@ -236,6 +262,7 @@ List of events emitted to Kafka by this microservice for below topics:
 - io.restorecommerce.users.resource
   - registered
   - activated
+  - passwordChangeRequested
   - passwordChanged
   - emailChangeRequested
   - emailChangeConfirmed
