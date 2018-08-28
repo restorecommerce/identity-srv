@@ -87,7 +87,7 @@ export class Worker {
         logger.info('Deactivating users for Contract ID:',
           { id: contractID });
         // Update users to deactive
-        await userService.modifyUsers(organization_ids, true)
+        await userService.modifyUsers(organization_ids, true);
       }
       else {
         // command events
