@@ -1,23 +1,15 @@
 import * as _ from 'lodash';
 import * as bcrypt from 'bcryptjs';
-import * as co from 'co';
 import * as moment from 'moment-timezone';
 import * as util from 'util';
 import * as uuid from 'uuid';
-import * as url from 'url';
 
 import * as chassis from '@restorecommerce/chassis-srv';
-import { Server } from '@restorecommerce/chassis-srv';
-import * as grpcClient from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
-import * as Logger from '@restorecommerce/logger';
 import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
-import { SSL_OP_CRYPTOPRO_TLSEXT_BUG } from 'constants';
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 
-const Events = kafkaClient.Events;
-const database = chassis.database;
 const errors = chassis.errors;
 
 const password = {
@@ -693,10 +685,10 @@ export class UserService extends ServiceBase {
     return {};
   }
 
-  async deleteUsersByOrg(call: any, context?: any): Promise<string[]> {
+  async deleteUsersByOrg(call: any, context?: any): Promise<any> {
     const orgIDs = call.request.org_ids;
-    const deletedUserIDs = await this.modifyUsers(orgIDs, false) as string[];
-    return deletedUserIDs;
+    const deletedUserIDs = await this.modifyUsers(orgIDs, false);
+    return { user_ids: deletedUserIDs.map((user) => { return user.id; }) };
   }
 
   /**
@@ -873,23 +865,33 @@ export class UserService extends ServiceBase {
     };
   }
 
-  async modifyUsers(orgIds: string[], deactivate: boolean): Promise<User[] | string[]> {
-    let deactivateUsersList = [];
-    let deleteUsersListIds = [];
-    let usersList = await this.read({ request: {} });
-    usersList = usersList.items;
-    if (orgIds.length > 0) {
-      const ROLE_SCOPING_ENTITY = this.cfg.get('scopingAttributeKeys:roleScopingEntity');
-      const ORGANIZATION_URN = this.cfg.get('scopingAttributeKeys:organizationUrn');
-      const ROLE_SCOPING_INSTANCE = this.cfg.get('scopingAttributeKeys:roleScopingInstance');
-      for (let i = 0; i < usersList.length; i += 1) {
-        const user: User = _.cloneDeep(usersList[i]);
-        const userRoleAscs = _.cloneDeep(user.role_associations);
-        for (let k = userRoleAscs.length - 1; k >= 0; k -= 1) {
-          const attributes = userRoleAscs[k].attributes;
+  async modifyUsers(orgIds: string[], deactivate: boolean): Promise<User[]> {
+    const ROLE_SCOPING_ENTITY = this.cfg.get('urns:roleScopingEntity');
+    const ORGANIZATION_URN = this.cfg.get('urns:organization');
+    const ROLE_SCOPING_INSTANCE = this.cfg.get('urns:roleScopingInstance');
+
+    const eligibleUsers = [];
+
+    for (let org of orgIds) {
+      const result = await super.read({
+        request: {
+          custom_query: 'filterByRoleAssociation',
+          custom_arguments: {
+            value: Buffer.from(JSON.stringify({
+              entity: this.cfg.get('urns:organization'),
+              instance: org
+            }))
+          }
+        }
+      });
+      const users = result.items || [];
+      for (let i = 0; i < users.length; i += 1) {
+        const user: User = _.cloneDeep(users[i]);
+        const associations = _.cloneDeep(user.role_associations);
+        for (let k = associations.length - 1; k >= 0; k -= 1) {
+          const attributes = associations[k].attributes;
           const attributesExist = attributes.length > 0;
           if (attributesExist) {
-            let currentEntity: string;
             for (let j = attributes.length - 1; j >= 0; j -= 1) {
               const attribute = attributes[j];
               if (attribute && attribute.id == ROLE_SCOPING_INSTANCE
@@ -908,27 +910,20 @@ export class UserService extends ServiceBase {
         }
         if (user.role_associations.length == 0) {
           user.active = false;
-          deactivateUsersList.push(user);
-          deleteUsersListIds.push(user.id);
-          if (deactivate) {
-            this.logger.info('Deactivating user:', { name: user.name });
-          }
-        }
-      }
-      if (deactivateUsersList.length > 0) {
-        if (deactivate) {
-          await super.update({ request: { items: deactivateUsersList } });
-        } else {
-          this.logger.info('Deleting users:', { ids: deleteUsersListIds });
-          await super.delete({ request: { ids: deleteUsersListIds } });
+          eligibleUsers.push(user);
         }
       }
     }
+
     if (deactivate) {
-      return deactivateUsersList;
+      await super.update({ request: { items: eligibleUsers } });
     } else {
-      return deleteUsersListIds;
+      const ids = eligibleUsers.map((user) => { return user.id; });
+      this.logger.info('Deleting users:', { ids  });
+      await super.delete({ request: { ids } });
     }
+
+    return eligibleUsers;
   }
 
   private makeNotificationData(emailAddress: string, response: any): any {
@@ -943,16 +938,12 @@ export class UserService extends ServiceBase {
 
   private setUserDefaults(user: User): User {
     const userID = user.id || this.idGen();
-    const OWNER_INDICATOR_ENTITY = this.cfg.get('scopingAttributeKeys:ownerIndicatoryEntity');
-    const USER_URN = this.cfg.get('scopingAttributeKeys:userUrn');
-    const OWNER_SCOPING_INSTANCE = this.cfg.get('scopingAttributeKeys:ownerIndicatoryInstance');
+    const OWNER_INDICATOR_ENTITY = this.cfg.get('urns:ownerEntity');
+    const USER_URN = this.cfg.get('urns:user');
+    const OWNER_SCOPING_INSTANCE = this.cfg.get('urns:ownerInstance');
 
     const meta: DocumentMetadata = {
       owner: !!user.meta && !_.isEmpty(user.meta.owner) ? user.meta.owner : [
-        // {
-        //   owner_entity: 'urn:restorecommerce:acs:model:User',
-        //   owner_id: user.id
-        // }urns.ownerIndicatoryEntity, urns.user
         {
           id: OWNER_INDICATOR_ENTITY,
           value: USER_URN
