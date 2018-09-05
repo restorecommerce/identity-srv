@@ -1,23 +1,15 @@
 import * as _ from 'lodash';
 import * as bcrypt from 'bcryptjs';
-import * as co from 'co';
 import * as moment from 'moment-timezone';
 import * as util from 'util';
 import * as uuid from 'uuid';
-import * as url from 'url';
 
 import * as chassis from '@restorecommerce/chassis-srv';
-import { Server } from '@restorecommerce/chassis-srv';
-import * as grpcClient from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
-import * as Logger from '@restorecommerce/logger';
 import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
-import { SSL_OP_CRYPTOPRO_TLSEXT_BUG } from 'constants';
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 
-const Events = kafkaClient.Events;
-const database = chassis.database;
 const errors = chassis.errors;
 
 const password = {
@@ -889,7 +881,6 @@ export class UserService extends ServiceBase {
           const attributes = userRoleAscs[k].attributes;
           const attributesExist = attributes.length > 0;
           if (attributesExist) {
-            let currentEntity: string;
             for (let j = attributes.length - 1; j >= 0; j -= 1) {
               const attribute = attributes[j];
               if (attribute && attribute.id == ROLE_SCOPING_INSTANCE

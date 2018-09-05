@@ -1,11 +1,9 @@
 import * as sconfig from '@restorecommerce/service-config';
-import * as util from 'util';
 import * as _ from 'lodash';
-import { Events, Topic } from '@restorecommerce/kafka-client';
+import { Events } from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
-import { UserService, RoleService, User } from './service';
-import { toStruct } from '@restorecommerce/resource-base-interface';
+import { UserService, RoleService } from './service';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
