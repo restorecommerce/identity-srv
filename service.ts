@@ -879,7 +879,7 @@ export class UserService extends ServiceBase {
           custom_arguments: {
             value: Buffer.from(JSON.stringify({
               entity: this.cfg.get('urns:organization'),
-              instance: org
+              instance: [org]
             }))
           }
         }
@@ -919,7 +919,7 @@ export class UserService extends ServiceBase {
       await super.update({ request: { items: eligibleUsers } });
     } else {
       const ids = eligibleUsers.map((user) => { return user.id; });
-      this.logger.info('Deleting users:', { ids  });
+      this.logger.info('Deleting users:', { ids });
       await super.delete({ request: { ids } });
     }
 
