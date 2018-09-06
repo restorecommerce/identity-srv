@@ -44,6 +44,7 @@ export interface User extends BaseDocument {
   locale_id: string;
   timezone: string;
   unauthenticated: boolean;
+  default_scope: string;
 }
 
 export interface FindUser {
