@@ -447,8 +447,7 @@ export class UserService extends ServiceBase {
    * @param call
    * @param context
    */
-  async requestPasswordChange(call: Call<ForgotPassword>, context?: any): Promise<any> {
-    const request = call.request;
+    async requestPasswordChange(call: Call<ForgotPassword>, context?: any): Promise<any> {
     const logger = this.logger;
 
     const user: User = (await this.find({
@@ -866,7 +865,11 @@ export class UserService extends ServiceBase {
     };
   }
 
-  async modifyUsers(orgIds: string[], deactivate: boolean): Promise<User[]> {
+  async disableUsers(orgIDs: string[]): Promise<void> {
+    await this.modifyUsers(orgIDs, true);
+  }
+
+  private async modifyUsers(orgIds: string[], deactivate: boolean): Promise<User[]> {
     const ROLE_SCOPING_ENTITY = this.cfg.get('urns:roleScopingEntity');
     const ORGANIZATION_URN = this.cfg.get('urns:organization');
     const ROLE_SCOPING_INSTANCE = this.cfg.get('urns:roleScopingInstance');
@@ -876,7 +879,7 @@ export class UserService extends ServiceBase {
     for (let org of orgIds) {
       const result = await super.read({
         request: {
-          custom_query: 'filterByRoleAssociation',
+          custom_queries: ['filterByRoleAssociation'],
           custom_arguments: {
             value: Buffer.from(JSON.stringify({
               entity: this.cfg.get('urns:organization'),
