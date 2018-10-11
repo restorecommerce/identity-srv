@@ -433,15 +433,15 @@ describe('testing identity-srv', () => {
             should.exist(message);
 
             const newUser = message;
-            newUser.timezone.should.equal('Europe/Moscow');
-            newUser.timezone.should.not.equal(user.timezone);
+            newUser.first_name.should.equal('John');
+            newUser.first_name.should.not.equal(user.first_name);
           };
           await topic.on('userModified', listener);
 
           const offset = await topic.$offset(-1);
           const result = await userService.update([{
             id: testUserID,
-            timezone: 'Europe/Moscow',
+            first_name: 'John',
             meta
           }]);
           await topic.$wait(offset);

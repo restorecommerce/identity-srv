@@ -42,7 +42,7 @@ export interface User extends BaseDocument {
   guest: boolean;
   role_associations: RoleAssociation[];
   locale_id: string;
-  timezone: string;
+  timezone_id: string;
   unauthenticated: boolean;
   default_scope: string;
 }
@@ -251,10 +251,6 @@ export class UserService extends ServiceBase {
 
     if (!this.roleService.verifyRoles(user.role_associations)) {
       throw new errors.InvalidArgument(`Invalid role ID in role associations`);
-    }
-
-    if (!user.timezone || !moment.tz.zone(user.timezone)) {
-      user.timezone = 'Europe/Berlin';  // fallback
     }
 
     const serviceCall = {
