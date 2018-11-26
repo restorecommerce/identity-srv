@@ -21,6 +21,9 @@
     "minUsernameLength": 8,
     "maxUsernameLength": 20
   },
+  "roles": {
+    "normalUser": "User"
+  },
   "database": {
     "main": {
       "provider": "arango",
