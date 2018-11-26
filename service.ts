@@ -443,7 +443,7 @@ export class UserService extends ServiceBase {
    * @param call
    * @param context
    */
-    async requestPasswordChange(call: Call<ForgotPassword>, context?: any): Promise<any> {
+  async requestPasswordChange(call: Call<ForgotPassword>, context?: any): Promise<any> {
     const logger = this.logger;
 
     const user: User = (await this.find({
@@ -683,7 +683,7 @@ export class UserService extends ServiceBase {
 
   async deleteUsersByOrg(call: any, context?: any): Promise<any> {
     const orgIDs = call.request.org_ids;
-    const deletedUserIDs = await this.modifyUsers(orgIDs, false);
+    const deletedUserIDs = await this.modifyUsers(orgIDs, false, context);
     return { user_ids: deletedUserIDs.map((user) => { return user.id; }) };
   }
 
@@ -865,25 +865,31 @@ export class UserService extends ServiceBase {
     await this.modifyUsers(orgIDs, true);
   }
 
-  private async modifyUsers(orgIds: string[], deactivate: boolean): Promise<User[]> {
+  private async modifyUsers(orgIds: string[], deactivate: boolean,
+    context?: any): Promise<User[]> {
     const ROLE_SCOPING_ENTITY = this.cfg.get('urns:roleScopingEntity');
     const ORGANIZATION_URN = this.cfg.get('urns:organization');
     const ROLE_SCOPING_INSTANCE = this.cfg.get('urns:roleScopingInstance');
 
     const eligibleUsers = [];
 
+    const roleID = await this.getNormalUserRoleID(context);
     for (let org of orgIds) {
       const result = await super.read({
         request: {
           custom_queries: ['filterByRoleAssociation'],
           custom_arguments: {
             value: Buffer.from(JSON.stringify({
-              entity: this.cfg.get('urns:organization'),
-              instance: [org]
+              userRole: roleID,
+              scopingEntity: this.cfg.get('urns:organization'),
+              scopingInstances: [org]
             }))
           }
         }
       });
+      // The above custom query is to avoid to retreive all the users in DB
+      // and get only those belong to orgIds and then check below to see if
+      // that org is the only one present before actually deleting the user
       const users = result.items || [];
       for (let i = 0; i < users.length; i += 1) {
         const user: User = _.cloneDeep(users[i]);
@@ -924,6 +930,25 @@ export class UserService extends ServiceBase {
     }
 
     return eligibleUsers;
+  }
+
+  /**
+   * Get normal users role identifier, since every user is a normal user.
+   * before sending emails (user registration / change).
+   * @param {ctx} User context
+   * @return {roleID}
+   */
+  private async getNormalUserRoleID(context: any): Promise<any> {
+    let roleID;
+    const roleName = this.cfg.get('reoles:normalUser');
+    const filter = toStruct(
+      { name: { $eq: roleName } },
+    );
+    const role: any = this.roleService.read({ request: { filter } }, context);
+    if (role) {
+      roleID = role.id;
+    }
+    return roleID;
   }
 
   private makeNotificationData(emailAddress: string, response: any): any {
