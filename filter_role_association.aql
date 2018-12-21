@@ -1,0 +1,18 @@
+let roleAssocs = node.role_associations
+let foundAssoc = (
+    for roleAssoc in roleAssocs
+        filter roleAssoc.role == @userRole
+        let attributes = roleAssoc.attributes
+        let inAttributes = (
+            for a in attributes
+                filter a.id == "urn:restorecommerce:acs:names:roleScopingEntity" && a.value == @scopingEntity
+                let elem = NTH(attributes, POSITION(attributes, a, true) + 1)
+                filter elem.id == "urn:restorecommerce:acs:names:roleScopingInstance" && elem.value in @scopingInstances
+                limit 1
+                return true
+        )
+        filter true in inAttributes
+        limit 1
+        return true
+)
+filter true in foundAssoc

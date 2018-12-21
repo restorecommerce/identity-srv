@@ -36,6 +36,18 @@
       "collections": [
         "user",
         "role"
+      ],
+      "customQueries": [
+        {
+          "path": "filter_ownership.aql",
+          "name": "filterByOwnership",
+          "type": "filter"
+        },
+        {
+          "path": "filter_role_association.aql",
+          "name": "filterByRoleAssociation",
+          "type": "filter"
+        }
       ]
     }
   },
