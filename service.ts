@@ -607,25 +607,26 @@ export class UserService extends ServiceBase {
     const items = call.request.items;
     const invalidFields = ['name', 'email', 'password', 'active', 'activation_code',
       'password_hash', 'guest'];
-    _.forEach(items, (user) => {
+    for (let i = 0; i < items.length; i += 1) {
+      // read the user from DB and update the special fields from DB
+      // for user modification
+      const user = items[i];
+      const filter = toStruct({
+        id: user.id
+      });
+      const users = await super.read({ request: { filter } }, context);
+      if (users.total_count === 0) {
+        throw new errors.NotFound('user not found');
+      }
       _.forEach(invalidFields, async (field) => {
         if (!_.isNil(user[field]) && !_.isEmpty(user[field])) {
           throw new errors.InvalidArgument(`Generic update operation is not
             allowed for field ${field}`);
         } else {
-          // read the user from DB and update the special fields from DB
-          // for user modification
-          const filter = toStruct({
-            id: user.id
-          });
-          const users = await super.read({ request: { filter } }, context);
-          if (users.total_count === 0) {
-            throw new errors.NotFound('user not found');
-          }
           user[field] = users.items[0][field];
         }
       });
-    });
+    }
     return super.update(call, context);
   }
   /**
