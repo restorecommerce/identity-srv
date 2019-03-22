@@ -459,8 +459,9 @@ describe('testing identity-srv', () => {
           should.not.exist(result.data);
           should.exist(result.error);
           should.exist(result.error.message);
-          result.error.message.should.equal('invalid argument');
-          result.error.details.should.containEql('Generic update operation is not allowed for field password');
+          result.error.message.should.equal('internal');
+          should.exist(result.error.details);
+          result.error.details.should.containEql(`13 INTERNAL: invalid argument - Update request holds no valid metadata for document ${testUserID}`);
         });
       });
       describe('calling unregister', function unregister(): void {

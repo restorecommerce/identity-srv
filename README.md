@@ -296,10 +296,44 @@ provides endpoints for retrieving the system status and resetting/restoring the 
 - database access, which is abstracted by the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface)
 - stores the offset values for Kafka topics at regular intervals to [Redis](https://redis.io/).
 
-## Usage
+## Development
 
+### Tests
 See [tests](test/).
-
 
 **Note**: although any kind of gRPC client can be used to connect to these endpoints, the tests make use of the [grpc-client](https://github.com/restorecommerce/grpc-client),
 a [restorecommerce](https://github.com/restorecommerce) module which allows an application to connect to multiple gRPC endpoints with custom middleware, loadbalancing and retry/timeout support.
+
+## Usage
+
+### Development
+
+- Install dependencies
+
+```sh
+npm install
+```
+
+- Build application
+
+```sh
+# compile the code
+npm run build
+```
+
+- Run application and restart it on changes in the code
+
+```sh
+# Start identity-srv backend in dev mode
+npm run dev
+```
+
+### Production
+
+```sh
+# compile the code
+npm run build
+
+# run compiled server
+npm start
+```
