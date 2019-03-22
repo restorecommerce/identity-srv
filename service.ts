@@ -328,8 +328,9 @@ export class UserService extends ServiceBase {
       return;
     }
 
-    const response = unmarshallProtobufAny(renderResponse.response[0]);
-    const emailData = this.makeNotificationData(emailAddress, response);
+    const responseBody = unmarshallProtobufAny(renderResponse.response[0]);
+    const responseSubject = unmarshallProtobufAny(renderResponse.response[1]);
+    const emailData = this.makeNotificationData(emailAddress, responseBody, responseSubject);
     await this.topics.notification.emit('sendEmail', emailData);
   }
 
@@ -826,15 +827,18 @@ export class UserService extends ServiceBase {
 
     activationLink = `${activationLink}${user.name}/${user.activation_code}`;
 
-    const data = {
+    const dataBody = {
       firstName: user.first_name,
       lastName: user.last_name,
       activationLink
     };
+    // since there are no place holders in subject
+    const dataSubject = { userName: user.name };
 
     const emailBody = this.registerBodyTpl;
     const emailSubject = this.registerSubjectTpl;
-    return this.makeRenderRequestMsg(user, emailSubject, emailBody, data);
+    return this.makeRenderRequestMsg(user, emailSubject, emailBody,
+      dataBody, dataSubject);
   }
 
   private makeConfirmationData(user: User, passwordChange: boolean): any {
@@ -850,26 +854,37 @@ export class UserService extends ServiceBase {
 
     link = `${link}${user.name}/${user.activation_code}`; // actual email
 
-    const data = {
-      passwordChange,
+    const dataBody = {
       firstName: user.first_name,
       lastName: user.last_name,
-      confirmationLink: link
+      confirmationLink: link,
+      passwordChange
     };
-    return this.makeRenderRequestMsg(user, emailSubject, emailBody, data);
+    const dataSubject = { passwordChange };
+    return this.makeRenderRequestMsg(user, emailSubject, emailBody,
+      dataBody, dataSubject);
   }
 
-  private makeRenderRequestMsg(user: User, subject: any, body: any, data: any): any {
+  private makeRenderRequestMsg(user: User, subject: any, body: any,
+    dataBody: any, dataSubject: any): any {
     return {
       id: `identity#${user.email}`,
       payload: [{
         templates: marshallProtobufAny({
           body: { body, layout: this.layoutTpl },
+        }),
+        data: marshallProtobufAny(dataBody),
+        style: this.emailStyle, // URL to a style
+        options: marshallProtobufAny({ texts: {} }),
+        content_type: 'application/html'
+      },
+      {
+        templates: marshallProtobufAny({
           subject: { body: subject }
         }),
-        data: marshallProtobufAny(data),
-        style: this.emailStyle, // URL to a style
-        options: marshallProtobufAny({ texts: {} })
+        data: marshallProtobufAny(dataSubject),
+        options: marshallProtobufAny({ texts: {} }),
+        content_type: 'application/text'
       }]
     };
   }
@@ -964,11 +979,12 @@ export class UserService extends ServiceBase {
     return roleID;
   }
 
-  private makeNotificationData(emailAddress: string, response: any): any {
+  private makeNotificationData(emailAddress: string, responseBody: any,
+    responseSubject: any): any {
     return {
       notifyee: emailAddress,
-      body: response.body,
-      subject: response.subject,
+      body: responseBody.body,
+      subject: responseSubject.subject,
       transport: 'email',
       target: emailAddress
     };
