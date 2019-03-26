@@ -621,8 +621,9 @@ export class UserService extends ServiceBase {
       }
       _.forEach(invalidFields, async (field) => {
         if (!_.isNil(user[field]) && !_.isEmpty(user[field])) {
-          throw new errors.InvalidArgument(`Generic update operation is not
-            allowed for field ${field}`);
+          new Promise((resolve, reject) => {
+            reject(`Generic update operation is not allowed for field ${field}`);
+          });
         } else {
           user[field] = users.items[0][field];
         }
@@ -982,11 +983,12 @@ export class UserService extends ServiceBase {
   private makeNotificationData(emailAddress: string, responseBody: any,
     responseSubject: any): any {
     return {
-      notifyee: emailAddress,
+      email: {
+        to: emailAddress
+      },
       body: responseBody.body,
       subject: responseSubject.subject,
-      transport: 'email',
-      target: emailAddress
+      transport: 'email'
     };
   }
 
