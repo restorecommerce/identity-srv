@@ -242,8 +242,16 @@ export class UserService extends ServiceBase {
     });
     const users = await super.read({ request: { filter } }, context);
     if (users.total_count > 0) {
-      logger.debug('user does already exist', users);
-      throw new errors.AlreadyExists('user does already exist');
+      let guest = false;
+      for (let user of users) {
+        if (user.guest) {
+          guest = true;
+        }
+      }
+      if (!guest) {
+        logger.debug('user does already exist', users);
+        throw new errors.AlreadyExists('user does already exist');
+      }
     }
     logger.silly('user does not exist');
 
