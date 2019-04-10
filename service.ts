@@ -214,6 +214,23 @@ export class UserService extends ServiceBase {
       throw new errors.InvalidArgument('User register requires both first and last name');
     }
 
+    // Since for guestUser he should be able to register with same email ID multiple times
+    // so we are creating user and not making the unique emailID or user name check
+    // Guest creation
+    if (user.guest) {
+      logger.silly('request to register a guest');
+
+      let serviceCall = {
+        request: {
+          items: [user]
+        }
+      };
+      await super.create(serviceCall, context);
+      logger.info('guest user registered', user);
+      await (this.topics['user.resource'].emit('registered', user));
+      return user;
+    }
+
     logger.silly(
       util.format('register is checking id:%s name:%s and email:%s',
         user.name, user.email));
@@ -229,21 +246,6 @@ export class UserService extends ServiceBase {
       throw new errors.AlreadyExists('user does already exist');
     }
     logger.silly('user does not exist');
-
-    // Guest creation
-    if (user.guest) {
-      logger.silly('request to register a guest');
-
-      let serviceCall = {
-        request: {
-          items: [user]
-        }
-      };
-      await super.create(serviceCall, context);
-      logger.info('guest user registered', user);
-      await (this.topics['user.resource'].emit('registered', user));
-      return user;
-    }
 
     // Hash password
     user.password_hash = password.hash(user.password);
@@ -289,7 +291,8 @@ export class UserService extends ServiceBase {
     this.logger.info('user registered', user);
     await this.topics['user.resource'].emit('registered', user);
 
-    if (this.emailEnabled) {
+    // For guest user email should not be sent out
+    if (this.emailEnabled && !user.guest) {
       const renderRequest = this.makeActivationEmailData(user);
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
