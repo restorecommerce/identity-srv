@@ -980,13 +980,13 @@ export class UserService extends ServiceBase {
    */
   private async getNormalUserRoleID(context: any): Promise<any> {
     let roleID;
-    const roleName = this.cfg.get('reoles:normalUser');
+    const roleName = this.cfg.get('roles:normalUser');
     const filter = toStruct(
       { name: { $eq: roleName } },
     );
-    const role: any = this.roleService.read({ request: { filter } }, context);
+    const role: any = await this.roleService.read({ request: { filter } }, context);
     if (role) {
-      roleID = role.id;
+      roleID = role.items[0].id;
     }
     return roleID;
   }
