@@ -294,6 +294,8 @@ export class UserService extends ServiceBase {
       user.unauthenticated = false;
     }
 
+    // TODO: verify captcha_code before deleting
+    delete user['captcha_code'];
     const createdUser = await this.createUser(user, context);
 
     this.logger.info('user registered', user);
