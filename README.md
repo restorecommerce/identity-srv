@@ -17,6 +17,7 @@ Several features are meant to be configurable and disabled, if they are not nece
 - `enableEmail`: if set to `true`, emails are sent out upon specific events, like account creation and email change
 - `activationLink`: contains the URL prefix for the activation link which is generated upon account creation
 - `emailConfirmationLink`: contains the URL prefix for the confirmation link which is generated upon an email change request
+- `invitationLink`: contains the URL prefix for invitation link when another user sends an invite request
 - `hbs_templates`: contains all data necessary for retrieving HBS templates from a remote server; such templates can be used to request email data rendering in order to send out all necessary emails (this is ignored if `enableEmail` is set to false).\
 - `minUsernameLength`: minimum length for the user's `name`
 - `maxUsernameLength`: maximum length for the user's `name`
@@ -163,6 +164,17 @@ Used to confirm the user's email change request. The input is a `io.restorecomme
 | ----- | ---- | ----- | ----------- |
 | name | string | required | User name |
 | activation_code | string | required | Activation code  |
+
+#### ConfirmUserInvitation
+Used to confirm user invitation. Requests are performed providing `io.restorecommerce.user.ActivateInvitationRequest` protobuf message as input and responses are a `google.protobuf.Empty` message. For `Create` operation if the invite flag `io.restorecommerce.user.invite` is set to true then an inviation mail would be sent if `invitationLink` and `hbs_templates` are configured accordingly.
+
+`io.restorecommerce.user.ActivateInvitationRequest`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| name | string | required | User name |
+| password | string | required | User password |
+| activation_code | string | required | User's activation_code sent via email |
 
 #### Login
 
