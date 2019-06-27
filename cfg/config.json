@@ -11,6 +11,8 @@
         "subject_change": "restore_identity/subject_change.hbs",
         "body_register": "restore_identity/body_register.hbs",
         "body_change": "restore_identity/body_change.hbs",
+        "subject_invitation": "restore_identity/subject_invitation.hbs",
+        "body_invitation": "restore_identity/body_invitation.hbs",
         "layout": "restore_identity/layout.hbs",
         "resources": "restore_identity/resources.json"
       }
@@ -18,6 +20,7 @@
     "activationLink": "http://restorecommerce.io/activate_user/",
     "emailConfirmationLink": "http://restorecommerce.io/confirm_email_change/",
     "passwordChangeConfirmationLink": "http://restorecommerce.io/confirm_password_change/",
+    "invitationLink": "http://restorecommerce.io/#/invite_user/",
     "minUsernameLength": 8,
     "maxUsernameLength": 20
   },
@@ -300,6 +303,11 @@
           ]
         },
         "confirmPasswordChange": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "confirmUserInvitation": {
           "transport": [
             "grpcIdentity"
           ]
