@@ -45,6 +45,16 @@ export interface User extends BaseDocument {
   timezone_id: string;
   unauthenticated: boolean;
   default_scope: string;
+  invite: boolean; // For user inviation
+  inviting_name: string; // user who is inviting
+  inviting_first_name: string; // First name of user inviting
+  inviting_last_name: string; // Last name of user inviting
+}
+
+export interface UserInviationReq {
+  name: string;
+  password: string;
+  activation_code: string;
 }
 
 export interface FindUser {
@@ -105,6 +115,8 @@ export class UserService extends ServiceBase {
   layoutTpl: string;
   registerBodyTpl: string;
   changeBodyTpl: string;
+  invitationSubjectTpl: string;
+  invitationBodyTpl: string;
   emailEnabled: boolean;
   emailStyle: string;
   roleService: RoleService;
@@ -139,7 +151,7 @@ export class UserService extends ServiceBase {
     });
     const users = await super.read({ request: { filter } }, context);
     if (users.total_count > 0) {
-      logger.silly('found user(s)', users);
+      logger.silly('found user(s)', { users });
       return users;
     }
     logger.silly('user(s) could not be found for request', request);
@@ -173,9 +185,19 @@ export class UserService extends ServiceBase {
       let user: User = usersList[i];
       user.activation_code = '';
       user.active = true;
+      user.unauthenticated = false;
+      if (user.invite) {
+        user.active = false;
+        user.activation_code = this.idGen();
+        user.unauthenticated = true;
+      }
       insertedUsers.push(await this.createUser(user, context));
+      if (this.emailEnabled && user.invite) {
+        // send render request for user Invitation
+        const renderRequest = this.makeInvitationEmailData(user);
+        await this.topics.rendering.emit('renderRequest', renderRequest);
+      }
     }
-
     return insertedUsers;
   }
 
@@ -190,7 +212,7 @@ export class UserService extends ServiceBase {
     logger.silly('request to register a user');
 
     this.setUserDefaults(user);
-    if (!user.password) {
+    if ((!user.password && !user.invite)) {
       throw new errors.InvalidArgument('argument password is empty');
     }
     if (!user.email) {
@@ -207,7 +229,7 @@ export class UserService extends ServiceBase {
 
     if (!this.validUsername(user.name, minLength, maxLength)) {
       throw new errors.InvalidArgument(`the user name is invalid - it should have a length between ${minLength} and ${maxLength}
-        and it can contain alphanumeric characters or any character of the following: ?!.*-_`);
+        and no capital characters, it can contain alphanumeric characters or any character of the following: ?!.*-_`);
     }
 
     if (_.isEmpty(user.first_name) || _.isEmpty(user.last_name)) {
@@ -308,6 +330,33 @@ export class UserService extends ServiceBase {
     }
 
     return user;
+  }
+
+  async confirmUserInvitation(call: any, context: any): Promise<any> {
+    const userInviteReq: UserInviationReq = call.request || call;
+    // find the actual user object from DB using the UserInvitationReq username
+    // activate user and update password
+    let user: User = (await this.find({ request: { name: userInviteReq.name } })).items[0];
+
+    if ((!userInviteReq.activation_code) || userInviteReq.activation_code !== user.activation_code) {
+      this.logger.debug('wrong activation code', { user });
+      throw new errors.FailedPrecondition('wrong activation code');
+    }
+
+    user.active = true;
+    user.unauthenticated = false;
+    user.activation_code = '';
+
+    const password_hash = password.hash(userInviteReq.password);
+    user.password_hash = password_hash;
+    const serviceCall = {
+      request: {
+        items: [user]
+      }
+    };
+    await super.update(serviceCall, context);
+    this.logger.info('password updated for invited user', { name: userInviteReq.name });
+    return {};
   }
 
   /**
@@ -814,6 +863,12 @@ export class UserService extends ServiceBase {
       response = await fetch(prefix + templates['body_change']);
       this.changeBodyTpl = await response.text();
 
+      response = await fetch(prefix + templates['subject_invitation']);
+      this.invitationSubjectTpl = await response.text();
+
+      response = await fetch(prefix + templates['body_invitation']);
+      this.invitationBodyTpl = await response.text();
+
       response = await fetch(prefix + templates['resources'], {});
       if (response.status == 200) {
         const externalRrc = JSON.parse(await response.text());
@@ -851,6 +906,35 @@ export class UserService extends ServiceBase {
 
     const emailBody = this.registerBodyTpl;
     const emailSubject = this.registerSubjectTpl;
+    return this.makeRenderRequestMsg(user, emailSubject, emailBody,
+      dataBody, dataSubject);
+  }
+
+  private makeInvitationEmailData(user: User): any {
+    let invitationLink: string = this.cfg.get('service:invitationLink');
+    if (!invitationLink.endsWith('/')) {
+      invitationLink += '/';
+    }
+
+    invitationLink = `${invitationLink}${user.name}/${user.activation_code}`;
+
+    const dataBody = {
+      firstName: user.first_name,
+      lastName: user.last_name,
+      invitingFirstName: user.inviting_first_name,
+      invitingLastName: user.inviting_last_name,
+      invitingUserName: user.inviting_name,
+      invitationLink
+    };
+
+    const dataSubject = {
+      invitingFirstName: user.inviting_first_name,
+      invitingLastName: user.inviting_last_name,
+      invitingUserName: user.inviting_name
+    };
+
+    const emailBody = this.invitationBodyTpl;
+    const emailSubject = this.invitationSubjectTpl;
     return this.makeRenderRequestMsg(user, emailSubject, emailBody,
       dataBody, dataSubject);
   }
@@ -997,7 +1081,7 @@ export class UserService extends ServiceBase {
     responseSubject: any): any {
     return {
       email: {
-        to: emailAddress
+        to: emailAddress.split(',')
       },
       body: responseBody.body,
       subject: responseSubject.subject,
