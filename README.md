@@ -166,7 +166,7 @@ Used to confirm the user's email change request. The input is a `io.restorecomme
 | activation_code | string | required | Activation code  |
 
 #### ConfirmUserInvitation
-Used to confirm user invitation. Requests are performed providing `io.restorecommerce.user.ActivateInvitationRequest` protobuf message as input and responses are a `google.protobuf.Empty` message. For `Create` operation if the invite flag `io.restorecommerce.user.invite` is set to true then an inviation mail would be sent if `invitationLink` and `hbs_templates` are configured accordingly.
+Used to confirm user invitation. Requests are performed providing `io.restorecommerce.user.ActivateInvitationRequest` protobuf message as input and responses are a `google.protobuf.Empty` message. For `Create` operation if the invite flag `io.restorecommerce.user.invite` is set to true then an inviation mail would be sent if `invitationLink` and `hbs_templates` configuration values are setup accordingly.
 
 `io.restorecommerce.user.ActivateInvitationRequest`
 
