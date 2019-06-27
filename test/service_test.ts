@@ -164,6 +164,68 @@ describe('testing identity-srv', () => {
           result.error.name.should.equal('InvalidArgument');
         });
       });
+      describe('calling createUsers', function createUser(): void {
+        const testuser2: any = {
+          id: 'testuser2',
+          // name: 'test.user2',
+          first_name: 'test',
+          last_name: 'user',
+          // password: 'notsecure',
+          // email: 'test2@ms.restorecommerce.io',
+          role_associations: [{
+            role: roleID,
+            attributes: []
+          }]
+        };
+        it('should not create a user with empty password', async function createUser(): Promise<void> {
+          const result = await userService.create({ items: [testuser2] });
+          should.exist(result.error);
+          result.error.name.should.equal('InvalidArgument');
+          result.error.details.should.equal('3 INVALID_ARGUMENT: argument password is empty');
+        });
+        it('should not create a user with empty email', async function createUser(): Promise<void> {
+          // append password, but no email
+          Object.assign(testuser2, { password: 'notsecure' });
+          const result = await userService.create({ items: [testuser2] });
+          should.exist(result.error);
+          result.error.name.should.equal('InvalidArgument');
+          result.error.details.should.equal('3 INVALID_ARGUMENT: argument email is empty');
+        });
+        it('should not create a user with empty name', async function createUser(): Promise<void> {
+          // append email, but no name
+          Object.assign(testuser2, { email: 'test2@ms.restorecommerce.io' });
+          const result = await userService.create({ items: [testuser2] });
+          should.exist(result.error);
+          result.error.name.should.equal('InvalidArgument');
+          result.error.details.should.equal('3 INVALID_ARGUMENT: argument name is empty');
+        });
+        it('should create a user and unregister it', async function createUser(): Promise<void> {
+          // append email, but no name
+          Object.assign(testuser2, { name: 'test.user2' });
+          const result = await userService.create({ items: [testuser2] });
+          should.exist(result);
+          should.exist(result.data);
+          should.exist(result.data.items);
+          result.data.items[0].id.should.equal('testuser2');
+          await userService.unregister({ id: 'testuser2' });
+        });
+        it('should invite a user and confirm User Invitation', async function inviteUser(): Promise<void> {
+          Object.assign(testuser2, { invite: true });
+          const result = await userService.create({ items: [testuser2] });
+          const userStatus = result.data.items[0].active;
+          userStatus.should.equal(false);
+          // confirm Invitation
+          await userService.confirmUserInvitation({
+            name: testuser2.name,
+            password: testuser2.password, activation_code: result.data.items[0].activation_code
+          });
+          // read the user and now the status should be true
+          const userData = await userService.find({id: 'testuser2'});
+          userData.data.items[0].active.should.equal(true);
+          // unregister
+          await userService.unregister({id: 'testuser2'});
+        });
+      });
       describe('calling find', function findUser(): void {
         it('should return a user', async function findUser(): Promise<void> {
           const result = await (userService.find({
@@ -287,7 +349,7 @@ describe('testing identity-srv', () => {
           // const listener = function listener(message: any, context: any): void {
           //   // pwHashA.should.not.equal(message.password_hash);
           // };
-          await topic.on('passwordChangeRequested', () => {});
+          await topic.on('passwordChangeRequested', () => { });
           let result = await userService.find({
             id: testUserID,
           });
@@ -315,7 +377,7 @@ describe('testing identity-srv', () => {
           // const listener = function listener(message: any, context: any): void {
           //   // pwHashA.should.not.equal(message.password_hash);
           // };
-          await topic.on('passwordChanged', () => {});
+          await topic.on('passwordChanged', () => { });
           let result = await userService.find({
             id: testUserID,
           });

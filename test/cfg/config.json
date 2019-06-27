@@ -2,6 +2,7 @@
   "service": {
     "userActivationRequired": true,
     "register": true,
+    "enableEmail": true,
     "hbs_templates": {
       "url": true,
       "prefix": "http://localhost:8080/",
@@ -9,12 +10,15 @@
         "subject": "restore_identity/subject.hbs",
         "body_register": "restore_identity/body_register.hbs",
         "body_change": "restore_identity/body_change.hbs",
-        "layout": "restore_identity/layout.hbs"
+        "layout": "restore_identity/layout.hbs",
+        "subject_invitation": "restore_identity/subject_invitation.hbs",
+        "body_invitation": "restore_identity/body_invitation.hbs"
       }
     },
     "activationLink": "http://restorecommerce.io/activate_user/",
     "emailConfirmationLink": "http://restorecommerce.io/confirm_email_change/",
     "passwordChangeConfirmationLink": "http://restorecommerce.io/confirm_password_change/",
+    "invitationLink": "http://restorecommerce.io/#/invite_user/",
     "minUsernameLength": 8,
     "maxUsernameLength": 20
   },
@@ -60,6 +64,7 @@
         "changePassword": {},
         "requestEmailChange": {},
         "confirmEmailChange": {},
+        "confirmUserInvitation": {},
         "requestPasswordChange": {},
         "confirmPasswordChange": {},
         "find": {},
@@ -388,6 +393,11 @@
           ]
         },
         "confirmEmailChange": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "confirmUserInvitation": {
           "transport": [
             "grpcIdentity"
           ]
