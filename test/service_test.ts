@@ -220,10 +220,10 @@ describe('testing identity-srv', () => {
             password: testuser2.password, activation_code: result.data.items[0].activation_code
           });
           // read the user and now the status should be true
-          const userData = await userService.find({id: 'testuser2'});
+          const userData = await userService.find({ id: 'testuser2' });
           userData.data.items[0].active.should.equal(true);
           // unregister
-          await userService.unregister({id: 'testuser2'});
+          await userService.unregister({ id: 'testuser2' });
         });
       });
       describe('calling find', function findUser(): void {
@@ -410,13 +410,13 @@ describe('testing identity-srv', () => {
         it('should request the email change and persist it without overriding the old email', async function requestEmailChange(): Promise<void> {
           this.timeout(3000);
           const validate = (user: User) => {
-            const emailNew = user.emailNew;
+            const email_new = user.email_new;
             const email = user.email;
             const activationCode = user.activation_code;
 
-            emailNew.should.not.be.null();
-            emailOld.should.not.equal(emailNew);
-            emailNew.should.equal('newmail@newmail.com');
+            email_new.should.not.be.null();
+            email_old.should.not.equal(email_new);
+            email_new.should.equal('newmail@newmail.com');
             activationCode.should.not.be.null();
           };
 
@@ -431,7 +431,7 @@ describe('testing identity-srv', () => {
           });
           should.exist(result.data);
           should.exist(result.data.items);
-          const emailOld = result.data.items[0].email;
+          const email_old = result.data.items[0].email;
           result = await (userService.requestEmailChange({
             id: testUserID,
             email: 'newmail@newmail.com',
@@ -484,7 +484,7 @@ describe('testing identity-srv', () => {
           }));
           const dbUser: User = result.data.items[0];
           validate(dbUser);
-          dbUser.emailNew.should.be.empty();
+          dbUser.email_new.should.be.empty();
           dbUser.activation_code.should.be.empty();
         });
       });

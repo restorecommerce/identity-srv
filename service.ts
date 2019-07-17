@@ -34,7 +34,7 @@ export interface User extends BaseDocument {
   first_name: string;
   last_name: string;
   email: string; /// Email address
-  emailNew: string; /// Email address
+  email_new: string; /// Email address
   active: boolean; /// If the user was activated via the activation process
   activation_code: string; /// Activation code used in the activation process
   password: string; /// Raw password, not stored
@@ -587,7 +587,7 @@ export class UserService extends ServiceBase {
     }
     const user: User = users.items[0];
 
-    user.emailNew = email;
+    user.email_new = email;
     user.activation_code = this.idGen();
     const serviceCall = {
       request: {
@@ -638,8 +638,8 @@ export class UserService extends ServiceBase {
       throw new errors.FailedPrecondition('wrong activation code');
     }
 
-    user.email = user.emailNew;
-    user.emailNew = '';
+    user.email = user.email_new;
+    user.email_new = '';
     user.activation_code = '';
 
     const serviceCall = {
