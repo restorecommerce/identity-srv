@@ -410,13 +410,13 @@ describe('testing identity-srv', () => {
         it('should request the email change and persist it without overriding the old email', async function requestEmailChange(): Promise<void> {
           this.timeout(3000);
           const validate = (user: User) => {
-            const email_new = user.email_new;
+            const new_email = user.new_email;
             const email = user.email;
             const activationCode = user.activation_code;
 
-            email_new.should.not.be.null();
-            email_old.should.not.equal(email_new);
-            email_new.should.equal('newmail@newmail.com');
+            new_email.should.not.be.null();
+            email_old.should.not.equal(new_email);
+            new_email.should.equal('newmail@newmail.com');
             activationCode.should.not.be.null();
           };
 
@@ -484,7 +484,7 @@ describe('testing identity-srv', () => {
           }));
           const dbUser: User = result.data.items[0];
           validate(dbUser);
-          dbUser.email_new.should.be.empty();
+          dbUser.new_email.should.be.empty();
           dbUser.activation_code.should.be.empty();
         });
       });

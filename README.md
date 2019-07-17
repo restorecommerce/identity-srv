@@ -39,7 +39,7 @@ A User resource.
 | first_name | string | required | User's first name |
 | last_name | string | required | User's last name |
 | email | string | required | Email address |
-| email_new | string | optional | Property in which the email is stored upon an email change request until its confirmation  |
+| new_email | string | optional | Property in which the email is stored upon an email change request until its confirmation  |
 | active | bool | optional | Value is `true` if the user was successfully activated |
 | activation_code | string | optional | Activation code used in the activation process (cleared after successful activation) |
 | password | string | required | Raw password, not stored |
@@ -145,7 +145,7 @@ Used to confirm the user's password change request. The input is a `io.restoreco
 #### RequestEmailChange
 
 Used to change the user's email. Requests are performed providing the `io.restorecommerce.user.RequestEmailChange` protobuf message as input and responses is a `google.protobuf.Empty` message. 
-when receiving this request, the service assigns the new email value to the user's `email_new` property and issues an email with a confirmation link containing a newly-generated activation code.
+when receiving this request, the service assigns the new email value to the user's `new_email` property and issues an email with a confirmation link containing a newly-generated activation code.
 
 `io.restorecommerce.user.ChangeEmailRequest`
 
@@ -156,7 +156,7 @@ when receiving this request, the service assigns the new email value to the user
 
 #### ConfirmEmailChange
 
-Used to confirm the user's email change request. The input is a `io.restorecommerce.user.ConfirmEmailChange` message and the response is a `google.protobuf.Empty` message. If the received activation code matches the previously generated activation code, the value assigned to the `email_new` property is then assigned to the `email` property and `email_new` is set to null.
+Used to confirm the user's email change request. The input is a `io.restorecommerce.user.ConfirmEmailChange` message and the response is a `google.protobuf.Empty` message. If the received activation code matches the previously generated activation code, the value assigned to the `new_email` property is then assigned to the `email` property and `new_email` is set to null.
 
 `io.restorecommerce.user.ConfirmEmailChange`
 
