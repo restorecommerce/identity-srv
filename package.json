@@ -21,7 +21,7 @@
     "@restorecommerce/cluster-service": "^0.1.1",
     "@restorecommerce/grpc-client": "github:restorecommerce/grpc-client",
     "@restorecommerce/kafka-client": "github:restorecommerce/kafka-client",
-    "@restorecommerce/logger": "^0.1.7",
+    "@restorecommerce/logger": "^0.1.8",
     "@restorecommerce/protos": "github:restorecommerce/protos",
     "@restorecommerce/resource-base-interface": "github:restorecommerce/resource-base-interface",
     "@restorecommerce/service-config": "^0.1.1",
