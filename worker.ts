@@ -1,7 +1,7 @@
 import * as sconfig from '@restorecommerce/service-config';
 import * as _ from 'lodash';
 import { Events } from '@restorecommerce/kafka-client';
-import * as Logger from '@restorecommerce/logger';
+import { Logger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { UserService, RoleService } from './service';
 
@@ -11,7 +11,7 @@ const CONTRACT_CANCELLED = 'contractCancelled';
 export class Worker {
   events: Events;
   server: any;
-  logger: Logger;
+  logger: chassis.Logger;
   cfg: any;
   topics: any;
   offsetStore: chassis.OffsetStore;

@@ -1,6 +1,5 @@
 import * as _ from 'lodash';
 import * as bcrypt from 'bcryptjs';
-import * as moment from 'moment-timezone';
 import * as util from 'util';
 import * as uuid from 'uuid';
 
