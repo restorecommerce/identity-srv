@@ -6,8 +6,8 @@ import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import { Worker } from '../worker';
 import * as sconfig from '@restorecommerce/service-config';
-import { equal } from 'assert';
-import { UserService, RoleService, User } from '../service';
+import { User } from '../service';
+import { Topic } from '@restorecommerce/kafka-client/lib/events/provider/kafka';
 
 const Events = kafkaClient.Events;
 
@@ -20,7 +20,7 @@ let client;
 let logger;
 // For event listeners
 let events;
-let topic;
+let topic: Topic;
 let roleID;
 let roleService: any, userService: any;
 
@@ -143,7 +143,35 @@ describe('testing identity-srv', () => {
           should.exist(getResult.data);
           should.not.exist(getResult.error);
           getResult.data.items[0].should.deepEqual(data);
-
+          await topic.removeListener('registered', listener);
+        });
+        it('should create guest User', async function registerUserAgain(): Promise<void> {
+          const guest_user = {
+            id: 'guest_id',
+            name: 'guest_user',
+            first_name: 'guest_first_name',
+            last_name: 'guest_last_name',
+            password: 'notsecure',
+            email: 'guest@guest.com',
+            guest: true,
+            role_associations: [{
+              role: roleID,
+              attributes: []
+            }]
+          };
+          const result = await (userService.register(guest_user));
+          should.exist(result);
+          should.exist(result.data);
+          result.data.id.should.equal('guest_id');
+          result.data.guest.should.equal(true);
+          await userService.unregister({ id: 'guest_id' });
+        });
+        it('should throw an error when registering same user', async function registerUserAgain(): Promise<void> {
+          const result = await (userService.register(user));
+          should.exist(result);
+          should.not.exist(result.data);
+          should.exist(result.error);
+          result.error.name.should.equal('AlreadyExists');
         });
         it('should not create a user with an invalid username format', async function registerUser(): Promise<void> {
           const invalidUser = _.cloneDeep(user);
@@ -200,7 +228,7 @@ describe('testing identity-srv', () => {
           result.error.details.should.equal('3 INVALID_ARGUMENT: argument name is empty');
         });
         it('should create a user and unregister it', async function createUser(): Promise<void> {
-          // append email, but no name
+          // append name
           Object.assign(testuser2, { name: 'test.user2' });
           const result = await userService.create({ items: [testuser2] });
           should.exist(result);

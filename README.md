@@ -9,7 +9,7 @@
 
 This microservice handles the User and Role resources.
 It provides a [gRPC](https://grpc.io/docs) interface for handling CRUD operations and user-specific functionalities.
-This service persists user data within an ArangoDB instance and generic asynchronous communication is performed with [Apache Kafka](https://kafka.apache.org/), using an event-driven approach with message interfaces defined with [Protocol Buffers](https://developers.google.com/protocol-buffers/) (see [kafka-client](https://github.com/restorecommerce/kafka-client) for more information). Resource-handling operations are implemented and exposed through the [UserService and the RoleService](service.ts), which extend the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface) generic class `ServiceBase`.
+This service persists user data within an [ArangoDB](https://www.arangodb.com/) instance and generic asynchronous communication is performed with [Apache Kafka](https://kafka.apache.org/), using an event-driven approach with message interfaces defined with [Protocol Buffers](https://developers.google.com/protocol-buffers/) (see [kafka-client](https://github.com/restorecommerce/kafka-client) for more information). Resource-handling operations are implemented and exposed through the [UserService and the RoleService](service.ts), which extend the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface) generic class `ServiceBase`.
 
 Several features are meant to be configurable and disabled, if they are not necessary. Within the service's configuration file. under `service/` there is a set of flags that can be enabled or disabled:
 - `userActivationRequired`: if set to `false`, users do not require account activation to be able to log in and use their account
@@ -311,7 +311,14 @@ provides endpoints for retrieving the system status and resetting/restoring the 
 ## Development
 
 ### Tests
-See [tests](test/).
+See [tests](test/). To execute the tests a running instance of [Kafka](https://kafka.apache.org/) and [ArangoDB](https://www.arangodb.com/) are needed.
+Refer to [System](https://github.com/restorecommerce/system) repository to start the backing-services before running the tests.
+
+- To run tests
+
+```sh
+npm run test
+```
 
 **Note**: although any kind of gRPC client can be used to connect to these endpoints, the tests make use of the [grpc-client](https://github.com/restorecommerce/grpc-client),
 a [restorecommerce](https://github.com/restorecommerce) module which allows an application to connect to multiple gRPC endpoints with custom middleware, loadbalancing and retry/timeout support.
