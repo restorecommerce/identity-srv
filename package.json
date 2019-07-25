@@ -54,7 +54,7 @@
     "mocha": "cross-env NODE_ENV=test mocha -R spec ./test/*.js --full-trace --exit",
     "tsctests": "tsc -d -p tsconfig.test.json",
     "test-debug": "mocha -R spec ./test/*.js --inspect-brk",
-    "coveralls": "nyc --reporter text --reporter lcov npm test",
+    "coveralls": "nyc report --reporter=text-lcov | coveralls",
     "createtopics": "node setupTopics.js io.restorecommerce.users.resource io.restorecommerce.roles.resource io.restorecommerce.rendering io.restorecommerce.command",
     "postinstall": "tsc -d",
     "build:tsc": "tsc -d",

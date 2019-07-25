@@ -8,6 +8,7 @@ import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
+import { Logger } from '@restorecommerce/logger';
 
 const errors = chassis.errors;
 
@@ -107,7 +108,7 @@ export interface ConfirmPasswordChange {
 export class UserService extends ServiceBase {
   db: any;
   topics: any;
-  logger: any;
+  logger: Logger;
   cfg: any;
   registerSubjectTpl: string;
   changeSubjectTpl: string;
@@ -119,7 +120,7 @@ export class UserService extends ServiceBase {
   emailEnabled: boolean;
   emailStyle: string;
   roleService: RoleService;
-  constructor(cfg: any, topics: any, db: any, logger: any,
+  constructor(cfg: any, topics: any, db: any, logger: Logger,
     isEventsEnabled: boolean, roleService: RoleService) {
     super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users'),
       isEventsEnabled);
@@ -684,7 +685,7 @@ export class UserService extends ServiceBase {
         if (!_.isNil(user[field]) && !_.isEmpty(user[field])) {
           new Promise((resolve, reject) => {
             reject(`Generic update operation is not allowed for field ${field}`);
-          });
+          }).catch((err) => { this.logger.error(`Generic update operation is not allowed for field ${field}`); });
         } else {
           user[field] = users.items[0][field];
         }
