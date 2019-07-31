@@ -1,4 +1,4 @@
-FROM node:10.15.3-jessie
+FROM node:12.2.0-stretch
 ## CREATE APP USER ##
 # Create the home directory for the new app user.
 RUN mkdir -p /home/app
