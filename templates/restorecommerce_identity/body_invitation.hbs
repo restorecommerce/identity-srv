@@ -1,0 +1,12 @@
+ {{#extend "layout"}}
+  {{#content "main"}}
+    <p>Dear {{firstName}} {{lastName}},</p>
+    <p>{{invitedByUserFirstName}} {{invitedByUserLastName}} ({{invitedByUserName}}) invited you to join for Xingular.
+      To activate your account and update password, please click on the following link:
+    </p>
+    <p><a href="{{invitationLink}}">{{invitationLink}}</a></p>
+    <p>The Restore Commerce Team</p>
+    <br/>
+    <br/>
+  {{/content}}
+{{/extend}}
