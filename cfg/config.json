@@ -7,14 +7,14 @@
       "url": true,
       "prefix": "http://localhost:8080/templates/",
       "templates": {
-        "subject_register": "restore_identity/subject_register.hbs",
-        "subject_change": "restore_identity/subject_change.hbs",
-        "body_register": "restore_identity/body_register.hbs",
-        "body_change": "restore_identity/body_change.hbs",
-        "subject_invitation": "restore_identity/subject_invitation.hbs",
-        "body_invitation": "restore_identity/body_invitation.hbs",
-        "layout": "restore_identity/layout.hbs",
-        "resources": "restore_identity/resources.json"
+        "subject_register": "restorecommerce_identity/subject_register.hbs",
+        "body_register": "restorecommerce_identity/body_register.hbs",
+        "subject_change": "restorecommerce_identity/subject_change.hbs",
+        "body_change": "restorecommerce_identity/body_change.hbs",
+        "subject_invitation": "restorecommerce_identity/subject_invitation.hbs",
+        "body_invitation": "restorecommerce_identity/body_invitation.hbs",
+        "layout": "restorecommerce_identity/layout.hbs",
+        "resources": "restorecommerce_identity/resources.json"
       }
     },
     "activationLink": "http://restorecommerce.io/activate_user/",

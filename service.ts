@@ -46,9 +46,9 @@ export interface User extends BaseDocument {
   unauthenticated: boolean;
   default_scope: string;
   invite: boolean; // For user inviation
-  inviting_name: string; // user who is inviting
-  inviting_first_name: string; // First name of user inviting
-  inviting_last_name: string; // Last name of user inviting
+  invited_by_user_name: string; // user who is inviting
+  invited_by_user_first_name: string; // First name of user inviting
+  invited_by_user_last_name: string; // Last name of user inviting
 }
 
 export interface UserInviationReq {
@@ -921,16 +921,16 @@ export class UserService extends ServiceBase {
     const dataBody = {
       firstName: user.first_name,
       lastName: user.last_name,
-      invitingFirstName: user.inviting_first_name,
-      invitingLastName: user.inviting_last_name,
-      invitingUserName: user.inviting_name,
+      invitedByUserName: user.invited_by_user_name,
+      invitedByUserFirstName: user.invited_by_user_first_name,
+      invitedByUserLastName: user.invited_by_user_last_name,
       invitationLink
     };
 
     const dataSubject = {
-      invitingFirstName: user.inviting_first_name,
-      invitingLastName: user.inviting_last_name,
-      invitingUserName: user.inviting_name
+      invitedByUserName: user.invited_by_user_name,
+      invitedByUserFirstName: user.invited_by_user_first_name,
+      invitedByUserLastName: user.invited_by_user_last_name
     };
 
     const emailBody = this.invitationBodyTpl;
