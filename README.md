@@ -90,7 +90,7 @@ Moreover, the `register` operation itself is optional and one can enable or disa
 | last_name | string | required | User's last name |
 | email | string | required | User email ID |
 | password | string | required | User password |
-| creator | string | required | User id of the creator |
+| creator | string | optional | User id of the creator |
 | timezone | string | optional | The User's timezone setting (defaults to 'Europe/Berlin') |
 | locale | string | optional | The User's locale setting (defaults to 'de-DE') |
 | role_associations | `io.restorecommerce.user.RoleAssociation`[] | required | A list of roles with their associated attributes |
