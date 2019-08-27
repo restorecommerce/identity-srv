@@ -18,7 +18,7 @@ Several features are meant to be configurable and disabled, if they are not nece
 - `activationLink`: contains the URL prefix for the activation link which is generated upon account creation
 - `emailConfirmationLink`: contains the URL prefix for the confirmation link which is generated upon an email change request
 - `invitationLink`: contains the URL prefix for invitation link when another user sends an invite request
-- `hbs_templates`: contains all data necessary for retrieving HBS templates from a remote server; such templates can be used to request email data rendering in order to send out all necessary emails (this is ignored if `enableEmail` is set to false).\
+- `hbs_templates`: contains all data necessary for retrieving HBS templates from a remote server; such templates can be used to request email data rendering in order to send out all necessary emails (this is ignored if `enableEmail` is set to false).
 - `minUsernameLength`: minimum length for the user's `name`
 - `maxUsernameLength`: maximum length for the user's `name`
 
@@ -115,7 +115,8 @@ Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest`
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | id | string | required | User ID |
-| password | string | required | new password |
+| password | string | required | old password |
+| new_password | string | required | new password |
 
 #### RequestPasswordChange
 
