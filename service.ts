@@ -1130,9 +1130,9 @@ export class RoleService extends ServiceBase {
       // check unique constraint for role name
       const result = await super.read({
         request: {
-          filter: {
+          filter: toStruct({
             name: role.name
-          }
+          })
         }
       }, context);
 
@@ -1150,9 +1150,9 @@ export class RoleService extends ServiceBase {
       const roleID = roleAssociation.role;
       const result = await super.read({
         request: {
-          filter: {
+          filter: toStruct({
             id: roleID
-          }
+          })
         }
       }, {});
 
