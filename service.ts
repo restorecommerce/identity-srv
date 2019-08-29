@@ -685,7 +685,7 @@ export class UserService extends ServiceBase {
         if (!_.isNil(user[field]) && !_.isEmpty(user[field])) {
           new Promise((resolve, reject) => {
             reject(`Generic update operation is not allowed for field ${field}`);
-          }).catch((err) => { this.logger.error(`Generic update operation is not allowed for field ${field}`); });
+          });
         } else {
           user[field] = users.items[0][field];
         }
