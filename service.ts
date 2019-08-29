@@ -681,11 +681,9 @@ export class UserService extends ServiceBase {
       if (users.total_count === 0) {
         throw new errors.NotFound('user not found');
       }
-      _.forEach(invalidFields, async (field) => {
+      _.forEach(invalidFields, (field) => {
         if (!_.isNil(user[field]) && !_.isEmpty(user[field])) {
-          new Promise((resolve, reject) => {
-            reject(`Generic update operation is not allowed for field ${field}`);
-          });
+          throw new errors.InvalidArgument(`Generic update operation is not allowed for field ${field}`);
         } else {
           user[field] = users.items[0][field];
         }
