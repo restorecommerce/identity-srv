@@ -1128,6 +1128,9 @@ export class RoleService extends ServiceBase {
 
     for (let role of call.request.items) {
       // check unique constraint for role name
+      if (!role.name) {
+        throw new errors.InvalidArgument('argument role name is empty');
+      }
       const result = await super.read({
         request: {
           filter: toStruct({
