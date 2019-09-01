@@ -7,18 +7,28 @@
 [depend]: https://img.shields.io/david/restorecommerce/identity-srv.svg?style=flat-square
 [cover]: http://img.shields.io/coveralls/restorecommerce/identity-srv/master.svg?style=flat-square
 
-This microservice handles the User and Role resources.
-It provides a [gRPC](https://grpc.io/docs) interface for handling CRUD operations and user-specific functionalities.
+This microservice' features:
+
+- Management of _User Accounts_ and _Roles_ entities
+- User account creation
+- Password change
+- Password recovery
+- Un-registration
+
+The microservice exposes a [gRPC](https://grpc.io/docs) interface for handling CRUD operations and user-specific functionalities.
 This service persists user data within an [ArangoDB](https://www.arangodb.com/) instance and generic asynchronous communication is performed with [Apache Kafka](https://kafka.apache.org/), using an event-driven approach with message interfaces defined with [Protocol Buffers](https://developers.google.com/protocol-buffers/) (see [kafka-client](https://github.com/restorecommerce/kafka-client) for more information). Resource-handling operations are implemented and exposed through the [UserService and the RoleService](service.ts), which extend the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface) generic class `ServiceBase`.
 
-Several features are meant to be configurable and disabled, if they are not necessary. Within the service's configuration file. under `service/` there is a set of flags that can be enabled or disabled:
-- `userActivationRequired`: if set to `false`, users do not require account activation to be able to log in and use their account
-- `register`: if set to `false`, the `Register` endpoint is disabled and users can only be created through the bulk creation method `createUsers`, which can be seen as an admin-only operation
-- `enableEmail`: if set to `true`, emails are sent out upon specific events, like account creation and email change
+## Configuration
+
+The following service specific configuration properties under the `service` property are available:
+
+- `userActivationRequired` [`true`]: if set to `false`, users do not require account activation to be able to log in and use their account
+- `register` [`true`]: if set to `false`, the `Register` endpoint is disabled and users can only be created through the bulk creation method `createUsers`, which can be seen as an admin-only operation
+- `enableEmail` [`true`]: if set to `true`, emails are sent out upon specific events, like account creation and email change
 - `activationLink`: contains the URL prefix for the activation link which is generated upon account creation
 - `emailConfirmationLink`: contains the URL prefix for the confirmation link which is generated upon an email change request
 - `invitationLink`: contains the URL prefix for invitation link when another user sends an invite request
-- `hbs_templates`: contains all data necessary for retrieving HBS templates from a remote server; such templates can be used to request email data rendering in order to send out all necessary emails (this is ignored if `enableEmail` is set to false).
+- `hbs_templates`: contains all data necessary for retrieving HBS templates from a remote server; such templates can be used to request email data rendering in order to send out all necessary emails (this is ignored if `enableEmail` is set to false). TODO
 - `minUsernameLength`: minimum length for the user's `name`
 - `maxUsernameLength`: maximum length for the user's `name`
 
@@ -27,6 +37,7 @@ Several features are meant to be configurable and disabled, if they are not nece
 This microservice exposes the following gRPC endpoints:
 
 ### User
+
 A User resource.
 
 `io.restorecommerce.user.User`
@@ -73,10 +84,11 @@ A list of User resources.
 | items | [ ]`io.restorecommerce.user.User` | required | List of Users |
 | total_count | number | optional | number of Users |
 
-#### Register
+#### `Register`
+
 Used to register a User.
-Requests are performed providing `io.restorecommerce.user.RegisterRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message. If a valid configuration for retrieving email-related [handlebars](http://handlebarsjs.com/) templates from a remote server is provided, an email request is performed upon a successful registration. Such config should correspond to the `service/hbs_templates` element in the config files. The email contains the user's activation code. Email requests are done by emitting a`sendEmail` notification event, which is consumed by [notification-srv](http://github.com/restorecommerce/notification-srv) to send an email. 
-Please note that this email operation also implies template rendering, which is performed by emitting a `renderRequest` event, which is consumed by the [rendering-srv](http://github.com/restorecommerce/rendering-srv). Therefore, the email sending step requires both a running instance of the rendering-srv and the notification-srv (or similar services which implement the given interfaces) as well as a remote server containing a set of email templates. This is decoupled from the service's core functionalities and it is automatically disabled if no templates configuration is provided. 
+Requests are performed providing `io.restorecommerce.user.RegisterRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message. If a valid configuration for retrieving email-related [handlebars](http://handlebarsjs.com/) templates from a remote server is provided, an email request is performed upon a successful registration. Such config should correspond to the `service/hbs_templates` element in the config files. The email contains the user's activation code. Email requests are done by emitting a`sendEmail` notification event, which is consumed by [notification-srv](http://github.com/restorecommerce/notification-srv) to send an email.
+Please note that this email operation also implies template rendering, which is performed by emitting a `renderRequest` event, which is consumed by the [rendering-srv](http://github.com/restorecommerce/rendering-srv). Therefore, the email sending step requires both a running instance of the rendering-srv and the notification-srv (or similar services which implement the given interfaces) as well as a remote server containing a set of email templates. This is decoupled from the service's core functionalities and it is automatically disabled if no templates configuration is provided.
 
 Moreover, the `register` operation itself is optional and one can enable or disable it through the `service.register` configuration value. If disabled, the only endpoint for user creation is `create`.
 
@@ -95,8 +107,9 @@ Moreover, the `register` operation itself is optional and one can enable or disa
 | locale | string | optional | The User's locale setting (defaults to 'de-DE') |
 | role_associations | `io.restorecommerce.user.RoleAssociation`[] | required | A list of roles with their associated attributes |
 
-#### Activate
-Used to activate a User. The ``service.userActivationRequired`` config value turns the user activation process on or off. Requests are performed providing `io.restorecommerce.user.ActiveRequest` protobuf message as input and responses are a `google.protobuf.Empty` message.
+#### `Activate`
+
+Used to activate a User. The `service.userActivationRequired` config value turns the user activation process on or off. Requests are performed providing `io.restorecommerce.user.ActiveRequest` protobuf message as input and responses are a `google.protobuf.Empty` message.
 
 `io.restorecommerce.user.ActiveRequest`
 
@@ -105,7 +118,7 @@ Used to activate a User. The ``service.userActivationRequired`` config value tur
 | id | string | required | User ID |
 | activation_code | string | required | activation code for User |
 
-#### ChangePassword
+#### `ChangePassword`
 
 Used to change password for the User (User should be activated to perform this operation).
 Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message.
@@ -118,7 +131,7 @@ Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest`
 | password | string | required | old password |
 | new_password | string | required | new password |
 
-#### RequestPasswordChange
+#### `RequestPasswordChange`
 
 Used to change password for the User in case he/she forgets it.
 It generates and persists an activation code for the user and issues an email with a confirmation link.
@@ -131,7 +144,7 @@ Requests are performed providing `io.restorecommerce.user.ForgotPasswordRequest`
 | name | string | optional | User name |
 | email | string | optional | User email |
 
-#### ConfirmPasswordChange
+#### `ConfirmPasswordChange`
 
 Used to confirm the user's password change request. The input is a `io.restorecommerce.user.ConfirmPasswordChangeRequest` message and the response is a `google.protobuf.Empty` message. If the received activation code matches the previously generated activation code, the stored password hash value is replaced by a hash derived from the new password and the activation code is reset.
 
@@ -143,9 +156,9 @@ Used to confirm the user's password change request. The input is a `io.restoreco
 | activation_code | string | required | Activation code  |
 | password | string | required | New password |
 
-#### RequestEmailChange
+#### `RequestEmailChange`
 
-Used to change the user's email. Requests are performed providing the `io.restorecommerce.user.RequestEmailChange` protobuf message as input and responses is a `google.protobuf.Empty` message. 
+Used to change the user's email. Requests are performed providing the `io.restorecommerce.user.RequestEmailChange` protobuf message as input and responses is a `google.protobuf.Empty` message.
 when receiving this request, the service assigns the new email value to the user's `new_email` property and issues an email with a confirmation link containing a newly-generated activation code.
 
 `io.restorecommerce.user.ChangeEmailRequest`
@@ -155,7 +168,7 @@ when receiving this request, the service assigns the new email value to the user
 | id | string | required | User ID |
 | email | string | required | New email  |
 
-#### ConfirmEmailChange
+#### `ConfirmEmailChange`
 
 Used to confirm the user's email change request. The input is a `io.restorecommerce.user.ConfirmEmailChange` message and the response is a `google.protobuf.Empty` message. If the received activation code matches the previously generated activation code, the value assigned to the `new_email` property is then assigned to the `email` property and `new_email` is set to null.
 
@@ -166,7 +179,8 @@ Used to confirm the user's email change request. The input is a `io.restorecomme
 | name | string | required | User name |
 | activation_code | string | required | Activation code  |
 
-#### ConfirmUserInvitation
+#### `ConfirmUserInvitation`
+
 Used to confirm user invitation. Requests are performed providing `io.restorecommerce.user.ConfirmUserInvitationRequest` protobuf message as input and responses are a `google.protobuf.Empty` message. For `Create` operation if the invite flag `io.restorecommerce.user.invite` is set to true then an inviation mail would be sent if `invitationLink` and `hbs_templates` configuration values are setup accordingly.
 
 `io.restorecommerce.user.ConfirmUserInvitationRequest`
@@ -177,7 +191,7 @@ Used to confirm user invitation. Requests are performed providing `io.restorecom
 | password | string | required | User password |
 | activation_code | string | required | User's activation_code sent via email |
 
-#### Login
+#### `Login`
 
 Used to verify the a User's password and return its info in case the operation is successful. Requests are performed providing `io.restorecommerce.user.LoginRequest` protobuf message as input and the response is `io.restorecommerce.user.User` message.
 
@@ -189,7 +203,8 @@ Used to verify the a User's password and return its info in case the operation i
 | email | string | optional | User email |
 | password | string | required | Raw password |
 
-#### Unregister
+#### `Unregister`
+
 Used to unregister a User. Requests are performed providing `io.restorecommerce.user.UnregisterRequest` protobuf message as input and responses are a `google.protobuf.Empty` message.
 
 `io.restorecommerce.user.UnregisterRequest`
@@ -198,7 +213,8 @@ Used to unregister a User. Requests are performed providing `io.restorecommerce.
 | ----- | ---- | ----- | ----------- |
 | id | string | required | User ID |
 
-#### Find
+#### `Find`
+
 A simplified version of `read`, which only filters users by username, email and/or ID. Requests are performed providing `io.restorecommerce.user.FindRequest` protobuf message as input and responses contain a list  `io.restorecommerce.user.User` messages.
 
 `io.restorecommerce.user.FindRequest`
@@ -209,7 +225,7 @@ A simplified version of `read`, which only filters users by username, email and/
 | name | string | required | User name |
 | email | string | required | User EmailID |
 
-#### FindByRole
+#### `FindByRole`
 
 A custom endpoint in order to filter a user by its role and any attributes associated with it. Requests are performed providing `io.restorecommerce.user.FindByRoleRequest` protobuf message as input and responses contain a list  `io.restorecommerce.user.User` messages.
 
@@ -220,7 +236,8 @@ A custom endpoint in order to filter a user by its role and any attributes assoc
 | role | string | required | Role name |
 | attributes | `io.restorecommerce.user.RoleAssociation.Attribute`[] | optional | Role attributes |
 
-### Role
+### `Role`
+
 A Role resource.
 
 `io.restorecommerce.role.Role`
@@ -233,8 +250,8 @@ A Role resource.
 | created | double | optional | Role created date |
 | modified | double | optional | Role modified date |
 
-
 #### CRUD Operations
+
 The microservice exposes the below CRUD operations for creating or
 modifying User and Role resources.
 
@@ -262,93 +279,90 @@ For the detailed protobuf message structure of `io.restorecommerce.resourcebase.
 
 ## Kafka Events
 
-This microservice subscribes to the following Kafka events by topic:
-- io.restorecommerce.command
-  - restoreCommand
-  - resetCommand
-  - healthCheckCommand
-  - versionCommand
-- io.restorecommerce.rendering
-  - renderResponse
+This microservice subscribes to the following events by topic:
 
-List of events emitted to Kafka by this microservice for below topics:
-- io.restorecommerce.users.resource
-  - registered
-  - activated
-  - passwordChangeRequested
-  - passwordChanged
-  - emailChangeRequested
-  - emailChangeConfirmed
-  - unregistered
-  - userCreated
-  - userModified
-  - userDeleted
-- io.restorecommerce.roles.resource
-  - roleCreated
-  - roleModified
-  - roleDeleted
-- io.restorecommerce.notification
-  - sendEmail
-- io.restorecommerce.rendering
-  - renderRequest
-- io.restorecommerce.command
-  - restoreResponse
-  - resetResponse
-  - healthCheckResponse
-  - versionResponse
+- `io.restorecommerce.command`
+  - `restoreCommand`
+  - `resetCommand`
+  - `healthCheckCommand`
+  - `versionCommand`
+- `io.restorecommerce.rendering`
+  - `renderResponse`
+
+List of events emitted by this microservice for below topics:
+
+- `io.restorecommerce.users.resource`
+  - `registered`
+  - `activated`
+  - `passwordChangeRequested`
+  - `passwordChanged`
+  - `emailChangeRequested`
+  - `emailChangeConfirmed`
+  - `unregistered`
+  - `userCreated`
+  - `userModified`
+  - `userDeleted`
+- `io.restorecommerce.roles.resource`
+  - `roleCreated`
+  - `roleModified`
+  - `roleDeleted`
+- `io.restorecommerce.notification`
+  - `sendEmail`
+- `io.restorecommerce.rendering`
+  - `renderRequest`
+- `io.restorecommerce.command`
+  - `restoreResponse`
+  - `resetResponse`
+  - `healthCheckResponse`
+  - `versionResponse`
 
 For `renderRequest` and `renderResponse` the message structures are defined in [rendering-srv](https://github.com/restorecommerce/rendering-srv) and for `sendEmail` they are defined in [notification-srv](https://github.com/restorecommerce/notification-srv),
-
 
 ## Chassis Service
 
 This service uses [chassis-srv](http://github.com/restorecommerce/chassis-srv), a base module for [restorecommerce](https://github.com/restorecommerce) microservices, in order to provide the following functionalities:
+
 - exposure of all previously mentioned gRPC endpoints
 - implementation of a [command-interface](https://github.com/restorecommerce/chassis-srv/blob/master/command-interface.md) which
 provides endpoints for retrieving the system status and resetting/restoring the system in case of failure. These endpoints can be called via gRPC or Kafka events (through the `io.restorecommerce.command` topic).
 - database access, which is abstracted by the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface)
 - stores the offset values for Kafka topics at regular intervals to [Redis](https://redis.io/).
 
-## Development
-
-### Tests
-See [tests](test/). To execute the tests a running instance of [Kafka](https://kafka.apache.org/) and [ArangoDB](https://www.arangodb.com/) are needed.
-Refer to [System](https://github.com/restorecommerce/system) repository to start the backing-services before running the tests.
-
-- To run tests
+## Running as Docker Container
 
 ```sh
-npm run test
+docker run \
+ --name restorecommerce_identity_srv \
+ -e NODE_ENV=production \
+ -p 9000:9000 \  TODO
+ restorecommerce/identity-srv
 ```
 
-**Note**: although any kind of gRPC client can be used to connect to these endpoints, the tests make use of the [grpc-client](https://github.com/restorecommerce/grpc-client),
-a [restorecommerce](https://github.com/restorecommerce) module which allows an application to connect to multiple gRPC endpoints with custom middleware, loadbalancing and retry/timeout support.
+## Running Locally
 
-## Usage
-
-### Development
-
-- Install dependencies
+Install dependencies
 
 ```sh
 npm install
 ```
 
-- Build application
+Build application
 
 ```sh
 # compile the code
 npm run build
 ```
 
-- Run application and restart it on changes in the code
+### Development Mode
+
+Run application in development mode
 
 ```sh
-# Start identity-srv backend in dev mode
+# Start identity-srv in development mode
 npm run dev
 ```
 
-### Production
+### Production Mode
 
 ```sh
 # compile the code
@@ -356,4 +370,35 @@ npm run build
 
 # run compiled server
 npm start
+```
+
+#### Environment Definition
+
+The environment is defined by the `NODE_ENV` environment variable
+and there are environment specific configuration files.
+
+```sh
+# Linux
+export NODE_ENV="development"
+
+# Windows
+set NODE_ENV=development
+```
+
+Valid environment identifiers are:
+
+- `development`
+- `production`
+
+## Development
+
+### Testing
+
+To execute the [tests](test/) a running instance of [Kafka](https://kafka.apache.org/) and [ArangoDB](https://www.arangodb.com/) are needed.
+Refer to [System](https://github.com/restorecommerce/system) repository to start the backing-services before running the tests.
+
+Run tests
+
+```sh
+npm run test
 ```
