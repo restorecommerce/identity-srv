@@ -1,7 +1,7 @@
 {
   "name": "@restorecommerce/identity-srv",
   "version": "0.1.16",
-  "description": "Restore Commerce identity microservice",
+  "description": "Restore Commerce identity service",
   "main": "index.js",
   "author": "Invend GmbH",
   "repository": {
@@ -18,32 +18,32 @@
   ],
   "dependencies": {
     "@restorecommerce/chassis-srv": "github:restorecommerce/chassis-srv",
-    "@restorecommerce/cluster-service": "^0.1.1",
+    "@restorecommerce/cluster-service": "^0.1.4",
     "@restorecommerce/grpc-client": "github:restorecommerce/grpc-client",
     "@restorecommerce/kafka-client": "^0.1.2",
     "@restorecommerce/logger": "^0.1.10",
     "@restorecommerce/protos": "github:restorecommerce/protos",
     "@restorecommerce/resource-base-interface": "github:restorecommerce/resource-base-interface",
-    "@restorecommerce/service-config": "^0.1.1",
+    "@restorecommerce/service-config": "^0.1.4",
     "bcryptjs": "^2.4.3",
-    "cross-env": "^5.2.0",
+    "cross-env": "^5.2.1",
     "lodash": "^4.17.11",
     "node-fetch": "^2.6.0",
-    "uuid": "^3.3.2"
+    "uuid": "^3.3.3"
   },
   "devDependencies": {
     "@types/mocha": "^5.2.7",
-    "@types/node": "^12.0.10",
-    "coveralls": "^3.0.4",
+    "@types/node": "^12.7.3",
+    "coveralls": "^3.0.6",
     "mocha": "^6.1.4",
     "nodemon": "^1.19.1",
     "npm-run-all": "^4.1.5",
     "nyc": "^14.1.1",
-    "rimraf": "^2.6.3",
+    "rimraf": "^3.0.0",
     "should": "^13.2.3",
-    "tslint": "^5.18.0",
     "ts-node": "^8.3.0",
-    "typescript": "^3.5.2"
+    "tslint": "^5.19.0",
+    "typescript": "^3.6.2"
   },
   "scripts": {
     "start": "npm run createtopics && node start.js",
@@ -62,6 +62,6 @@
     "build": "npm-run-all lint build:clean build:tsc"
   },
   "engines": {
-    "node": ">= 9.2.0"
+    "node": ">= 12.0.0"
   }
 }
