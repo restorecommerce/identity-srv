@@ -7,6 +7,7 @@ pid/
 .project
 .settings
 .directory
+.nyc_output
 
 *.js
 *.d.ts
