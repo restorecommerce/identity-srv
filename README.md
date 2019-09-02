@@ -10,10 +10,12 @@
 This microservice' features:
 
 - Management of _User Accounts_ and _Roles_ entities
-- User account creation
-- Password change
-- Password recovery
-- Un-registration
+- User-to-Role associations with arbitrary scoping
+- User account creation (self-service and by privileged user)
+- Password change (self-service)
+- Password recovery (self-service)
+- Un-registration (self-service)
+- Customizable, optional email notifications to drive processes
 
 The microservice exposes a [gRPC](https://grpc.io/docs) interface for handling CRUD operations and user-specific functionalities.
 This service persists user data within an [ArangoDB](https://www.arangodb.com/) instance and generic asynchronous communication is performed with [Apache Kafka](https://kafka.apache.org/), using an event-driven approach with message interfaces defined with [Protocol Buffers](https://developers.google.com/protocol-buffers/) (see [kafka-client](https://github.com/restorecommerce/kafka-client) for more information). Resource-handling operations are implemented and exposed through the [UserService and the RoleService](service.ts), which extend the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface) generic class `ServiceBase`.
@@ -330,6 +332,9 @@ provides endpoints for retrieving the system status and resetting/restoring the 
 
 ## Running as Docker Container
 
+This service depends on a set of _backing services_ that can be started using a
+dedicated [docker compose definition](https://github.com/restorecommerce/system).
+
 ```sh
 docker run \
  --name restorecommerce_identity_srv \
@@ -346,59 +351,16 @@ Install dependencies
 npm install
 ```
 
-Build application
+Build service
 
 ```sh
 # compile the code
 npm run build
 ```
 
-### Development Mode
-
-Run application in development mode
+Start service
 
 ```sh
-# Start identity-srv in development mode
-npm run dev
-```
-
-### Production Mode
-
-```sh
-# compile the code
-npm run build
-
-# run compiled server
+# run compiled service
 npm start
-```
-
-#### Environment Definition
-
-The environment is defined by the `NODE_ENV` environment variable
-and there are environment specific configuration files.
-
-```sh
-# Linux
-export NODE_ENV="development"
-
-# Windows
-set NODE_ENV=development
-```
-
-Valid environment identifiers are:
-
-- `development`
-- `production`
-
-## Development
-
-### Testing
-
-To execute the [tests](test/) a running instance of [Kafka](https://kafka.apache.org/) and [ArangoDB](https://www.arangodb.com/) are needed.
-Refer to [System](https://github.com/restorecommerce/system) repository to start the backing-services before running the tests.
-
-Run tests
-
-```sh
-npm run test
 ```
