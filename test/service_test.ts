@@ -280,7 +280,7 @@ describe('testing identity-srv', () => {
       describe('login', function login(): void {
         it('without activation should throw an error', async function login(): Promise<void> {
           const result = await (userService.login({
-            name: user.name,
+            identifier: user.name,
             password: user.password,
           }));
           should.exist(result);
@@ -325,7 +325,7 @@ describe('testing identity-srv', () => {
         });
         it('should return verify password and return the user', async function login(): Promise<void> {
           const result = await (userService.login({
-            name: user.name,
+            identifier: user.name,
             password: user.password,
           }));
           should.exist(result);
@@ -340,7 +340,7 @@ describe('testing identity-srv', () => {
         });
         it('should return an error in case the passwords don`t match', async function login(): Promise<void> {
           const result = await (userService.login({
-            name: user.name,
+            identifier: user.name,
             password: 'invalid_pw',
           }));
           should.exist(result);
@@ -575,6 +575,11 @@ describe('testing identity-srv', () => {
 
           await roleService.delete({
             collection: true
+          });
+
+          // this would throw an error since user does not exist
+          await userService.delete({
+            ids: testUserID
           });
 
           const result = await userService.find({

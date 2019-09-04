@@ -661,8 +661,8 @@ export class UserService extends ServiceBase {
   }
 
   /**
-   * Extends the generic update operation in order to update any fields except
-   * "special handling" fields, like email, password, etc
+   * Extends the generic update operation in order to update any fields
+   * depending on the rules configured for the User scope
    * @param call
    * @param context
    */
@@ -715,14 +715,24 @@ export class UserService extends ServiceBase {
    */
   async login(call: any, context?: any): Promise<any> {
     if (_.isEmpty(call) || _.isEmpty(call.request) ||
-      (_.isEmpty(call.request.name) && _.isEmpty(call.request.email))) {
+      (_.isEmpty(call.request.identifier) || (_.isEmpty(call.request.password)))) {
       throw new errors.InvalidArgument('Missing credentials');
     }
-    const field = call.request.name ? 'name' : 'email';
-    const value = call.request.name ? call.request.name : call.request.email;
-
+    const identifier = call.request.identifier;
+    // check for the identifier against name or email in DB
     const filter = toStruct({
-      [field]: value
+      $or: [
+        {
+          name: {
+            $eq: identifier
+          }
+        },
+        {
+          email: {
+            $eq: identifier
+          }
+        }
+      ]
     });
 
     const users = await super.read({ request: { filter } }, context);
@@ -758,7 +768,7 @@ export class UserService extends ServiceBase {
     const users = await super.read({ request: { filter } }, context);
     if (users.total_count === 0) {
       logger.debug('user does not exist', userID);
-      throw new errors.NotFound('user not found');
+      throw new errors.NotFound(`user with ${userID} does not exist for unregistering`);
     }
 
     // delete user
@@ -771,6 +781,54 @@ export class UserService extends ServiceBase {
 
     logger.info('user deleted', userID);
     await this.topics['user.resource'].emit('unregistered', userID);
+    return {};
+  }
+
+  /**
+   * Endpoint delete, to delete a user or list of users
+   * @param  {any} call request containing list of userIds or collection name
+   * @param {any} context
+   * @return {} returns empty response
+   */
+  async delete(call: any, context?: any): Promise<any> {
+    const request = call.request;
+    const logger = this.logger;
+    let userIDs = request.ids;
+    if (request.collection) {
+      // delete collection and return
+      const serviceCall = {
+        request: {
+          collection: request.collection
+        }
+      };
+      await super.delete(serviceCall, context);
+      logger.info('Users collection deleted:');
+      return {};
+    }
+    if (!_.isArray(userIDs)) {
+      userIDs = [userIDs];
+    }
+    logger.silly('Deleting User IDs:', { userIDs });
+    // Check each user exist if one of the user does not exist throw an error
+    for (let userID of userIDs) {
+      const filter = toStruct({
+        id: userID
+      });
+      const users = await super.read({ request: { filter } }, context);
+      if (users.total_count === 0) {
+        logger.debug('User does not exist for deleting:', { userID });
+        throw new errors.NotFound(`User with ${userID} does not exist for deleting`);
+      }
+    }
+
+    // delete users
+    const serviceCall = {
+      request: {
+        ids: userIDs
+      }
+    };
+    await super.delete(serviceCall, context);
+    logger.info('Users deleted:', userIDs);
     return {};
   }
 
@@ -1130,8 +1188,10 @@ export class UserService extends ServiceBase {
 
 
 export class RoleService extends ServiceBase {
+  logger: Logger;
   constructor(db: any, roleTopic: kafkaClient.Topic, logger: any, isEventsEnabled: boolean) {
     super('role', roleTopic, logger, new ResourcesAPIBase(db, 'roles'), isEventsEnabled);
+    this.logger = logger;
   }
 
   async create(call: any, context?: any): Promise<any> {
@@ -1158,6 +1218,92 @@ export class RoleService extends ServiceBase {
     }
 
     return super.create(call, context);
+  }
+
+  /**
+   * Extends the generic update operation in order to update any fields
+   * @param call
+   * @param context
+   */
+  async update(call: any, context?: any): Promise<any> {
+    if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
+      || _.isEmpty(call.request.items)) {
+      throw new errors.InvalidArgument('No items were provided for update');
+    }
+
+    const items = call.request.items;
+    for (let i = 0; i < items.length; i += 1) {
+      // read the role from DB and check if it exists
+      const role = items[i];
+      const filter = toStruct({
+        id: role.id
+      });
+      const roles = await super.read({ request: { filter } }, context);
+      if (roles.total_count === 0) {
+        throw new errors.NotFound('roles not found for updating');
+      }
+    }
+    return super.update(call, context);
+  }
+
+  /**
+   * Extends the generic upsert operation in order to upsert any fields
+   * @param call
+   * @param context
+   */
+  async upsert(call: any, context?: any): Promise<any> {
+    if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
+      || _.isEmpty(call.request.items)) {
+      throw new errors.InvalidArgument('No items were provided for upsert');
+    }
+    return super.upsert(call, context);
+  }
+
+  /**
+   * Endpoint delete, to delete a role or list of roles
+   * @param  {any} call request containing list of userIds or collection name
+   * @param {any} context
+   * @return {} returns empty response
+   */
+  async delete(call: any, context?: any): Promise<any> {
+    const request = call.request;
+    const logger = this.logger;
+    let roleIDs = request.ids;
+    if (request.collection) {
+      // delete collection and return
+      const serviceCall = {
+        request: {
+          collection: request.collection
+        }
+      };
+      await super.delete(serviceCall, context);
+      logger.info('Role collection deleted:');
+      return {};
+    }
+    if (!_.isArray(roleIDs)) {
+      roleIDs = [roleIDs];
+    }
+    logger.silly('deleting Role IDs:', { roleIDs });
+    // Check each user exist if one of the user does not exist throw an error
+    for (let roleID of roleIDs) {
+      const filter = toStruct({
+        id: roleID
+      });
+      const roles = await super.read({ request: { filter } }, context);
+      if (roles.total_count === 0) {
+        logger.debug('Role does not exist for deleting:', { roleID });
+        throw new errors.NotFound(`Role with ${roleID} does not exist for deleting`);
+      }
+    }
+    // delete users
+    const serviceCall = {
+      request: {
+        ids: roleIDs
+      }
+    };
+    await super.delete(serviceCall, context);
+    logger.info('Roles deleted:', roleIDs);
+    return {};
   }
 
   async verifyRoles(roleAssociations: RoleAssociation[]): Promise<boolean> {
