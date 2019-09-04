@@ -303,6 +303,11 @@ export class UserService extends ServiceBase {
    */
   async register(call: any, context?: any): Promise<any> {
     const user: User = call.request || call;
+    const register = this.cfg.get('service:register');
+    if (!register) {
+      this.logger.info('Endpoint register has been disabled');
+      throw new errors.FailedPrecondition('Endpoint register has been disabled');
+    }
     // Create User
     const userActivationRequired: Boolean = this.isUserActivationRequired();
     this.logger.silly('user activation required', userActivationRequired);
@@ -715,6 +720,9 @@ export class UserService extends ServiceBase {
       throw new errors.NotFound('user not found');
     }
     const user = users.items[0];
+    if (!user.active) {
+      throw new errors.FailedPrecondition('user not activated');
+    }
     const match = password.verify(user.password_hash, call.request.password);
     if (!match) {
       throw new errors.Unauthenticated('password does not match');
@@ -841,36 +849,33 @@ export class UserService extends ServiceBase {
    * @param {any } tplConfig Templates prefix and URLs.
    */
   async setRenderRequestConfigs(tplConfig: any): Promise<any> {
-    const templates = tplConfig.templates;
-    const prefix = tplConfig.prefix;
-
     let response: any;
     try {
-      response = await fetch(prefix + templates['subject_register']);
+      response = await fetch(tplConfig.registerSubjectURL);
       this.registerSubjectTpl = await response.text();
 
-      response = await fetch(prefix + templates['subject_change']);
-      this.changeSubjectTpl = await response.text();
-
-      response = await fetch(prefix + templates['layout']);
-      this.layoutTpl = await response.text();
-
-      response = await fetch(prefix + templates['body_register']);
+      response = await fetch(tplConfig.registerBodyURL);
       this.registerBodyTpl = await response.text();
 
-      response = await fetch(prefix + templates['body_change']);
+      response = await fetch(tplConfig.changeSubjectURL);
+      this.changeSubjectTpl = await response.text();
+
+      response = await fetch(tplConfig.changeBodyURL);
       this.changeBodyTpl = await response.text();
 
-      response = await fetch(prefix + templates['subject_invitation']);
+      response = await fetch(tplConfig.invitationSubjectURL);
       this.invitationSubjectTpl = await response.text();
 
-      response = await fetch(prefix + templates['body_invitation']);
+      response = await fetch(tplConfig.invitationBodyURL);
       this.invitationBodyTpl = await response.text();
 
-      response = await fetch(prefix + templates['resources'], {});
+      response = await fetch(tplConfig.layoutURL);
+      this.layoutTpl = await response.text();
+
+      response = await fetch(tplConfig.resourcesURL, {});
       if (response.status == 200) {
         const externalRrc = JSON.parse(await response.text());
-        this.emailStyle = prefix + externalRrc.style;
+        this.emailStyle = externalRrc.styleURL;
       }
 
       this.emailEnabled = true;
@@ -887,17 +892,17 @@ export class UserService extends ServiceBase {
   }
 
   private makeActivationEmailData(user: User): any {
-    let activationLink: string = this.cfg.get('service:activationLink');
-    if (!activationLink.endsWith('/')) {
-      activationLink += '/';
+    let activationURL: string = this.cfg.get('service:activationURL');
+    if (!activationURL.endsWith('/')) {
+      activationURL += '/';
     }
 
-    activationLink = `${activationLink}${user.name}/${user.activation_code}`;
+    activationURL = `${activationURL}${user.name}/${user.activation_code}`;
 
     const dataBody = {
       firstName: user.first_name,
       lastName: user.last_name,
-      activationLink
+      activationURL
     };
     // since there are no place holders in subject
     const dataSubject = { userName: user.name };
@@ -909,12 +914,12 @@ export class UserService extends ServiceBase {
   }
 
   private makeInvitationEmailData(user: User): any {
-    let invitationLink: string = this.cfg.get('service:invitationLink');
-    if (!invitationLink.endsWith('/')) {
-      invitationLink += '/';
+    let invitationURL: string = this.cfg.get('service:invitationURL');
+    if (!invitationURL.endsWith('/')) {
+      invitationURL += '/';
     }
 
-    invitationLink = `${invitationLink}${user.name}/${user.activation_code}`;
+    invitationURL = `${invitationURL}${user.name}/${user.activation_code}`;
 
     const dataBody = {
       firstName: user.first_name,
@@ -922,7 +927,7 @@ export class UserService extends ServiceBase {
       invitedByUserName: user.invited_by_user_name,
       invitedByUserFirstName: user.invited_by_user_first_name,
       invitedByUserLastName: user.invited_by_user_last_name,
-      invitationLink
+      invitationURL
     };
 
     const dataSubject = {
@@ -941,19 +946,19 @@ export class UserService extends ServiceBase {
     const emailBody = this.changeBodyTpl;
     const emailSubject = this.changeSubjectTpl;
 
-    let link: string = passwordChange ? this.cfg.get('service:passwordChangeConfirmationLink')
-      : this.cfg.get('service:emailConfirmationLink'); // prefix
+    let URL: string = passwordChange ? this.cfg.get('service:passwordChangeConfirmationURL')
+      : this.cfg.get('service:emailConfirmationURL'); // prefix
 
-    if (!link.endsWith('/')) {
-      link += '/';
+    if (!URL.endsWith('/')) {
+      URL += '/';
     }
 
-    link = `${link}${user.name}/${user.activation_code}`; // actual email
+    URL = `${URL}${user.name}/${user.activation_code}`; // actual email
 
     const dataBody = {
       firstName: user.first_name,
       lastName: user.last_name,
-      confirmationLink: link,
+      confirmationURL: URL,
       passwordChange
     };
     const dataSubject = { passwordChange };

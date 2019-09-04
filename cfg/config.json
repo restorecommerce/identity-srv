@@ -3,24 +3,20 @@
     "userActivationRequired": true,
     "register": true,
     "enableEmail": true,
-    "hbs_templates": {
-      "url": true,
-      "prefix": "http://localhost:8080/templates/",
-      "templates": {
-        "register_subject": "identity-srv/register_subject.hbs",
-        "register_body": "identity-srv/register_body.hbs",
-        "change_subject": "identity-srv/change_subject.hbs",
-        "change_body": "identity-srv/change_body.hbs",
-        "invitation_subject": "identity-srv/invitation_subject.hbs",
-        "invitation_body": "identity-srv/invitation_body.hbs",
-        "layout": "identity-srv/layout.hbs",
-        "resources": "identity-srv/resources.json"
-      }
+    "hbsTemplates": {
+      "registerSubjectURL": "http://localhost:8080/identity-srv/templates/register_subject.hbs",
+      "registerBodyURL": "http://localhost:8080/identity-srv/templates/register_body.hbs",
+      "changeSubjectURL": "http://localhost:8080/identity-srv/templates/change_subject.hbs",
+      "changeBodyURL": "http://localhost:8080/identity-srv/templates/change_body.hbs",
+      "invitationSubjectURL": "http://localhost:8080/identity-srv/templates/invitation_subject.hbs",
+      "invitationBodyURL": "http://localhost:8080/identity-srv/templates/invitation_body.hbs",
+      "layoutURL": "http://localhost:8080/identity-srv/templates/layout.hbs",
+      "resourcesURL": "http://localhost:8080/identity-srv/templates/resources.json"
     },
-    "activationLink": "http://restorecommerce.io/activate_user/",
-    "emailConfirmationLink": "http://restorecommerce.io/confirm_email_change/",
-    "passwordChangeConfirmationLink": "http://restorecommerce.io/confirm_password_change/",
-    "invitationLink": "http://restorecommerce.io/#/invite_user/",
+    "activationURL": "http://restorecommerce.io/activate_user/",
+    "emailConfirmationURL": "http://restorecommerce.io/confirm_email_change/",
+    "passwordChangeConfirmationURL": "http://restorecommerce.io/confirm_password_change/",
+    "invitationURL": "http://restorecommerce.io/#/invite_user/",
     "minUsernameLength": 8,
     "maxUsernameLength": 20
   },

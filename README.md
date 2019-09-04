@@ -25,12 +25,12 @@ This service persists user data within an [ArangoDB](https://www.arangodb.com/) 
 The following service specific configuration properties under the `service` property are available:
 
 - `userActivationRequired` [`true`]: if set to `false`, users do not require account activation to be able to log in and use their account
-- `register` [`true`]: if set to `false`, the `Register` endpoint is disabled and users can only be created through the bulk creation method `createUsers`, which can be seen as an admin-only operation
+- `register` [`true`]: if set to `false`, the `Register` endpoint is disabled and users can only be created through the bulk creation method `Create`, which can be seen as an admin-only operation
 - `enableEmail` [`true`]: if set to `true`, emails are sent out upon specific events, like account creation and email change
-- `activationLink`: contains the URL prefix for the activation link which is generated upon account creation
-- `emailConfirmationLink`: contains the URL prefix for the confirmation link which is generated upon an email change request
-- `invitationLink`: contains the URL prefix for invitation link when another user sends an invite request
-- `hbs_templates`: contains all data necessary for retrieving HBS templates from a remote server; such templates can be used to request email data rendering in order to send out all necessary emails (this is ignored if `enableEmail` is set to false). TODO
+- `activationURL`: URL for account activation sent via email upon account registration
+- `emailConfirmationURL`: URL for email confirmation sent via email when requested for email change
+- `invitationURL`: URL for user invitation setn via email when inviting an user
+- `hbsTemplates`: contains URLs for [Handlebars templates](https://handlebarsjs.com/) and served via external web application. These templates are used in email sent by system for different user operations like `Register`, `RequestEmailChange` and `RequestPasswordChange`.
 - `minUsernameLength`: minimum length for the user's `name`
 - `maxUsernameLength`: maximum length for the user's `name`
 
@@ -86,13 +86,27 @@ A list of User resources.
 | items | [ ]`io.restorecommerce.user.User` | required | List of Users |
 | total_count | number | optional | number of Users |
 
+#### `CRUD Operations`
+
+The microservice exposes the below CRUD operations for creating or modifying User resources.
+
+`io.restorecommerce.user.Service`
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| Create | `io.restorecommerce.user.UserList` | `io.restorecommerce.user.UserList` | Create a list of User resources |
+| Read | `io.restorecommerce.resourcebase.ReadRequest` | `io.restorecommerce.user.UserList` | Read a list of User resources |
+| Update | `io.restorecommerce.user.UserList` | `io.restorecommerce.user.UserList` | Update a list of User resources |
+| Delete | `io.restorecommerce.resourcebase.DeleteRequest` | Empty | Delete a list of User resources |
+| Upsert | `io.restorecommerce.user.UserList` | `io.restorecommerce.user.UserList` | Create or Update a list of User resources |
+
 #### `Register`
 
 Used to register a User.
-Requests are performed providing `io.restorecommerce.user.RegisterRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message. If a valid configuration for retrieving email-related [handlebars](http://handlebarsjs.com/) templates from a remote server is provided, an email request is performed upon a successful registration. Such config should correspond to the `service/hbs_templates` element in the config files. The email contains the user's activation code. Email requests are done by emitting a`sendEmail` notification event, which is consumed by [notification-srv](http://github.com/restorecommerce/notification-srv) to send an email.
+Requests are performed providing `io.restorecommerce.user.RegisterRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message. If a valid configuration for retrieving email-related [handlebars](http://handlebarsjs.com/) templates from a remote server is provided, an email request is performed upon a successful registration. Such config should correspond to the `service/hbsTemplates` element in the config files. The email contains the user's activation code. Email requests are done by emitting a`sendEmail` notification event, which is consumed by [notification-srv](http://github.com/restorecommerce/notification-srv) to send an email.
 Please note that this email operation also implies template rendering, which is performed by emitting a `renderRequest` event, which is consumed by the [rendering-srv](http://github.com/restorecommerce/rendering-srv). Therefore, the email sending step requires both a running instance of the rendering-srv and the notification-srv (or similar services which implement the given interfaces) as well as a remote server containing a set of email templates. This is decoupled from the service's core functionalities and it is automatically disabled if no templates configuration is provided.
 
-Moreover, the `register` operation itself is optional and one can enable or disable it through the `service.register` configuration value. If disabled, the only endpoint for user creation is `create`.
+Moreover, the `Register` operation itself is optional and one can enable or disable it through the `service.register` configuration value. If disabled, the only endpoint for user creation is `Create`.
 
 `io.restorecommerce.user.RegisterRequest`
 
@@ -135,11 +149,11 @@ Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest`
 
 #### `RequestPasswordChange`
 
-Used to change password for the User in case he/she forgets it.
-It generates and persists an activation code for the user and issues an email with a confirmation link.
-Requests are performed providing `io.restorecommerce.user.ForgotPasswordRequest` protobuf message as input and responses are `google.protobuf.Empty` messages. Either user name or email should be specified upon the request.
+Used to change password for the User in case they forget it.
+It generates and persists an activation code for the user and issues an email with a confirmation URL.
+Requests are performed providing `io.restorecommerce.user.RequestPasswordChangeRequest` protobuf message as input and responses are `google.protobuf.Empty` messages. Either user name or email should be specified upon the request.
 
-`io.restorecommerce.user.ForgotPasswordRequest`
+`io.restorecommerce.user.RequestPasswordChangeRequest`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
@@ -160,8 +174,7 @@ Used to confirm the user's password change request. The input is a `io.restoreco
 
 #### `RequestEmailChange`
 
-Used to change the user's email. Requests are performed providing the `io.restorecommerce.user.RequestEmailChange` protobuf message as input and responses is a `google.protobuf.Empty` message.
-when receiving this request, the service assigns the new email value to the user's `new_email` property and issues an email with a confirmation link containing a newly-generated activation code.
+Used to change the user's email. Requests are performed providing the `io.restorecommerce.user.RequestEmailChange` protobuf message as input and responses is a `google.protobuf.Empty` message. when receiving this request, the service assigns the new email value to the user's `new_email` property and triggers an email with a confirmation URL containing a newly-generated activation code.
 
 `io.restorecommerce.user.ChangeEmailRequest`
 
@@ -183,7 +196,7 @@ Used to confirm the user's email change request. The input is a `io.restorecomme
 
 #### `ConfirmUserInvitation`
 
-Used to confirm user invitation. Requests are performed providing `io.restorecommerce.user.ConfirmUserInvitationRequest` protobuf message as input and responses are a `google.protobuf.Empty` message. For `Create` operation if the invite flag `io.restorecommerce.user.invite` is set to true then an inviation mail would be sent if `invitationLink` and `hbs_templates` configuration values are setup accordingly.
+Used to confirm user invitation. Requests are performed providing `io.restorecommerce.user.ConfirmUserInvitationRequest` protobuf message as input and responses are a `google.protobuf.Empty` message. For `Create` operation if the invite flag `io.restorecommerce.user.invite` is set to true then an inviation mail would be sent if `invitationURL` and `hbsTemplates` configuration values are setup accordingly.
 
 `io.restorecommerce.user.ConfirmUserInvitationRequest`
 
@@ -252,20 +265,9 @@ A Role resource.
 | created | double | optional | Role created date |
 | modified | double | optional | Role modified date |
 
-#### CRUD Operations
+#### `CRUD Operations`
 
-The microservice exposes the below CRUD operations for creating or
-modifying User and Role resources.
-
-`io.restorecommerce.user.Service`
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| Create | `io.restorecommerce.user.UserList` | `io.restorecommerce.user.UserList` | Create a list of User resources |
-| Read | `io.restorecommerce.resourcebase.ReadRequest` | `io.restorecommerce.user.UserList` | Read a list of User resources |
-| Update | `io.restorecommerce.user.UserList` | `io.restorecommerce.user.UserList` | Update a list of User resources |
-| Delete | `io.restorecommerce.resourcebase.DeleteRequest` | Empty | Delete a list of User resources |
-| Upsert | `io.restorecommerce.user.UserList` | `io.restorecommerce.user.UserList` | Create or Update a list of User resources |
+The microservice exposes the below CRUD operations for creating or modifying Role resources.
 
 `io.restorecommerce.role.Service`
 
@@ -283,40 +285,37 @@ For the detailed protobuf message structure of `io.restorecommerce.resourcebase.
 
 This microservice subscribes to the following events by topic:
 
-- `io.restorecommerce.command`
-  - `restoreCommand`
-  - `resetCommand`
-  - `healthCheckCommand`
-  - `versionCommand`
-- `io.restorecommerce.rendering`
-  - `renderResponse`
+| Topic Name | Event Name | Description |
+| ----------- | ------------ | ------------- |
+| `io.restorecommerce.command` | `restoreCommand` | for triggering for system restore |
+|                              | `resetCommand` | for triggering system reset |
+|                              | `healthCheckCommand` | to get system health check |
+|                              | `versionCommand` | to get system version |
+| `io.restorecommerce.rendering` | `renderResponse` | to get response from render request |
 
 List of events emitted by this microservice for below topics:
 
-- `io.restorecommerce.users.resource`
-  - `registered`
-  - `activated`
-  - `passwordChangeRequested`
-  - `passwordChanged`
-  - `emailChangeRequested`
-  - `emailChangeConfirmed`
-  - `unregistered`
-  - `userCreated`
-  - `userModified`
-  - `userDeleted`
-- `io.restorecommerce.roles.resource`
-  - `roleCreated`
-  - `roleModified`
-  - `roleDeleted`
-- `io.restorecommerce.notification`
-  - `sendEmail`
-- `io.restorecommerce.rendering`
-  - `renderRequest`
-- `io.restorecommerce.command`
-  - `restoreResponse`
-  - `resetResponse`
-  - `healthCheckResponse`
-  - `versionResponse`
+| Topic Name | Event Name | Description |
+| ----------- | ------------ | ------------- |
+| `io.restorecommerce.users.resource` | `registered` | emitted upon user registration |
+|                                     | `activated` | emitted upon user activation |
+|                                     | `passwordChangeRequested` | emitted when user reqeusts for password change |
+|                                     | `passwordChanged` | emitted when password was changed successfully |
+|                                     | `emailChangeRequested` | emitted when user reqeusts for email change |
+|                                     | `emailChangeConfirmed` | emitted when user's email was changed successfully |
+|                                     | `unregistered` | emitted when an user is unregistered |
+|                                     | `userCreated` | emitted when an user is created |
+|                                     | `userModified` | emitted when an user is modified |
+|                                     | `userDeleted` | emitted when an user is deleted |
+| `io.restorecommerce.roles.resource` | `roleCreated` | emitted upon role creation |
+|                                     | `roleModified` | emitted upon role modification |
+|                                     | `roleDeleted` | emitted when role deletion |
+| `io.restorecommerce.notification` | `sendEmail` | emitted when triggering notification email |
+| `io.restorecommerce.rendering` | `renderRequest` | emitted when rendering is requested  |
+| `io.restorecommerce.command` | `restoreResponse` | system restore response |
+|                              | `resetResponse` | system reset response |
+|                              | `healthCheckResponse` | system health check response |
+|                              | `versionResponse` | system version response |
 
 For `renderRequest` and `renderResponse` the message structures are defined in [rendering-srv](https://github.com/restorecommerce/rendering-srv) and for `sendEmail` they are defined in [notification-srv](https://github.com/restorecommerce/notification-srv),
 
@@ -338,8 +337,9 @@ dedicated [docker compose definition](https://github.com/restorecommerce/system)
 ```sh
 docker run \
  --name restorecommerce_identity_srv \
+ --hostname identity-srv \
  -e NODE_ENV=production \
- -p 9000:9000 \  TODO
+ -p 50051:50051 \
  restorecommerce/identity-srv
 ```
 

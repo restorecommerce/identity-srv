@@ -278,37 +278,19 @@ describe('testing identity-srv', () => {
       });
 
       describe('login', function login(): void {
-        it('should return verify password and return the user', async function login(): Promise<void> {
+        it('without activation should throw an error', async function login(): Promise<void> {
           const result = await (userService.login({
             name: user.name,
             password: user.password,
           }));
           should.exist(result);
-          should.not.exist(result.error);
-          should.exist(result.data);
-
-          const compareResult = await (userService.find({
-            id: testUserID,
-          }));
-          const userDBDoc = compareResult.data.items[0];
-          result.data.should.deepEqual(userDBDoc);
-        });
-        it('should return an error in case the passwords don`t match', async function login(): Promise<void> {
-          const result = await (userService.login({
-            name: user.name,
-            password: 'invalid_pw',
-          }));
-          should.exist(result);
-          should.exist(result.error);
           should.not.exist(result.data);
-
-
-          should.exist(result.error.message);
-          result.error.message.should.containEql('unauthenticated');
-          result.error.details.should.containEql('password does not match');
+          should.exist(result.error);
+          should.exist(result.error.name);
+          result.error.name.should.equal('FailedPrecondition');
+          should.exist(result.error.details);
+          result.error.details.should.equal('9 FAILED_PRECONDITION: user not activated');
         });
-      });
-      describe('calling activate', function activateUser(): void {
         it('should activate the user', async function activateUser(): Promise<void> {
           const offset = await topic.$offset(-1);
           const listener = function listener(message: any, context: any): void {
@@ -340,6 +322,35 @@ describe('testing identity-srv', () => {
           should.exist(result.data.items[0].active);
           result.data.items[0].active.should.be.true();
           result.data.items[0].activation_code.should.be.empty();
+        });
+        it('should return verify password and return the user', async function login(): Promise<void> {
+          const result = await (userService.login({
+            name: user.name,
+            password: user.password,
+          }));
+          should.exist(result);
+          should.not.exist(result.error);
+          should.exist(result.data);
+
+          const compareResult = await (userService.find({
+            id: testUserID,
+          }));
+          const userDBDoc = compareResult.data.items[0];
+          result.data.should.deepEqual(userDBDoc);
+        });
+        it('should return an error in case the passwords don`t match', async function login(): Promise<void> {
+          const result = await (userService.login({
+            name: user.name,
+            password: 'invalid_pw',
+          }));
+          should.exist(result);
+          should.exist(result.error);
+          should.not.exist(result.data);
+
+
+          should.exist(result.error.message);
+          result.error.message.should.containEql('unauthenticated');
+          result.error.details.should.containEql('password does not match');
         });
       });
       describe('calling changePassword', function changePassword(): void {

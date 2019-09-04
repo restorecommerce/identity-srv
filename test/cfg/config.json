@@ -3,22 +3,20 @@
     "userActivationRequired": true,
     "register": true,
     "enableEmail": true,
-    "hbs_templates": {
-      "url": true,
-      "prefix": "http://localhost:8080/",
-      "templates": {
-        "subject": "restore_identity/subject.hbs",
-        "body_register": "restore_identity/body_register.hbs",
-        "body_change": "restore_identity/body_change.hbs",
-        "layout": "restore_identity/layout.hbs",
-        "subject_invitation": "restore_identity/subject_invitation.hbs",
-        "body_invitation": "restore_identity/body_invitation.hbs"
-      }
+    "hbsTemplates": {
+      "registerSubjectURL": "http://localhost:8080/identity-srv/templates/register_subject.hbs",
+      "registerBodyURL": "http://localhost:8080/identity-srv/templates/register_body.hbs",
+      "changeSubjectURL": "http://localhost:8080/identity-srv/templates/change_subject.hbs",
+      "changeBodyURL": "http://localhost:8080/identity-srv/templates/change_body.hbs",
+      "invitationSubjectURL": "http://localhost:8080/identity-srv/templates/invitation_subject.hbs",
+      "invitationBodyURL": "http://localhost:8080/identity-srv/templates/invitation_body.hbs",
+      "layoutURL": "http://localhost:8080/identity-srv/templates/layout.hbs",
+      "resourcesURL": "http://localhost:8080/identity-srv/templates/resources.json"
     },
-    "activationLink": "http://restorecommerce.io/activate_user/",
-    "emailConfirmationLink": "http://restorecommerce.io/confirm_email_change/",
-    "passwordChangeConfirmationLink": "http://restorecommerce.io/confirm_password_change/",
-    "invitationLink": "http://restorecommerce.io/#/invite_user/",
+    "activationURL": "http://restorecommerce.io/activate_user/",
+    "emailConfirmationURL": "http://restorecommerce.io/confirm_email_change/",
+    "passwordChangeConfirmationURL": "http://restorecommerce.io/confirm_password_change/",
+    "invitationURL": "http://restorecommerce.io/#/invite_user/",
     "minUsernameLength": 8,
     "maxUsernameLength": 20
   },

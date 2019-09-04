@@ -12,8 +12,15 @@
     "host": "redis"
   },
   "service": {
-    "hbs_templates": {
-      "prefix": "http://console/templates/"
+    "hbsTemplates": {
+      "registerSubjectURL": "http://restorecommerce-console:8080/identity-srv/templates/register_subject.hbs",
+      "registerBodyURL": "http://restorecommerce-console:8080/identity-srv/templates/register_body.hbs",
+      "changeSubjectURL": "http://restorecommerce-console:8080/identity-srv/templates/change_subject.hbs",
+      "changeBodyURL": "http://restorecommerce-console:8080/identity-srv/templates/change_body.hbs",
+      "invitationSubjectURL": "http://restorecommerce-console:8080/identity-srv/templates/invitation_subject.hbs",
+      "invitationBodyURL": "http://restorecommerce-console:8080/identity-srv/templates/invitation_body.hbs",
+      "layoutURL": "http://restorecommerce-console:8080/identity-srv/templates/layout.hbs",
+      "resourcesURL": "http://restorecommerce-console:8080/identity-srv/templates/resources.json"
     }
   },
   "database": {
