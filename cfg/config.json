@@ -352,6 +352,11 @@
           "transport": [
             "grpcIdentity"
           ]
+        },
+        "upsert": {
+          "transport": [
+            "grpcIdentity"
+          ]
         }
       },
       "io-restorecommerce-role-srv": {

@@ -62,6 +62,12 @@ A User resource.
 | unauthenticated | boolean | optional | Set automatically to `true` upon user registry until its account is activated for the first time |
 | guest | bool | optional | If user is guest |
 | role_associations | [ ] `io.restorecommerce.user.RoleAssociation` | optional | Role associations |
+| user_type | `io.restorecommerce.user.UserType` | optional | User Type - individula, organization or guest user |
+| image | `io.restorecommerce.image.Image` | optional | Image |
+| invite | bool | optional | used for user invitation |
+| invited_by_user_name | string | optional | inviting User's name |
+| invited_by_user_first_name | string | optional | inviting User's first name |
+| invited_by_user_last_name | string | optional | inviting User's last name |
 
 `io.restorecommerce.user.RoleAssociation`
 
@@ -76,6 +82,28 @@ A User resource.
 | ----- | ---- | ----- | ----------- |
 | id | string | optional | attribute identifier |
 | value | string | optional | attribute value |
+
+`io.restorecommerce.user.UserType`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| INDIVIDUAL_USER | enum | optional | individual User |
+| ORG_USER  | enum | optional | organizational User |
+| GUEST | enum | optional | guest User |
+
+
+`io.restorecommerce.image.Image`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | string | optional | image identifier |
+| caption | string | optional | image caption |
+| filename | string | optional | image file name |
+| content_type | string | optional | image content type |
+| url | string | required | image URL |
+| url | string | optional | image width |
+| url | string | optional | image height |
+| url | string | optional | image length |
 
 A list of User resources.
 
@@ -208,7 +236,7 @@ Used to confirm user invitation. Requests are performed providing `io.restorecom
 
 #### `Login`
 
-Used to verify the a User's password and return its info in case the operation is successful. Requests are performed providing `io.restorecommerce.user.LoginRequest` protobuf message as input and the response is `io.restorecommerce.user.User` message.
+Used to verify the User name or email with password and return User's information in case the operation is successful. Requests are performed providing `io.restorecommerce.user.LoginRequest` protobuf message as input and the response is `io.restorecommerce.user.User` message.
 
 `io.restorecommerce.user.LoginRequest`
 

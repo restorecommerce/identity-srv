@@ -673,8 +673,6 @@ export class UserService extends ServiceBase {
     }
 
     const items = call.request.items;
-    const invalidFields = ['name', 'email', 'password', 'active', 'activation_code',
-      'password_hash', 'guest'];
     for (let i = 0; i < items.length; i += 1) {
       // read the user from DB and update the special fields from DB
       // for user modification
@@ -686,16 +684,28 @@ export class UserService extends ServiceBase {
       if (users.total_count === 0) {
         throw new errors.NotFound('user not found');
       }
-      _.forEach(invalidFields, (field) => {
-        if (!_.isNil(user[field]) && !_.isEmpty(user[field])) {
-          throw new errors.InvalidArgument(`Generic update operation is not allowed for field ${field}`);
-        } else {
-          user[field] = users.items[0][field];
-        }
-      });
+      // Update password if it contains that field by updating hash
+      if (user.password) {
+        user.password_hash = password.hash(user.password);
+        delete user.password;
+      }
     }
     return super.update(call, context);
   }
+
+  /**
+   * Extends the generic upsert operation in order to upsert any fields
+   * @param call
+   * @param context
+   */
+  async upsert(call: any, context?: any): Promise<any> {
+    if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
+      || _.isEmpty(call.request.items)) {
+      throw new errors.InvalidArgument('No items were provided for upsert');
+    }
+    return super.upsert(call, context);
+  }
+
   /**
    * Endpoint verifyPassword, checks if the provided password and user matches
    * the one found in the database.

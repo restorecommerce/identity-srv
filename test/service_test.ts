@@ -550,19 +550,21 @@ describe('testing identity-srv', () => {
           should.not.exist(result.error);
         });
 
-        it('should not allow to update "special" fields', async function changeEmailId(): Promise<void> {
+        it('should allow to update "special" fields', async function changeEmailId(): Promise<void> {
           this.timeout(3000);
 
           let result = await userService.update([{
             id: testUserID,
-            password: 'notsecure2'
+            email: 'update@restorecommerce.io',
+            password: 'notsecure2',
+            first_name: 'John',
+            meta
           }]);
-          should.not.exist(result.data);
-          should.exist(result.error);
-          should.exist(result.error.message);
-          result.error.message.should.equal('invalid argument');
-          should.exist(result.error.details);
-          result.error.details.should.containEql('3 INVALID_ARGUMENT: Generic update operation is not allowed for field password');
+          should.exist(result.data);
+          should.not.exist(result.error);
+          should.exist(result.data.items);
+          result.data.items[0].email.should.equal('update@restorecommerce.io');
+          result.data.items[0].password.should.equal('');
         });
       });
       describe('calling unregister', function unregister(): void {
