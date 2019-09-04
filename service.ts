@@ -258,8 +258,8 @@ export class UserService extends ServiceBase {
         user.name, user.email));
     const filter = toStruct({
       $or: [
-        { name: user.name },
-        { email: user.email },
+        { name: { $eq: user.name } },
+        { email: { $eq: user.email } },
       ]
     });
     let users = await super.read({ request: { filter } }, context);
@@ -385,7 +385,7 @@ export class UserService extends ServiceBase {
     const user = await super.read({
       request: {
         filter: toStruct({
-          email: emailAddress
+          email: { $eq: emailAddress }
         })
       }
     });
@@ -429,7 +429,7 @@ export class UserService extends ServiceBase {
       throw new errors.InvalidArgument('argument activation_code is empty');
     }
     const filter = toStruct({
-      name: userName
+      name: { $eq: userName }
     });
     const users = await super.read({ request: { filter } }, context);
     if (!users || users.total_count === 0) {
@@ -477,7 +477,7 @@ export class UserService extends ServiceBase {
     const newPw = request.new_password;
 
     const filter = toStruct({
-      id: userID
+      id: { $eq: userID }
     });
     const users = await super.read({ request: { filter } }, context);
     if (_.size(users) === 0) {
@@ -583,7 +583,7 @@ export class UserService extends ServiceBase {
     const userID = request.id;
     const email = request.email;
     const filter = toStruct({
-      id: userID
+      id: { $eq: userID }
     });
     const users = await super.read({ request: { filter } }, context);
     if (users.total_count === 0) {
@@ -678,7 +678,7 @@ export class UserService extends ServiceBase {
       // for user modification
       const user = items[i];
       const filter = toStruct({
-        id: user.id
+        id: { $eq: user.id }
       });
       const users = await super.read({ request: { filter } }, context);
       if (users.total_count === 0) {
@@ -763,7 +763,7 @@ export class UserService extends ServiceBase {
     const userID = request.id;
     logger.silly('unregister', userID);
     const filter = toStruct({
-      id: userID
+      id: { $eq: userID }
     });
     const users = await super.read({ request: { filter } }, context);
     if (users.total_count === 0) {
@@ -812,7 +812,7 @@ export class UserService extends ServiceBase {
     // Check each user exist if one of the user does not exist throw an error
     for (let userID of userIDs) {
       const filter = toStruct({
-        id: userID
+        id: { $eq: userID }
       });
       const users = await super.read({ request: { filter } }, context);
       if (users.total_count === 0) {
@@ -854,7 +854,7 @@ export class UserService extends ServiceBase {
     const result = await this.roleService.read({
       request: {
         filter: toStruct({
-          name: role
+          name: { $eq: role }
         }),
         field: [{
           name: 'id',
@@ -1207,11 +1207,10 @@ export class RoleService extends ServiceBase {
       const result = await super.read({
         request: {
           filter: toStruct({
-            name: role.name
+            name: { $eq: role.name }
           })
         }
       }, context);
-
       if (result && result.items && result.items.length > 0) {
         throw new errors.AlreadyExists(`Role ${role.name} already exists`);
       }
@@ -1236,7 +1235,7 @@ export class RoleService extends ServiceBase {
       // read the role from DB and check if it exists
       const role = items[i];
       const filter = toStruct({
-        id: role.id
+        id: { $eq: role.id }
       });
       const roles = await super.read({ request: { filter } }, context);
       if (roles.total_count === 0) {
@@ -1287,7 +1286,7 @@ export class RoleService extends ServiceBase {
     // Check each user exist if one of the user does not exist throw an error
     for (let roleID of roleIDs) {
       const filter = toStruct({
-        id: roleID
+        id: { $eq: roleID }
       });
       const roles = await super.read({ request: { filter } }, context);
       if (roles.total_count === 0) {
@@ -1313,7 +1312,7 @@ export class RoleService extends ServiceBase {
       const result = await super.read({
         request: {
           filter: toStruct({
-            id: roleID
+            id: { $eq: roleID }
           })
         }
       }, {});

@@ -73,7 +73,8 @@
         "create": {},
         "read": {},
         "delete": {},
-        "update": {}
+        "update": {},
+        "upsert": {}
       }
     },
     "service-role": {
@@ -454,6 +455,11 @@
           "transport": [
             "grpcIdentity"
           ]
+        },
+        "upsert": {
+          "transport": [
+            "grpcIdentity"
+          ]
         }
       },
       "io-restorecommerce-role-srv": {
@@ -467,7 +473,12 @@
             "grpcIdentity"
           ]
         },
-        "modify": {
+        "update": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "upsert": {
           "transport": [
             "grpcIdentity"
           ]
