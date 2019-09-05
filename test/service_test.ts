@@ -97,6 +97,7 @@ describe('testing identity-srv', () => {
     describe('with test client', () => {
       let userService;
       let testUserID;
+      let upserUserID;
       let user;
       before(async function connectUserService(): Promise<void> {
         userService = await connect('client:service-user', 'user.resource');
@@ -588,6 +589,43 @@ describe('testing identity-srv', () => {
           should.not.exist(result.data);
           should.exist(result.error);
           should.equal(result.error.message, 'not found');
+        });
+      });
+      describe('calling upsert', function upsert(): void {
+        it('should upsert (create) user', async function upsert(): Promise<void> {
+          let result = await userService.upsert([{
+            name: 'upsertuser',
+            email: 'upsert@restorecommerce.io',
+            password: 'testUpsert',
+            first_name: 'John',
+            last_name: 'upsert'
+          }]);
+          upserUserID = result.data.items[0].id;
+          should.exist(result.data);
+          should.not.exist(result.error);
+          should.exist(result.data.items);
+          result.data.items[0].email.should.equal('upsert@restorecommerce.io');
+          result.data.items[0].password.should.equal('');
+        });
+        it('should upsert (update) user and delete user collection', async function upsert(): Promise<void> {
+          let result = await userService.upsert([{
+            id: upserUserID,
+            name: 'upsertuser',
+            email: 'upsert2@restorecommerce.io',
+            password: 'testUpsert2',
+            first_name: 'John',
+            last_name: 'upsert2',
+            meta
+          }]);
+          should.exist(result.data);
+          should.not.exist(result.error);
+          should.exist(result.data.items);
+          result.data.items[0].email.should.equal('upsert2@restorecommerce.io');
+          result.data.items[0].password.should.equal('');
+          // delete user collection
+          await userService.delete({
+            collection: true
+          });
         });
       });
     });

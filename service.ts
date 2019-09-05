@@ -703,7 +703,36 @@ export class UserService extends ServiceBase {
       || _.isEmpty(call.request.items)) {
       throw new errors.InvalidArgument('No items were provided for upsert');
     }
-    return super.upsert(call, context);
+    let result = [];
+    const items = call.request.items;
+    for (let i = 0; i < items.length; i += 1) {
+      // read the user from DB and update the special fields from DB
+      // for user modification
+      const user = items[i];
+      const filter = toStruct({
+        $or: [
+          {
+            name: {
+              $eq: user.name
+            }
+          },
+          {
+            email: {
+              $eq: user.email
+            }
+          }
+        ]
+      });
+      const users = await super.read({ request: { filter } }, context);
+      if (users.total_count === 0) {
+        // call the create method, checks all conditions before inserting
+        result.push(await this.createUser(user));
+      } else {
+        let updateResponse = await this.update({ request: { items: [user] } });
+        result.push(updateResponse.items[0]);
+      }
+    }
+    return { items: result };
   }
 
   /**
