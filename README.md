@@ -11,7 +11,7 @@ This microservice' features:
 
 - Management of _User Accounts_ and _Roles_ entities
 - User-to-Role associations with arbitrary scoping
-- User account creation (self-service and by privileged user)
+- User account creation (self-service, by privileged user, by invitation)
 - Password change (self-service)
 - Password recovery (self-service)
 - Un-registration (self-service)
@@ -90,7 +90,6 @@ A User resource.
 | INDIVIDUAL_USER | enum | optional | individual User |
 | ORG_USER  | enum | optional | organizational User |
 | GUEST | enum | optional | guest User |
-
 
 `io.restorecommerce.image.Image`
 
