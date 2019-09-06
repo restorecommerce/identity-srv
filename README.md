@@ -29,7 +29,7 @@ The following service specific configuration properties under the `service` prop
 - `enableEmail` [`true`]: if set to `true`, emails are sent out upon specific events, like account creation and email change
 - `activationURL`: URL for account activation sent via email upon account registration
 - `emailConfirmationURL`: URL for email confirmation sent via email when requested for email change
-- `invitationURL`: URL for user invitation setn via email when inviting an user
+- `invitationURL`: URL for user invitation sent via email when inviting an user
 - `hbsTemplates`: contains URLs for [Handlebars templates](https://handlebarsjs.com/) and served via external web application. These templates are used in email sent by system for different user operations like `Register`, `RequestEmailChange` and `RequestPasswordChange`.
 - `minUsernameLength`: minimum length for the user's `name`
 - `maxUsernameLength`: maximum length for the user's `name`
