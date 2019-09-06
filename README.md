@@ -11,7 +11,7 @@ This microservice' features:
 
 - Management of _User Accounts_ and _Roles_ entities
 - User-to-Role associations with arbitrary scoping
-- User account creation (self-service and by privileged user)
+- User account creation (self-service, by privileged user, by invitation)
 - Password change (self-service)
 - Password recovery (self-service)
 - Un-registration (self-service)
@@ -27,9 +27,9 @@ The following service specific configuration properties under the `service` prop
 - `userActivationRequired` [`true`]: if set to `false`, users do not require account activation to be able to log in and use their account
 - `register` [`true`]: if set to `false`, the `Register` endpoint is disabled and users can only be created through the bulk creation method `Create`, which can be seen as an admin-only operation
 - `enableEmail` [`true`]: if set to `true`, emails are sent out upon specific events, like account creation and email change
-- `activationURL`: URL for account activation sent via email upon account registration
-- `emailConfirmationURL`: URL for email confirmation sent via email when requested for email change
-- `invitationURL`: URL for user invitation setn via email when inviting an user
+- `activationURL`: URL to show link in activation email to activate the account
+- `emailConfirmationURL`: URL to show link in confirmation email to confirm email address change
+- `invitationURL`: URL to show link in invitation email to accept invitation
 - `hbsTemplates`: contains URLs for [Handlebars templates](https://handlebarsjs.com/) and served via external web application. These templates are used in email sent by system for different user operations like `Register`, `RequestEmailChange` and `RequestPasswordChange`.
 - `minUsernameLength`: minimum length for the user's `name`
 - `maxUsernameLength`: maximum length for the user's `name`
@@ -90,7 +90,6 @@ A User resource.
 | INDIVIDUAL_USER | enum | optional | individual User |
 | ORG_USER  | enum | optional | organizational User |
 | GUEST | enum | optional | guest User |
-
 
 `io.restorecommerce.image.Image`
 
