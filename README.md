@@ -113,7 +113,7 @@ A list of User resources.
 | items | [ ]`io.restorecommerce.user.User` | required | List of Users |
 | total_count | number | optional | number of Users |
 
-#### `CRUD Operations`
+#### CRUD Operations
 
 The microservice exposes the below CRUD operations for creating or modifying User resources.
 
