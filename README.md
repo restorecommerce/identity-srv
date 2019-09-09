@@ -241,8 +241,7 @@ Used to verify the User name or email with password and return User's informatio
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| name | string | optional | User name |
-| email | string | optional | User email |
+| identifier | string | required | User name or User email |
 | password | string | required | Raw password |
 
 #### `Unregister`
