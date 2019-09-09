@@ -5,6 +5,7 @@ To run the service, a running instance of
 - [Kafka](https://kafka.apache.org/)
 - [ArangoDB](https://www.arangodb.com/)
 - [Redis](https://redis.io/)
+- [ElasticSearch](https://www.elastic.co/products/elasticsearch)
 
 Refer to [System](https://github.com/restorecommerce/system) repository to start the backing-services before running the tests.
 
