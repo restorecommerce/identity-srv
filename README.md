@@ -364,6 +364,7 @@ dedicated [docker compose definition](https://github.com/restorecommerce/system)
 docker run \
  --name restorecommerce_identity_srv \
  --hostname identity-srv \
+ --network=system_test \
  -e NODE_ENV=production \
  -p 50051:50051 \
  restorecommerce/identity-srv
