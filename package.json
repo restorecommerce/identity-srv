@@ -1,6 +1,6 @@
 {
   "name": "@restorecommerce/identity-srv",
-  "version": "0.1.16",
+  "version": "0.0.1",
   "description": "Restore Commerce identity service",
   "main": "index.js",
   "author": "Invend GmbH",
@@ -33,7 +33,7 @@
   },
   "devDependencies": {
     "@types/mocha": "^5.2.7",
-    "@types/node": "^12.7.3",
+    "@types/node": "^12.7.5",
     "coveralls": "^3.0.6",
     "mocha": "^6.1.4",
     "nodemon": "^1.19.1",
@@ -42,8 +42,8 @@
     "rimraf": "^3.0.0",
     "should": "^13.2.3",
     "ts-node": "^8.3.0",
-    "tslint": "^5.19.0",
-    "typescript": "^3.6.2"
+    "tslint": "^5.20.0",
+    "typescript": "^3.6.3"
   },
   "scripts": {
     "start": "npm run createtopics && node start.js",
