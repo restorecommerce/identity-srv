@@ -8,6 +8,7 @@ pid/
 .settings
 .directory
 .nyc_output
+.idea
 
 *.js
 *.d.ts

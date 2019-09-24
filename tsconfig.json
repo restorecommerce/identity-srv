@@ -1,4 +1,4 @@
-  {
+{
   "compilerOptions": {
     "target": "es6",
     "module": "commonjs",
@@ -8,9 +8,11 @@
     "allowSyntheticDefaultImports": true
   },
   "include": [
-     "./client/*.ts",
-     "./start.ts", "./service.ts",
-     "./worker.ts"
+    "./client/*.ts",
+    "./start.ts",
+    "./service.ts",
+    "./worker.ts",
+    "./healthcheck.ts"
   ],
   "exclude": [
     "node_modules",
