@@ -59,7 +59,7 @@
     "build:tsc": "tsc -d",
     "build:clean": "rimraf service.js start.js worker.js",
     "build": "npm-run-all lint build:clean build:tsc",
-    "healtchcheck": "node healthcheck.js"
+    "healthcheck": "node healthcheck.js"
   },
   "engines": {
     "node": ">= 12.0.0"
