@@ -11,29 +11,52 @@ grpcConfig['service'] = grpcConfig['services'][cfg.get('serviceNames:cis')];
 grpcConfig['protos'] = ['io/restorecommerce/commandinterface.proto'];
 grpcConfig['timeout'] = 3000;
 
+logger.info("Connecting to: " + 'grpc://' + grpcConfig['addr']);
+
 const client = new grpcClient(grpcConfig, logger);
 const command = client.makeEndpoint('command', 'grpc://' + grpcConfig['addr']);
 
-Object.keys(grpcConfig['services']).forEach(async (service) => {
-  const value = new Buffer(JSON.stringify({service})).toString('base64');
-  const response = await command({name: 'health_check', payload: {type_url: 'payload', value}});
+const requests: Promise<any>[] = [];
 
-  if ('data' in response && 'value' in response.data) {
-    const decoded = Buffer.from(response.data.value, 'base64').toString();
-    const realValue = JSON.parse(decoded);
-    if ('status' in realValue) {
-      if (realValue.status !== 'SERVING') {
-        logger.error(service + ' is down: ' + realValue.status);
-        process.exit(1);
+Object.keys(grpcConfig['services']).forEach((service) => {
+  requests.push(new Promise<any>(async (resolve, reject) => {
+    try {
+      const value = new Buffer(JSON.stringify({service})).toString('base64');
+      const fullPayload = {name: 'health_check', payload: {type_url: 'payload', value}};
+
+      logger.info("Executing: " + JSON.stringify(fullPayload));
+
+      const response = await command(fullPayload);
+
+      if ('data' in response && 'value' in response.data) {
+        const decoded = Buffer.from(response.data.value, 'base64').toString();
+        const realValue = JSON.parse(decoded);
+        if ('status' in realValue) {
+          if (realValue.status !== 'SERVING') {
+            logger.error(service + ' is down: ' + realValue.status);
+            reject();
+          } else {
+            logger.info(service + ' is serving');
+            resolve();
+          }
+        } else {
+          logger.error('ERROR!', realValue);
+          reject();
+        }
       } else {
-        logger.info(service + ' is serving');
+        logger.error('ERROR!', response);
+        reject();
       }
-    } else {
-      logger.error('ERR!', realValue);
-      process.exit(1);
+    } catch (e) {
+      logger.error('ERROR!', e);
+      reject();
     }
-  } else {
-    logger.error('ERR!', response);
-    process.exit(1);
-  }
+  }));
+});
+
+// Force exit as sometimes there is a hanging thread
+Promise.all(requests).catch(() => {
+  process.exit(1);
+}).then(() => {
+  process.exit(0);
 });
