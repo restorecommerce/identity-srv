@@ -26,7 +26,7 @@
     "@restorecommerce/resource-base-interface": "github:restorecommerce/resource-base-interface",
     "@restorecommerce/service-config": "^0.1.4",
     "bcryptjs": "^2.4.3",
-    "cross-env": "^5.2.1",
+    "cross-env": "^6.0.3",
     "lodash": "^4.17.11",
     "node-fetch": "^2.6.0",
     "uuid": "^3.3.3"
