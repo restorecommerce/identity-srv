@@ -7,7 +7,7 @@
 [depend]: https://img.shields.io/david/restorecommerce/identity-srv.svg?style=flat-square
 [cover]: http://img.shields.io/coveralls/restorecommerce/identity-srv/master.svg?style=flat-square
 
-This microservice' features:
+Features:
 
 - Management of _User Accounts_ and _Roles_ entities
 - User-to-Role associations with arbitrary scoping
