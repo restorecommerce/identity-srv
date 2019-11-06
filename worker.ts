@@ -126,7 +126,7 @@ export class Worker {
     const reflectionService = new chassis.grpc.ServerReflection(transport.$builder, server.config);
     await server.bind(reflectionServiceName, reflectionService);
 
-    const hbsTemplates = cfg.get('service:hbsTemplates');
+    const hbsTemplates = cfg.get('service:hbs_templates');
     if (hbsTemplates && cfg.get('service:enableEmail')) {
       await userService.setRenderRequestConfigs(hbsTemplates);
     } else {
