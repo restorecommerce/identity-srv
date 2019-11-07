@@ -1072,7 +1072,7 @@ export class UserService extends ServiceBase {
           body: { body, layout: this.layoutTpl },
         }),
         data: marshallProtobufAny(dataBody),
-        style: this.emailStyle, // URL to a style
+        style_url: this.emailStyle, // URL to a style
         options: marshallProtobufAny({ texts: {} }),
         content_type: 'application/html'
       },
