@@ -18,7 +18,7 @@ Features:
 - Customizable, optional email notifications to drive processes
 
 The microservice exposes a [gRPC](https://grpc.io/docs) interface for handling CRUD operations and user-specific functionalities.
-This service persists user data within an [ArangoDB](https://www.arangodb.com/) instance and generic asynchronous communication is performed with [Apache Kafka](https://kafka.apache.org/), using an event-driven approach with message interfaces defined with [Protocol Buffers](https://developers.google.com/protocol-buffers/) (see [kafka-client](https://github.com/restorecommerce/kafka-client) for more information). Resource-handling operations are implemented and exposed through the [UserService and the RoleService](service.ts), which extend the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface) generic class `ServiceBase`.
+This service persists user data within an [ArangoDB](https://www.arangodb.com/) instance and generic asynchronous communication is performed with [Apache Kafka](https://kafka.apache.org/), using an event-driven approach with message interfaces defined with [Protocol Buffers](https://developers.google.com/protocol-buffers/) (see [kafka-client](https://github.com/restorecommerce/kafka-client) for more information). Resource-handling operations are implemented and exposed through the [UserService and the RoleService](src/service.ts), which extend the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface) generic class `ServiceBase`.
 
 ## Configuration
 

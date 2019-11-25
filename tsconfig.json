@@ -1,22 +1,30 @@
 {
   "compilerOptions": {
-    "target": "es6",
+    "target": "ES6",
     "module": "commonjs",
     "moduleResolution": "node",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "noUnusedLocals": false,
+    "skipLibCheck": false,
+    "outDir": "lib",
+    "typeRoots": [
+      "node_modules/@types"
+    ]
   },
   "include": [
+    "./src/**/*.ts",
     "./client/*.ts",
-    "./start.ts",
-    "./service.ts",
+    "./src/start.ts",
+    "./src/service.ts",
     "./worker.ts",
     "./healthcheck.ts"
   ],
   "exclude": [
     "node_modules",
     "lib",
-    "docs"
+    "doc",
+    "**/*.service_test.ts"
   ]
 }

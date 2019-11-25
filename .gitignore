@@ -10,9 +10,9 @@ pid/
 .nyc_output
 .idea
 
-*.js
-*.d.ts
 !setupTopics.js
+
+lib
 
 *.log
 *~
