@@ -68,6 +68,7 @@ export class Worker {
   cfg: any;
   topics: any;
   offsetStore: chassis.OffsetStore;
+  userService: UserService;
   constructor(cfg?: any) {
     this.cfg = cfg || sconfig(process.cwd());
     this.logger = new Logger(this.cfg.get('logger'));
@@ -126,18 +127,11 @@ export class Worker {
 
     const cis = new UserCommandInterface(server, cfg.get(), logger, events);
 
-    // user service
-    logger.verbose('Setting up user and role services');
-    const roleService = new RoleService(db,
-      this.topics['role.resource'], logger, true);
-    const userService = new UserService(cfg,
-      this.topics, db, logger, true, roleService);
-
     const identityServiceEventListener = async (msg: any,
       context: any, config: any, eventName: string) => {
       if (eventName === RENDER_RESPONSE_EVENT) {
-        if (userService.emailEnabled) {
-          await userService.sendEmail(msg);
+        if (this.userService.emailEnabled) {
+          await this.userService.sendEmail(msg);
         }
       } else if (eventName === CONTRACT_CANCELLED) {
         const contractID = msg.id;
@@ -145,7 +139,7 @@ export class Worker {
         logger.info('Deactivating users for Contract ID:',
           { id: contractID });
         // Update users to deactive
-        await userService.disableUsers(organization_ids);
+        await this.userService.disableUsers(organization_ids);
       }
       else {
         // command events
@@ -167,6 +161,14 @@ export class Worker {
         }
       }
     }
+
+    // user service
+    logger.verbose('Setting up user and role services');
+    const roleService = new RoleService(db,
+      this.topics['role.resource'], logger, true);
+    const userService = new UserService(cfg,
+      this.topics, db, logger, true, roleService);
+    this.userService = userService;
 
     await server.bind(serviceNamesCfg.user, userService);
     await server.bind(serviceNamesCfg.role, roleService);

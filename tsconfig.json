@@ -14,17 +14,11 @@
     ]
   },
   "include": [
-    "./src/**/*.ts",
-    "./client/*.ts",
-    "./src/start.ts",
-    "./src/service.ts",
-    "./worker.ts",
-    "./healthcheck.ts"
+    "./src/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "lib",
-    "doc",
-    "**/*.service_test.ts"
+    "doc"
   ]
 }

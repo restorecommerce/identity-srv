@@ -6,7 +6,7 @@ import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
 import { Worker } from '../lib/worker';
 import * as sconfig from '@restorecommerce/service-config';
-import { User } from '../src/service';
+import { User } from '../lib/service';
 import { Topic } from '@restorecommerce/kafka-client/lib/events/provider/kafka';
 
 const Events = kafkaClient.Events;
