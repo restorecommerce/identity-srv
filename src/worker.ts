@@ -3,10 +3,63 @@ import * as _ from 'lodash';
 import { Events } from '@restorecommerce/kafka-client';
 import { Logger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
-import { UserService, RoleService } from './src/service';
+import { UserService, RoleService } from './service';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
+
+class UserCommandInterface extends chassis.CommandInterface {
+  constructor(server: chassis.Server, cfg: any, logger: any, events: Events) {
+    super(server, cfg, logger, events);
+  }
+
+  makeResourcesRestoreSetup(db: any, resource: string): any {
+    const that = this;
+    return {
+      unregistered: async function restoreUnregistered(message: any, context: any,
+        config: any, eventName: string): Promise<any> {
+        try {
+          await db.delete(`${resource}s`, { id: message.id });
+        } catch (err) {
+          that.logger.error('Exception caught while restoring unregistered User',
+            message);
+        }
+        return {};
+      },
+      userModified: async function restoreUsersModified(message: any, context: any,
+        config: any, eventName: string): Promise<any> {
+        try {
+          await db.update(`${resource}s`, { id: message.id },
+            message);
+        } catch (err) {
+          that.logger.error('Exception caught while restoring modified User',
+            message);
+        }
+        return {};
+      },
+      registered: async function restoreUsersRegistered(message: any, context: any,
+        config: any, eventName: string): Promise<any> {
+        try {
+          await db.insert(`${resource}s`, message);
+        } catch (err) {
+          that.logger.error('Exception caught while restoring registered User',
+            message);
+        }
+        return {};
+      },
+      userCreated: async function restoreUsersCreated(message: any, context: any,
+        config: any, eventName: string): Promise<any> {
+        try {
+          await db.insert(`${resource}s`, message);
+        } catch (err) {
+          that.logger.error('Exception caught while restoring registered User',
+            message);
+        }
+        return {};
+      },
+    };
+  }
+}
 
 export class Worker {
   events: Events;
@@ -73,6 +126,13 @@ export class Worker {
 
     const cis = new UserCommandInterface(server, cfg.get(), logger, events);
 
+    // user service
+    logger.verbose('Setting up user and role services');
+    const roleService = new RoleService(db,
+      this.topics['role.resource'], logger, true);
+    const userService = new UserService(cfg,
+      this.topics, db, logger, true, roleService);
+
     const identityServiceEventListener = async (msg: any,
       context: any, config: any, eventName: string) => {
       if (eventName === RENDER_RESPONSE_EVENT) {
@@ -108,13 +168,6 @@ export class Worker {
       }
     }
 
-    // user service
-    logger.verbose('Setting up user and role services');
-    const roleService = new RoleService(db,
-      this.topics['role.resource'], logger, true);
-    const userService = new UserService(cfg,
-      this.topics, db, logger, true, roleService);
-
     await server.bind(serviceNamesCfg.user, userService);
     await server.bind(serviceNamesCfg.role, roleService);
     await server.bind(serviceNamesCfg.cis, cis);
@@ -144,59 +197,6 @@ export class Worker {
     await this.server.stop();
     await this.events.stop();
     await this.offsetStore.stop();
-  }
-}
-
-class UserCommandInterface extends chassis.CommandInterface {
-  constructor(server: chassis.Server, cfg: any, logger: any, events: Events) {
-    super(server, cfg, logger, events);
-  }
-
-  makeResourcesRestoreSetup(db: any, resource: string): any {
-    const that = this;
-    return {
-      unregistered: async function restoreUnregistered(message: any, context: any,
-        config: any, eventName: string): Promise<any> {
-        try {
-          await db.delete(`${resource}s`, { id: message.id });
-        } catch (err) {
-          that.logger.error('Exception caught while restoring unregistered User',
-            message);
-        }
-        return {};
-      },
-      userModified: async function restoreUsersModified(message: any, context: any,
-        config: any, eventName: string): Promise<any> {
-        try {
-          await db.update(`${resource}s`, { id: message.id },
-            message);
-        } catch (err) {
-          that.logger.error('Exception caught while restoring modified User',
-            message);
-        }
-        return {};
-      },
-      registered: async function restoreUsersRegistered(message: any, context: any,
-        config: any, eventName: string): Promise<any> {
-        try {
-          await db.insert(`${resource}s`, message);
-        } catch (err) {
-          that.logger.error('Exception caught while restoring registered User',
-            message);
-        }
-        return {};
-      },
-      userCreated: async function restoreUsersCreated(message: any, context: any,
-        config: any, eventName: string): Promise<any> {
-        try {
-          await db.insert(`${resource}s`, message);
-        } catch (err) {
-          that.logger.error('Exception caught while restoring registered User',
-            message);
-        }
-        return {};
-      },
-    };
   }
 }
 
