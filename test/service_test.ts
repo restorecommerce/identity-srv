@@ -4,9 +4,9 @@ import * as _ from 'lodash';
 import * as grpcClient from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as Logger from '@restorecommerce/logger';
-import { Worker } from '../worker';
+import { Worker } from '../lib/worker';
 import * as sconfig from '@restorecommerce/service-config';
-import { User } from '../service';
+import { User } from '../src/service';
 import { Topic } from '@restorecommerce/kafka-client/lib/events/provider/kafka';
 
 const Events = kafkaClient.Events;

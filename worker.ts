@@ -3,7 +3,7 @@ import * as _ from 'lodash';
 import { Events } from '@restorecommerce/kafka-client';
 import { Logger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
-import { UserService, RoleService } from './service';
+import { UserService, RoleService } from './src/service';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
@@ -73,8 +73,8 @@ export class Worker {
 
     const cis = new UserCommandInterface(server, cfg.get(), logger, events);
 
-    const identityServiceEventListener = async function eventListener(msg: any,
-      context: any, config: any, eventName: string): Promise<any> {
+    const identityServiceEventListener = async (msg: any,
+      context: any, config: any, eventName: string) => {
       if (eventName === RENDER_RESPONSE_EVENT) {
         if (userService.emailEnabled) {
           await userService.sendEmail(msg);
