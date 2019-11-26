@@ -33,12 +33,12 @@ export interface User extends BaseDocument {
   name: string; // The name of the user, can be used for login
   first_name: string;
   last_name: string;
-  email: string; /// Email address
-  new_email: string; /// Email address
-  active: boolean; /// If the user was activated via the activation process
-  activation_code: string; /// Activation code used in the activation process
-  password: string; /// Raw password, not stored
-  password_hash: string; /// Encrypted password, stored
+  email: string; // Email address
+  new_email: string; // Email address
+  active: boolean; // If the user was activated via the activation process
+  activation_code: string; // Activation code used in the activation process
+  password: string; // Raw password, not stored
+  password_hash: string; // Encrypted password, stored
   guest: boolean;
   role_associations: RoleAssociation[];
   locale_id: string;
@@ -104,6 +104,15 @@ export interface ConfirmPasswordChange {
   password: string;
   activation_code: string;
 }
+
+const marshallProtobufAny = (msg: any): any => {
+  return {
+    type_url: 'identity.rendering.renderRequest',
+    value: Buffer.from(JSON.stringify(msg))
+  };
+};
+
+const unmarshallProtobufAny = (msg: any): any => JSON.parse(msg.value.toString());
 
 export class UserService extends ServiceBase {
   db: any;
@@ -1353,15 +1362,4 @@ export class RoleService extends ServiceBase {
 
     return true;
   }
-}
-
-function marshallProtobufAny(msg: any): any {
-  return {
-    type_url: 'identity.rendering.renderRequest',
-    value: Buffer.from(JSON.stringify(msg))
-  };
-}
-
-function unmarshallProtobufAny(msg: any): any {
-  return JSON.parse(msg.value.toString());
 }
