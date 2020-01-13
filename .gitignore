@@ -20,3 +20,6 @@ id_rsa
 id_rsa.pub
 known_hosts
 config
+
+test/service_test.d.ts
+test/service_test.js
