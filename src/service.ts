@@ -693,10 +693,17 @@ export class UserService extends ServiceBase {
       if (users.total_count === 0) {
         throw new errors.NotFound('user not found');
       }
+      let dbUser = users.items[0];
+      if (dbUser.name != user.name) {
+        throw new errors.InvalidArgument('User name field cannot be updated');
+      }
       // Update password if it contains that field by updating hash
       if (user.password) {
         user.password_hash = password.hash(user.password);
         delete user.password;
+      } else {
+        // set the existing hash password field
+        user.password_hash = dbUser.password_hash;
       }
     }
     return super.update(call, context);
