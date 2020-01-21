@@ -543,6 +543,7 @@ describe('testing identity-srv', () => {
           const offset = await topic.$offset(-1);
           const result = await userService.update([{
             id: testUserID,
+            name: 'test.user1', // existing user name
             first_name: 'John',
             meta
           }]);
@@ -551,11 +552,12 @@ describe('testing identity-srv', () => {
           should.not.exist(result.error);
         });
 
-        it('should allow to update "special" fields', async function changeEmailId(): Promise<void> {
+        it(`should allow to update special fields such as 'email' and 'password`, async function changeEmailId(): Promise<void> {
           this.timeout(3000);
 
           let result = await userService.update([{
             id: testUserID,
+            name: 'test.user1',
             email: 'update@restorecommerce.io',
             password: 'notsecure2',
             first_name: 'John',
@@ -567,6 +569,21 @@ describe('testing identity-srv', () => {
           result.data.items[0].email.should.equal('update@restorecommerce.io');
           result.data.items[0].password.should.equal('');
         });
+
+        it(`should not allow to update 'name' field`,
+          async function changeEmailId(): Promise<void> {
+            this.timeout(3000);
+
+            let result = await userService.update([{
+              id: testUserID,
+              name: 'new_name',
+              meta
+            }]);
+            should.not.exist(result.data);
+            should.exist(result.error);
+            result.error.name.should.equal('InvalidArgument');
+            result.error.details.should.equal('3 INVALID_ARGUMENT: User name field cannot be updated');
+          });
       });
       describe('calling unregister', function unregister(): void {
         it('should remove the user and person', async function unregister(): Promise<void> {
