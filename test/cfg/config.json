@@ -178,7 +178,7 @@
       "provider": "kafka",
       "groupId": "restore-identity-srv-test",
       "clientId": "restore-identity-srv-test",
-      "kafkaHost": "0.0.0.0:9092",
+      "kafkaHost": "0.0.0.0:29092",
       "latestOffset": true,
       "userModified": {
         "protos": [

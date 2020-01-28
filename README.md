@@ -1,8 +1,7 @@
 # identity-srv
 
-<img src="http://img.shields.io/npm/v/%40restorecommerce%2Fidentity%2Dsrv.svg?style=flat-square" alt="">[![Build Status][build]](https://travis-ci.org/restorecommerce/identity-srv?branch=master)[![Dependencies][depend]](https://david-dm.org/restorecommerce/identity-srv)[![Coverage Status][cover]](https://coveralls.io/github/restorecommerce/identity-srv?branch=master)
+[![Build Status][build]](https://travis-ci.org/restorecommerce/identity-srv?branch=master)[![Dependencies][depend]](https://david-dm.org/restorecommerce/identity-srv)[![Coverage Status][cover]](https://coveralls.io/github/restorecommerce/identity-srv?branch=master)
 
-[version]: http://img.shields.io/npm/v/identity-srv.svg?style=flat-square
 [build]: http://img.shields.io/travis/restorecommerce/identity-srv/master.svg?style=flat-square
 [depend]: https://img.shields.io/david/restorecommerce/identity-srv.svg?style=flat-square
 [cover]: http://img.shields.io/coveralls/restorecommerce/identity-srv/master.svg?style=flat-square
@@ -57,8 +56,9 @@ A User resource.
 | activation_code | string | optional | Activation code used in the activation process (cleared after successful activation) |
 | password | string | required | Raw password, not stored |
 | password_hash | bytes | optional | Hashed password, stored |
-| timezone | string | optional | The User's timezone setting (defaults to 'Europe/Berlin') |
-| locale | string | optional | The User's locale ID |
+| timezone_id | string | optional | The User's timezone setting (defaults to 'Europe/Berlin') |
+| locale_id | string | optional | The User's locale ID |
+| default_scope | string | optional | default scope of user |
 | unauthenticated | boolean | optional | Set automatically to `true` upon user registry until its account is activated for the first time |
 | guest | bool | optional | If user is guest |
 | role_associations | [ ] `io.restorecommerce.user.RoleAssociation` | optional | Role associations |
@@ -201,7 +201,7 @@ Used to confirm the user's password change request. The input is a `io.restoreco
 
 #### `RequestEmailChange`
 
-Used to change the user's email. Requests are performed providing the `io.restorecommerce.user.RequestEmailChange` protobuf message as input and responses is a `google.protobuf.Empty` message. when receiving this request, the service assigns the new email value to the user's `new_email` property and triggers an email with a confirmation URL containing a newly-generated activation code.
+Used to change the user's email. Requests are performed providing the `io.restorecommerce.user.ChangeEmailRequest` protobuf message as input and responses is a `google.protobuf.Empty` message. when receiving this request, the service assigns the new email value to the user's `new_email` property and triggers an email with a confirmation URL containing a newly-generated activation code.
 
 `io.restorecommerce.user.ChangeEmailRequest`
 
@@ -212,9 +212,9 @@ Used to change the user's email. Requests are performed providing the `io.restor
 
 #### `ConfirmEmailChange`
 
-Used to confirm the user's email change request. The input is a `io.restorecommerce.user.ConfirmEmailChange` message and the response is a `google.protobuf.Empty` message. If the received activation code matches the previously generated activation code, the value assigned to the `new_email` property is then assigned to the `email` property and `new_email` is set to null.
+Used to confirm the user's email change request. The input is a `io.restorecommerce.user.ConfirmEmailChangeRequest` message and the response is a `google.protobuf.Empty` message. If the received activation code matches the previously generated activation code, the value assigned to the `new_email` property is then assigned to the `email` property and `new_email` is set to null.
 
-`io.restorecommerce.user.ConfirmEmailChange`
+`io.restorecommerce.user.ConfirmEmailChangeRequest`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
@@ -270,7 +270,7 @@ A simplified version of `read`, which only filters users by username, email and/
 
 A custom endpoint in order to filter a user by its role and any attributes associated with it. Requests are performed providing `io.restorecommerce.user.FindByRoleRequest` protobuf message as input and responses contain a list  `io.restorecommerce.user.User` messages.
 
-`io.restorecommerce.user.FindRequest`
+`io.restorecommerce.user.FindByRoleRequest`
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
@@ -354,6 +354,19 @@ This service uses [chassis-srv](http://github.com/restorecommerce/chassis-srv), 
 provides endpoints for retrieving the system status and resetting/restoring the system in case of failure. These endpoints can be called via gRPC or Kafka events (through the `io.restorecommerce.command` topic).
 - database access, which is abstracted by the [resource-base-interface](https://github.com/restorecommerce/resource-base-interface)
 - stores the offset values for Kafka topics at regular intervals to [Redis](https://redis.io/).
+
+## Development
+
+### Tests
+
+See [tests](test/). To execute the tests a set of _backing services_ are needed.
+Refer to [System](https://github.com/restorecommerce/system) repository to start the backing-services before running the tests.
+
+- To run tests
+
+```sh
+npm run test
+```
 
 ## Running as Docker Container
 

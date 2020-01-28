@@ -63,7 +63,7 @@
       "provider": "kafka",
       "groupId": "restore-identity-srv",
       "clientId": "restore-identity-srv",
-      "kafkaHost": "localhost:9092",
+      "kafkaHost": "localhost:29092",
       "latestOffset": false,
       "userCreated": {
         "protos": [
