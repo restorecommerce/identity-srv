@@ -17,13 +17,13 @@
     "srv"
   ],
   "dependencies": {
-    "@restorecommerce/chassis-srv": "git+https://git@github.com/restorecommerce/chassis-srv.git",
+    "@restorecommerce/chassis-srv": "^0.0.1",
     "@restorecommerce/cluster-service": "^0.1.4",
-    "@restorecommerce/grpc-client": "^0.0.4",
-    "@restorecommerce/kafka-client": "^0.1.7",
+    "@restorecommerce/grpc-client": "^0.0.5",
+    "@restorecommerce/kafka-client": "^0.1.8",
     "@restorecommerce/logger": "^0.1.12",
-    "@restorecommerce/protos": "git+https://git@github.com/restorecommerce/protos.git",
-    "@restorecommerce/resource-base-interface": "git+https://git@github.com/restorecommerce/resource-base-interface.git",
+    "@restorecommerce/protos": "^0.0.1",
+    "@restorecommerce/resource-base-interface": "^0.0.1",
     "@restorecommerce/service-config": "^0.1.6",
     "bcryptjs": "^2.4.3",
     "cross-env": "^6.0.3",
