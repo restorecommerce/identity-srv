@@ -36,6 +36,11 @@
       "db-offsetStore": 0
     }
   },
+  "authorization": {
+    "service": "acs-srv",
+    "enabled": false,
+    "enforce": false
+  },
   "client": {
     "service-user": {
       "transports": {
@@ -155,6 +160,31 @@
         "restore": {},
         "check": {},
         "version": {}
+      }
+    },
+    "acs-srv": {
+      "transports": {
+        "grpc": {
+          "service": "io.restorecommerce.access_control.Service",
+          "protos": [
+            "io/restorecommerce/access_control.proto"
+          ],
+          "protoRoot": "node_modules/@restorecommerce/protos/",
+          "timeout": 3000
+        }
+      },
+      "loadbalancer": {
+        "name": "roundRobin"
+      },
+      "publisher": {
+        "name": "static",
+        "instances": [
+          "grpc://localhost:50061"
+        ]
+      },
+      "endpoints": {
+        "isAllowed": {},
+        "whatIsAllowed": {}
       }
     }
   },

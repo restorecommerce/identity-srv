@@ -11,6 +11,16 @@
   "redis": {
     "host": "redis"
   },
+  "client": {
+    "acs-srv": {
+      "publisher": {
+        "name": "static",
+        "instances": [
+          "grpc://access-control-srv:50061"
+        ]
+      }
+    }
+  },
   "service": {
     "hbsTemplates": {
       "registerSubjectURL": "http://restorecommerce-console:8080/identity-srv/templates/register_subject.hbs",

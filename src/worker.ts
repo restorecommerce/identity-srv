@@ -4,6 +4,8 @@ import { Events } from '@restorecommerce/kafka-client';
 import { Logger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { UserService, RoleService } from './service';
+// import * as acsClient from '@restorecommerce/acs-client';
+// import { ACSAuthZ, UnAuthZ } from '@restorecommerce/acs-client';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
@@ -69,6 +71,7 @@ export class Worker {
   topics: any;
   offsetStore: chassis.OffsetStore;
   userService: UserService;
+  // authZ: ACSAuthZ | UnAuthZ;
   constructor(cfg?: any) {
     this.cfg = cfg || sconfig(process.cwd());
     this.logger = new Logger(this.cfg.get('logger'));
@@ -125,7 +128,8 @@ export class Worker {
       isEventsEnabled = false;
     }
 
-    const cis = new UserCommandInterface(server, cfg.get(), logger, events);
+    // this.authZ = await acsClient.initAuthZ(this.cfg) as ACSAuthZ;
+    const cis = new UserCommandInterface(server, this.cfg.get(), logger, events);
 
     const identityServiceEventListener = async (msg: any,
       context: any, config: any, eventName: string) => {

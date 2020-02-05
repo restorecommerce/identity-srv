@@ -646,5 +646,79 @@ describe('testing identity-srv', () => {
         });
       });
     });
+    // HR scoping tests
+    /* describe('testing hierarchical scopes', function registerUser(): void {
+      // mainOrg -> orgA -> orgB -> orgC
+      const testUser: any = {
+        id: 'testuser',
+        name: 'test.user',
+        first_name: 'test',
+        last_name: 'user',
+        password: 'password',
+        email: 'test@restorecommerce.io',
+        role_associations: [{
+          role: 'normal_user_role',
+          attributes: [{
+            id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+            value: 'urn:test:acs:model:organization.Organization'
+          },
+          {
+            id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+            value: 'orgC'
+          }]
+        }]
+      };
+      let hierarchical_scopes = [{
+        id: 'mainOrg',
+        role: 'normal_user_role',
+        children: [{
+          id: 'orgA',
+          children: [{
+            id: 'orgB',
+            children: [{
+              id: 'orgC'
+            }]
+          }]
+        }]
+      }];
+      it('should allow to create a User with valid role and valid valid HR scope', async () => {
+        const result = await userService.create({ items: testUser, hierarchical_scopes });
+        should.exist(result);
+        should.exist(result.data);
+        should.exist(result.data.items);
+        result.data.items[0].id.should.equal('testuser');
+        await userService.unregister({ id: 'testuser' });
+      });
+      it('should not allow to create a User with invalid role association', async () => {
+        testUser.role_associations[0].role = 'invalid_role';
+        const result = await userService.create({ items: testUser, hierarchical_scopes });
+        should.not.exist(result.data);
+        should.exist(result.error);
+        should.exist(result.error.name);
+        result.error.name.should.equal('InvalidArgument');
+        should.exist(result.error.details);
+        result.error.details.should.equal('3 INVALID_ARGUMENT: the role invalid_role cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
+      });
+      it('should not allow to create a User with invalid hierarchical_scope scope', async () => {
+        testUser.role_associations[0].role = 'normal_user_role';
+        let hierarchical_scopes = [{
+          id: 'mainOrg',
+          role: 'normal_user_role',
+          children: [{
+            id: 'orgA',
+            children: [{
+              id: 'orgB'
+            }]
+          }] // orgC is missing in HR scope
+        }];
+        const result = await userService.create({ items: testUser, hierarchical_scopes });
+        should.not.exist(result.data);
+        should.exist(result.error);
+        should.exist(result.error.name);
+        result.error.name.should.equal('InvalidArgument');
+        should.exist(result.error.details);
+        result.error.details.should.equal('3 INVALID_ARGUMENT: the role normal_user_role cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
+      });
+    });*/
   });
 });
