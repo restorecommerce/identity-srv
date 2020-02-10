@@ -9,6 +9,7 @@ import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from '@restorecommerce/logger';
+import { PolicySetRQ, ACSAuthZ, UnAuthZ, accessRequest, AuthZAction } from '@restorecommerce/acs-client';
 
 const errors = chassis.errors;
 
@@ -135,8 +136,9 @@ export class UserService extends ServiceBase {
   emailEnabled: boolean;
   emailStyle: string;
   roleService: RoleService;
+  authZ: ACSAuthZ | UnAuthZ;
   constructor(cfg: any, topics: any, db: any, logger: Logger,
-    isEventsEnabled: boolean, roleService: RoleService) {
+    isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ | UnAuthZ) {
     super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users'),
       isEventsEnabled);
     this.cfg = cfg;
@@ -144,6 +146,7 @@ export class UserService extends ServiceBase {
     this.topics = topics;
     this.logger = logger;
     this.roleService = roleService;
+    this.authZ = authZ;
   }
 
   /**
@@ -197,13 +200,14 @@ export class UserService extends ServiceBase {
     const usersList: User[] = call.request.items;
     const insertedUsers = [];
     // verify the assigned role_associations with the HR scope data before creating
-    /* context = call.request.context;
+    // extract details from auth_context of request and update the context Object
+    let authContext = call.request.auth_context;
     let id, scope, hierarchical_scopes, role_associations;
-    if (context) {
-      scope = context.scope;
-      hierarchical_scopes = context.hierarchical_scopes;
-      role_associations = context.role_associations;
-      id = context.id;
+    if (authContext) {
+      scope = authContext.scope;
+      hierarchical_scopes = authContext.hierarchical_scopes;
+      role_associations = authContext.role_associations;
+      id = authContext.id;
       // update user session context with scope, role assocs and HR scopes
       context = {
         session: {
@@ -219,42 +223,13 @@ export class UserService extends ServiceBase {
       context = Object.assign({}, context, { authZ: this.authZ });
     }
     if (this.cfg.get('authorization:enabled')) {
-      let validateRoleAssociations = false;
       try {
-        // Make whatIsAllowedACS request to retreive the set of applicable
-        // policies and check for role scoping entity, if it exists then validate
-        // the user role associations if not skip validation
-        let policySetRQ: PolicySetRQ = await accessRequest(AuthZAction.READ, {
-          entity: 'user',
-          args: { filter: [] }
-        }, context) as PolicySetRQ;
-        const policiesList = policySetRQ.policies;
-        for (let policy of policiesList) {
-          for (let rule of policy.rules) {
-            if (rule.effect === 'PERMIT' && rule.target && rule.target.subject) {
-              // check if the rule subject has any scoping Entity
-              const ruleSubjectAttrs = rule.target.subject;
-              for (let ruleAttr of ruleSubjectAttrs) {
-                if (ruleAttr.id === this.cfg.get('authorization:urns:roleScopingEntity')) {
-                  validateRoleAssociations = true;
-                  break;
-                }
-              }
-            }
-          }
-        }
+        await this.verifyUserRoleAssociations(usersList, context, hierarchical_scopes);
       } catch (err) {
-        this.logger.error('Error caught calling ACS:', { err });
+        // for unhandled promise rejection
         throw err;
       }
-      if (validateRoleAssociations) {
-        this.logger.debug('Validating assigned user role associations');
-        for (let user of usersList) {
-          this.validateUserRoleAssociations(user.role_associations,
-            hierarchical_scopes, user.name);
-        }
-      }
-    } */
+    }
 
     for (let i = 0; i < usersList.length; i++) {
       let user: User = usersList[i];
@@ -274,6 +249,92 @@ export class UserService extends ServiceBase {
       }
     }
     return insertedUsers;
+  }
+
+  private async verifyUserRoleAssociations(usersList: User[], context: any,
+    hierarchical_scopes: HierarchicalScope[]): Promise<void> {
+    let validateRoleScope = false;
+    let createAccessRole;
+    try {
+      // Make whatIsAllowedACS request to retreive the set of applicable
+      // policies and check for role scoping entity, if it exists then validate
+      // the user role associations if not skip validation
+      let policySetRQ: PolicySetRQ = await accessRequest(AuthZAction.CREATE, {
+        entity: 'user',
+        args: { filter: [] }
+      }, context) as PolicySetRQ;
+      const policiesList = policySetRQ.policies;
+      for (let policy of policiesList) {
+        for (let rule of policy.rules) {
+          if (rule.effect === 'PERMIT' && rule.target && rule.target.subject) {
+            // check if the rule subject has any scoping Entity
+            const ruleSubjectAttrs = rule.target.subject;
+            for (let ruleAttr of ruleSubjectAttrs) {
+              if (ruleAttr.id === this.cfg.get('authorization:urns:role')) {
+                // rule's role which give's user the acess to create User
+                createAccessRole = ruleAttr.value;
+              }
+              if (ruleAttr.id === this.cfg.get('authorization:urns:roleScopingEntity')) {
+                validateRoleScope = true;
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      this.logger.error('Error caught calling ACS:', { err });
+      throw err;
+    }
+    // check if the assignable_by_roles contain createAccessRole
+    for (let user of usersList) {
+      let userRoleAssocs = user.role_associations;
+      let targetUserRoleIds = [];
+      for (let roleAssoc of userRoleAssocs) {
+        targetUserRoleIds.push(roleAssoc.role);
+      }
+      // read all target roles at once and check for each role's assign_by_role
+      // contains createAccessRole
+      const filter = toStruct({
+        id: {
+          $in: targetUserRoleIds
+        }
+      });
+      let rolesData = await this.roleService.read({
+        request: {
+          filter
+        }
+      });
+      if (rolesData.items.length === 0) {
+        let message = `One or more of the target role IDs are invalid ${targetUserRoleIds},` +
+          ` no such role exist in system`;
+        this.logger.verbose(message);
+        throw new errors.InvalidArgument(message);
+      }
+      for (let targetRole of rolesData.items) {
+        if (!targetRole.assignable_by_roles ||
+          !_.includes(targetRole.assignable_by_roles, createAccessRole)) {
+          let message = `The target role ${targetRole.id} cannot be assigned to` +
+            ` user ${user.name} as user role ${createAccessRole} does not have permissions`;
+          this.logger.verbose(message);
+          throw new errors.InvalidArgument(message);
+        }
+      }
+    }
+
+    if (validateRoleScope) {
+      this.logger.debug('Validating assigned user role associations');
+      // find the HR scopes which gives user the create access
+      // it's an array `hrScopes` since an user can be Admin for multiple orgs
+      let hrScopes: HierarchicalScope[] = [];
+      for (let hrScope of hierarchical_scopes) {
+        if (hrScope.role === createAccessRole) {
+          hrScopes.push(hrScope);
+        }
+      }
+      for (let user of usersList) {
+        this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name);
+      }
+    }
   }
 
   /**
@@ -296,12 +357,8 @@ export class UserService extends ServiceBase {
           // validate the userRole and userScope with hrScopes
           if (userRole && hrScopes && !_.isEmpty(hrScopes)) {
             for (let hrScope of hrScopes) {
-              if (userScope && hrScope.role === userRole &&
-                this.checkTargetScopeExists(hrScope, userScope)) {
+              if (userScope && this.checkTargetScopeExists(hrScope, userScope)) {
                 // check if userScope is valid in hrScope
-                validUserRoleAssoc = true;
-                break;
-              } else if (!userScope && hrScope.role === userRole) {
                 validUserRoleAssoc = true;
                 break;
               }
@@ -848,13 +905,13 @@ export class UserService extends ServiceBase {
 
     const usersList = call.request.items;
     // verify the assigned role_associations with the HR scope data before creating
-    /* context = call.request.context;
     let id, scope, hierarchical_scopes, role_associations;
-    if (context) {
-      scope = context.scope;
-      hierarchical_scopes = context.hierarchical_scopes;
-      role_associations = context.role_associations;
-      id = context.id;
+    let authContext = call.request.auth_context;
+    if (authContext) {
+      scope = authContext.scope;
+      hierarchical_scopes = authContext.hierarchical_scopes;
+      role_associations = authContext.role_associations;
+      id = authContext.id;
       // update user session context with scope, role assocs and HR scopes
       context = {
         session: {
@@ -870,42 +927,13 @@ export class UserService extends ServiceBase {
       context = Object.assign({}, context, { authZ: this.authZ });
     }
     if (this.cfg.get('authorization:enabled')) {
-      let validateRoleAssociations = false;
       try {
-        // Make whatIsAllowedACS request to retreive the set of applicable
-        // policies and check for role scoping entity, if it exists then validate
-        // the user role associations if not skip validation
-        let policySetRQ: PolicySetRQ = await accessRequest(AuthZAction.READ, {
-          entity: 'user',
-          args: { filter: [] }
-        }, context) as PolicySetRQ;
-        const policiesList = policySetRQ.policies;
-        for (let policy of policiesList) {
-          for (let rule of policy.rules) {
-            if (rule.effect === 'PERMIT' && rule.target && rule.target.subject) {
-              // check if the rule subject has any scoping Entity
-              const ruleSubjectAttrs = rule.target.subject;
-              for (let ruleAttr of ruleSubjectAttrs) {
-                if (ruleAttr.id === this.cfg.get('authorization:urns:roleScopingEntity')) {
-                  validateRoleAssociations = true;
-                  break;
-                }
-              }
-            }
-          }
-        }
+        await this.verifyUserRoleAssociations(usersList, context, hierarchical_scopes);
       } catch (err) {
-        this.logger.error('Error caught calling ACS:', { err });
+        // for unhandled promise rejection
         throw err;
       }
-      if (validateRoleAssociations) {
-        this.logger.debug('Validating assigned user role associations');
-        for (let user of usersList) {
-          this.validateUserRoleAssociations(user.role_associations,
-            hierarchical_scopes, user.name);
-        }
-      }
-    }*/
+    }
 
     let result = [];
     const items = call.request.items;

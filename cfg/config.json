@@ -20,6 +20,14 @@
     "minUsernameLength": 8,
     "maxUsernameLength": 40
   },
+  "logger": {
+    "console": {
+      "handleExceptions": false,
+      "level": "fatal",
+      "colorize": true,
+      "prettyPrint": true
+    }
+  },
   "roles": {
     "normalUser": "User"
   },
@@ -500,5 +508,19 @@
     "role": "io-restorecommerce-role-srv",
     "reflection": "io-restorecommerce-identity-reflection",
     "cis": "io-restorecommerce-identity-cis"
+  },
+  "errors": {
+    "INVALID_CREDENTIALS": {
+      "code": "401",
+      "message": "Invalid credentials"
+    },
+    "USER_NOT_LOGGED_IN": {
+      "code": "401",
+      "message": "Invalid authentication context, please log in first"
+    },
+    "ACTION_NOT_ALLOWED": {
+      "code": "403",
+      "message": "Action not allowed on this resource"
+    }
   }
 }

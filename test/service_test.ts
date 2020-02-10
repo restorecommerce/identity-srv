@@ -8,6 +8,7 @@ import { Worker } from '../lib/worker';
 import * as sconfig from '@restorecommerce/service-config';
 import { User } from '../lib/service';
 import { Topic } from '@restorecommerce/kafka-client/lib/events/provider/kafka';
+import { createMockServer } from 'grpc-mock';
 
 const Events = kafkaClient.Events;
 
@@ -21,8 +22,8 @@ let logger;
 // For event listeners
 let events;
 let topic: Topic;
-let roleID;
-let roleService: any, userService: any;
+let roleService: any;
+let mockServer: any;
 
 async function start(): Promise<void> {
   cfg = sconfig(process.cwd() + '/test');
@@ -54,9 +55,81 @@ let meta = {
   }]
 };
 
+interface serverRule {
+  method: string,
+  input: any,
+  output: any
+};
+
+const permitRule = {
+  id: 'permit_rule_id',
+  target: {
+    action: [],
+    resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:user.User' }],
+    subject: [
+      {
+        id: 'urn:restorecommerce:acs:names:role',
+        value: 'admin-r-id'
+      },
+      {
+        id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+        value: 'urn:restorecommerce:acs:model:organization.Organization'
+      }]
+  },
+  effect: 'PERMIT'
+};
+
+let policySetRQ = {
+  policy_sets:
+    [{
+      combining_algorithm: 'urn:oasis:names:tc:xacml:3.0:rule-combining-algorithm:permit-overrides',
+      id: 'test_policy_set_id',
+      policies: [
+        {
+          combining_algorithm: 'urn:oasis:names:tc:xacml:3.0:rule-combining-algorithm:permit-overrides',
+          id: 'test_policy_id',
+          target: {
+            action: [],
+            resources: [{
+              id: 'urn:restorecommerce:acs:names:model:entity',
+              value: 'urn:restorecommerce:acs:model:user.User'
+            }],
+            subject: []
+          }, effect: 'PERMIT',
+          rules: [ // permit or deny rule will be added
+          ],
+          has_rules: true
+        }]
+    }]
+};
+
+const startGrpcMockServer = async (rules: serverRule[]) => {
+  // Create a mock ACS server to expose isAllowed and whatIsAllowed
+  mockServer = createMockServer({
+    protoPath: 'test/protos/io/restorecommerce/access_control.proto',
+    packageName: 'io.restorecommerce.access_control',
+    serviceName: 'Service',
+    options: {
+      keepCase: true
+    },
+    rules
+  });
+  mockServer.listen('0.0.0.0:50061');
+  logger.info('ACS Server started on port 50061');
+};
+
+const stopGrpcMockServer = async () => {
+  await mockServer.close(() => {
+    logger.info('Server closed successfully');
+  });
+};
+
 describe('testing identity-srv', () => {
   before(async function startServer(): Promise<void> {
     await start();
+    // disable authorization
+    cfg.set('authorization:enabled', false);
+    cfg.set('authorization:enforce', false);
   });
 
 
@@ -72,25 +145,39 @@ describe('testing identity-srv', () => {
       });
 
       it('should create roles', async () => {
-        const role = {
-          name: 'normal_user',
-          description: 'Normal user',
-          meta
-        };
+        const roles = [
+          {
+            id: 'super-admin-r-id',
+            name: 'super_admin_user',
+            description: 'Super Admin User',
+            meta
+          },
+          {
+            id: 'admin-r-id',
+            name: 'admin_user',
+            description: 'Admin user',
+            meta,
+            assignable_by_roles: ['admin-r-id']
+          },
+          {
+            id: 'user-r-id',
+            name: 'normal_user',
+            description: 'Normal user',
+            meta,
+            assignable_by_roles: ['admin-r-id']
+          }];
 
         const result = await roleService.create({
-          items: [role]
+          items: roles
         });
 
         should.not.exist(result.error);
         should.exist(result);
         should.exist(result.data);
         should.exist(result.data.items);
-        result.data.items.should.have.length(1);
-        roleID = result.data.items[0].id;
+        result.data.items.should.have.length(3);
       });
     });
-
   });
 
   describe('testing User service', () => {
@@ -108,7 +195,7 @@ describe('testing identity-srv', () => {
           password: 'notsecure',
           email: 'test@ms.restorecommerce.io',
           role_associations: [{
-            role: roleID,
+            role: 'user-r-id',
             attributes: []
           }]
         };
@@ -156,7 +243,7 @@ describe('testing identity-srv', () => {
             email: 'guest@guest.com',
             guest: true,
             role_associations: [{
-              role: roleID,
+              role: 'user-r-id',
               attributes: []
             }]
           };
@@ -202,7 +289,7 @@ describe('testing identity-srv', () => {
           // password: 'notsecure',
           // email: 'test2@ms.restorecommerce.io',
           role_associations: [{
-            role: roleID,
+            role: 'user-r-id',
             attributes: []
           }]
         };
@@ -247,7 +334,7 @@ describe('testing identity-srv', () => {
           await userService.confirmUserInvitation({
             name: testuser2.name,
             password: testuser2.password, activation_code: result.data.items[0].activation_code
-          });
+          }, null);
           // read the user and now the status should be true
           const userData = await userService.find({ id: 'testuser2' });
           userData.data.items[0].active.should.equal(true);
@@ -586,13 +673,9 @@ describe('testing identity-srv', () => {
           });
       });
       describe('calling unregister', function unregister(): void {
-        it('should remove the user and person', async function unregister(): Promise<void> {
+        it('should remove the user', async function unregister(): Promise<void> {
           await userService.unregister({
             id: testUserID,
-          });
-
-          await roleService.delete({
-            collection: true
           });
 
           // this would throw an error since user does not exist
@@ -645,80 +728,130 @@ describe('testing identity-srv', () => {
           });
         });
       });
+      // HR scoping tests
+      describe('testing hierarchical scopes with authroization enabled', function registerUser(): void {
+        // mainOrg -> orgA -> orgB -> orgC
+        const testUser: any = {
+          id: 'testuser',
+          name: 'test.user',
+          first_name: 'test',
+          last_name: 'user',
+          password: 'password',
+          email: 'test@restorecommerce.io',
+          role_associations: [{
+            role: 'user-r-id',
+            attributes: [{
+              id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+              value: 'urn:restorecommerce:acs:model:organization.Organization'
+            },
+            {
+              id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+              value: 'orgC'
+            }]
+          }]
+        };
+
+        let auth_context = {
+          id: 'admin_user_id',
+          scope: 'orgC',
+          role_associations: [
+            {
+              role: 'admin-r-id',
+              attributes: [{
+                id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+                value: 'urn:restorecommerce:acs:model:organization.Organization'
+              },
+              {
+                id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                value: 'mainOrg'
+              }]
+            }
+          ],
+          hierarchical_scopes: [
+            {
+              id: 'mainOrg',
+              role: 'admin-r-id',
+              children: [{
+                id: 'orgA',
+                children: [{
+                  id: 'orgB',
+                  children: [{
+                    id: 'orgC'
+                  }]
+                }]
+              }]
+            }
+          ]
+        };
+        it('should allow to create a User with valid role and valid valid HR scope', async () => {
+          // enable and enforce authorization
+          cfg.set('authorization:enabled', true);
+          cfg.set('authorization:enforce', true);
+          policySetRQ.policy_sets[0].policies[0].rules[0] = permitRule;
+          // start mock acs-srv
+          startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: policySetRQ },
+          { method: 'IsAllowed', input: '.*', output: {} }]);
+          const result = await userService.create({ items: testUser, auth_context });
+          should.exist(result);
+          should.exist(result.data);
+          should.exist(result.data.items);
+          result.data.items[0].id.should.equal('testuser');
+          await userService.unregister({ id: 'testuser' });
+        });
+        it('should not allow to create a User with invalid role existing in system', async () => {
+          testUser.role_associations[0].role = 'invalid_role';
+          const result = await userService.create({ items: testUser, auth_context });
+          should.not.exist(result.data);
+          should.exist(result.error);
+          should.exist(result.error.name);
+          result.error.name.should.equal('InvalidArgument');
+          should.exist(result.error.details);
+          result.error.details.should.equal('3 INVALID_ARGUMENT: One or more of the target role IDs are invalid invalid_role, no such role exist in system');
+        });
+        it('should not allow to create a User with role assocation which is not assignable', async () => {
+          testUser.role_associations[0].role = 'super-admin-r-id';
+          const result = await userService.create({ items: testUser, auth_context });
+          should.not.exist(result.data);
+          should.exist(result.error);
+          should.exist(result.error.name);
+          result.error.name.should.equal('InvalidArgument');
+          should.exist(result.error.details);
+          result.error.details.should.equal('3 INVALID_ARGUMENT: The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id does not have permissions');
+        });
+        it('should not allow to create a User with role assocation with invalid hierarchical_scope', async () => {
+          testUser.role_associations[0].role = 'user-r-id';
+          // auth_context missing orgC in HR scope
+          auth_context.hierarchical_scopes = [
+            {
+              id: 'mainOrg',
+              role: 'admin-r-id',
+              children: [{
+                id: 'orgA',
+                children: [{
+                  id: 'orgB',
+                  children: [] // orgC is missing in HR scope
+                }]
+              }]
+            }
+          ];
+          const result = await userService.create({ items: testUser, auth_context });
+          should.not.exist(result.data);
+          should.exist(result.error);
+          should.exist(result.error.name);
+          result.error.name.should.equal('PermissionDenied');
+          should.exist(result.error.details);
+          result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for a request from user admin_user_id for resource user; the response was DENY');
+          // stop mock acs-srv
+          stopGrpcMockServer();
+          // delete user and roles collection
+          await userService.delete({
+            collection: true
+          });
+          await roleService.delete({
+            collection: true
+          });
+        });
+      });
     });
-    // HR scoping tests
-    /* describe('testing hierarchical scopes', function registerUser(): void {
-      // mainOrg -> orgA -> orgB -> orgC
-      const testUser: any = {
-        id: 'testuser',
-        name: 'test.user',
-        first_name: 'test',
-        last_name: 'user',
-        password: 'password',
-        email: 'test@restorecommerce.io',
-        role_associations: [{
-          role: 'normal_user_role',
-          attributes: [{
-            id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-            value: 'urn:test:acs:model:organization.Organization'
-          },
-          {
-            id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-            value: 'orgC'
-          }]
-        }]
-      };
-      let hierarchical_scopes = [{
-        id: 'mainOrg',
-        role: 'normal_user_role',
-        children: [{
-          id: 'orgA',
-          children: [{
-            id: 'orgB',
-            children: [{
-              id: 'orgC'
-            }]
-          }]
-        }]
-      }];
-      it('should allow to create a User with valid role and valid valid HR scope', async () => {
-        const result = await userService.create({ items: testUser, hierarchical_scopes });
-        should.exist(result);
-        should.exist(result.data);
-        should.exist(result.data.items);
-        result.data.items[0].id.should.equal('testuser');
-        await userService.unregister({ id: 'testuser' });
-      });
-      it('should not allow to create a User with invalid role association', async () => {
-        testUser.role_associations[0].role = 'invalid_role';
-        const result = await userService.create({ items: testUser, hierarchical_scopes });
-        should.not.exist(result.data);
-        should.exist(result.error);
-        should.exist(result.error.name);
-        result.error.name.should.equal('InvalidArgument');
-        should.exist(result.error.details);
-        result.error.details.should.equal('3 INVALID_ARGUMENT: the role invalid_role cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
-      });
-      it('should not allow to create a User with invalid hierarchical_scope scope', async () => {
-        testUser.role_associations[0].role = 'normal_user_role';
-        let hierarchical_scopes = [{
-          id: 'mainOrg',
-          role: 'normal_user_role',
-          children: [{
-            id: 'orgA',
-            children: [{
-              id: 'orgB'
-            }]
-          }] // orgC is missing in HR scope
-        }];
-        const result = await userService.create({ items: testUser, hierarchical_scopes });
-        should.not.exist(result.data);
-        should.exist(result.error);
-        should.exist(result.error.name);
-        result.error.name.should.equal('InvalidArgument');
-        should.exist(result.error.details);
-        result.error.details.should.equal('3 INVALID_ARGUMENT: the role normal_user_role cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
-      });
-    });*/
   });
 });
