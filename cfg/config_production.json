@@ -47,6 +47,11 @@
       "kafkaHost": "kafka:9092"
     }
   },
+  "authorization": {
+    "cache": {
+      "host": "localhost"
+    }
+  },
   "server": {
     "transports": [
       {

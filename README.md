@@ -112,6 +112,24 @@ A list of User resources.
 | ----- | ---- | ----- | ----------- |
 | items | [ ]`io.restorecommerce.user.User` | required | List of Users |
 | total_count | number | optional | number of Users |
+| auth_context | `io.restorecommerce.user.Context` | optional | authentication context |
+
+`io.restorecommerce.user.Context`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | string | required | user id of the authenticated user |
+| scope | string | required | target scope of user |
+| role_associations | `io.restorecommerce.user.RoleAssociation`[] | required | A list of roles with their associated attributes |
+| hierarchical_scopes | `io.restorecommerce.user.HierarchicalScope` | required | hierarchical scope of the authenticated user |
+
+`io.restorecommerce.user.HierarchicalScope`
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| id | string | required | role scoping instance / root node value of Organization |
+| role | `io.restorecommerce.role.Role.id` | optional | role identifier associated with role scoping instance |
+| children | `io.restorecommerce.user.HierarchicalScope`[] | optional | hierarchical organizational tree |
 
 #### CRUD Operations
 
@@ -126,6 +144,14 @@ The microservice exposes the below CRUD operations for creating or modifying Use
 | Update | `io.restorecommerce.user.UserList` | `io.restorecommerce.user.UserList` | Update a list of User resources |
 | Delete | `io.restorecommerce.resourcebase.DeleteRequest` | Empty | Delete a list of User resources |
 | Upsert | `io.restorecommerce.user.UserList` | `io.restorecommerce.user.UserList` | Create or Update a list of User resources |
+
+#### `Create`
+
+Used to create a User (usually by previleged user).
+Requests are performed providing `io.restorecommerce.user.UserList` protobuf message as input and responses are a `io.restorecommerce.user.UserList` message.
+The User-to-Role associations assignment is optionally secured by `access-control-srv` with [configuration](./cfg/config.json#L71).
+If authorization is enabled it uses `acs-client` to invoke `access-control-srv` to verify the role and its assocations are valid.
+When authorization is enabled the creating user should have a valid authentication context `io.restorecommerce.user.Context` in request and he is allowed to create Users with valid User-to-Role associations `io.restorecommerce.user.RoleAssociation.Attribute` with in his `io.restorecommerce.user.HierarchicalScope`. The User can assign roles if `io.restorecommerce.role.Role.assignable_by_roles` is with in hierarchical scope context `io.restorecommerce.user.HierarchicalScope.role`.
 
 #### `Register`
 
@@ -290,6 +316,7 @@ A Role resource.
 | description | string | optional | Role description |
 | created | double | optional | Role created date |
 | modified | double | optional | Role modified date |
+| assignable_by_roles | string [] | optional | role identifier's who can assign this role |
 
 #### `CRUD Operations`
 
