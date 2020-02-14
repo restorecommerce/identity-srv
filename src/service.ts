@@ -254,7 +254,7 @@ export class UserService extends ServiceBase {
   private async verifyUserRoleAssociations(usersList: User[], context: any,
     hierarchical_scopes: HierarchicalScope[]): Promise<void> {
     let validateRoleScope = false;
-    let createAccessRole;
+    let createAccessRole = [];
     try {
       // Make whatIsAllowedACS request to retreive the set of applicable
       // policies and check for role scoping entity, if it exists then validate
@@ -272,7 +272,7 @@ export class UserService extends ServiceBase {
             for (let ruleAttr of ruleSubjectAttrs) {
               if (ruleAttr.id === this.cfg.get('authorization:urns:role')) {
                 // rule's role which give's user the acess to create User
-                createAccessRole = ruleAttr.value;
+                createAccessRole.push(ruleAttr.value);
               }
               if (ruleAttr.id === this.cfg.get('authorization:urns:roleScopingEntity')) {
                 validateRoleScope = true;
@@ -312,7 +312,7 @@ export class UserService extends ServiceBase {
       }
       for (let targetRole of rolesData.items) {
         if (!targetRole.assignable_by_roles ||
-          !_.includes(targetRole.assignable_by_roles, createAccessRole)) {
+          !createAccessRole.some((role) => targetRole.assignable_by_roles.includes(role))) {
           let message = `The target role ${targetRole.id} cannot be assigned to` +
             ` user ${user.name} as user role ${createAccessRole} does not have permissions`;
           this.logger.verbose(message);
@@ -327,8 +327,10 @@ export class UserService extends ServiceBase {
       // it's an array `hrScopes` since an user can be Admin for multiple orgs
       let hrScopes: HierarchicalScope[] = [];
       for (let hrScope of hierarchical_scopes) {
-        if (hrScope.role === createAccessRole) {
-          hrScopes.push(hrScope);
+        for (let accessRole of createAccessRole) {
+          if (hrScope.role === accessRole) {
+            hrScopes.push(hrScope);
+          }
         }
       }
       for (let user of usersList) {
