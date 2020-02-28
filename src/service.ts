@@ -334,7 +334,7 @@ export class UserService extends ServiceBase {
         }
       }
       for (let user of usersList) {
-        this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name);
+        this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, context);
       }
     }
   }
@@ -345,7 +345,7 @@ export class UserService extends ServiceBase {
    * @param user
    */
   private validateUserRoleAssociations(userRoleAssocs: RoleAssociation[],
-    hrScopes: HierarchicalScope[], userName: string) {
+    hrScopes: HierarchicalScope[], userName: string, context) {
     if (userRoleAssocs && !_.isEmpty(userRoleAssocs)) {
       for (let userRoleAssoc of userRoleAssocs) {
         let validUserRoleAssoc = false;
@@ -363,6 +363,19 @@ export class UserService extends ServiceBase {
                 // check if userScope is valid in hrScope
                 validUserRoleAssoc = true;
                 break;
+              } else if (!userScope) {
+                // if userScope is not defined for this role association by creator
+                // check the creating users same role if he does not have the
+                // scoping instance as well then its considered a valid role association
+                if (context && context.session && context.session.data) {
+                  const creatorRoleAssocs = context.session.data.role_associations;
+                  for (let role of creatorRoleAssocs) {
+                    if (role.role === userRole && role.attributes.length === 0) {
+                      validUserRoleAssoc = true;
+                      break;
+                    }
+                  }
+                }
               }
             }
           }
