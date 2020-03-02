@@ -364,16 +364,28 @@ export class UserService extends ServiceBase {
                 validUserRoleAssoc = true;
                 break;
               } else if (!userScope) {
-                // if userScope is not defined for this role association by creator
-                // check the creating users same role if he does not have the
-                // scoping instance as well then its considered a valid role association
-                if (context && context.session && context.session.data) {
-                  const creatorRoleAssocs = context.session.data.role_associations;
-                  for (let role of creatorRoleAssocs) {
-                    if (role.role === userRole && role.attributes.length === 0) {
-                      validUserRoleAssoc = true;
-                      break;
-                    }
+                // if targetscope for role is not defined and since its already
+                // verified this user role is assignable by cretor its considered a valid role association
+                validUserRoleAssoc = true;
+                break;
+              }
+            }
+          }
+          if (!validUserRoleAssoc) {
+            // check the context role assoc - scope matches with requested scope
+            if (context && context.session && context.session.data) {
+              const creatorRoleAssocs = context.session.data.role_associations;
+              for (let role of creatorRoleAssocs) {
+                if (role.role === userRole) {
+                  // check if the target scope matches
+                  let creatorScope;
+                  let creatorRoleAttr = role.attributes;
+                  if (creatorRoleAttr && creatorRoleAttr[1] && creatorRoleAttr[1].value) {
+                    creatorScope = creatorRoleAttr[1].value;
+                  }
+                  if (creatorScope && creatorScope === userScope) {
+                    validUserRoleAssoc = true;
+                    break;
                   }
                 }
               }
