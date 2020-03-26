@@ -2,16 +2,15 @@ import * as _ from 'lodash';
 import * as bcrypt from 'bcryptjs';
 import * as util from 'util';
 import * as uuid from 'uuid';
-
-import * as chassis from '@restorecommerce/chassis-srv';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from '@restorecommerce/logger';
-import { PolicySetRQ, ACSAuthZ, UnAuthZ, accessRequest, AuthZAction } from '@restorecommerce/acs-client';
-
-const errors = chassis.errors;
+import { PolicySetRQ, ACSAuthZ, UnAuthZ, AuthZAction, Decision } from '@restorecommerce/acs-client';
+import { RedisClient } from 'redis';
+import { getSubjectRedis, checkAccessRequest } from './utils';
+import { errors } from '@restorecommerce/chassis-srv';
 
 const password = {
   hash: (pw): string => {
@@ -137,8 +136,10 @@ export class UserService extends ServiceBase {
   emailStyle: string;
   roleService: RoleService;
   authZ: ACSAuthZ | UnAuthZ;
+  redisClient: RedisClient;
   constructor(cfg: any, topics: any, db: any, logger: Logger,
-    isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ | UnAuthZ) {
+    isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ | UnAuthZ,
+    redisClient: RedisClient) {
     super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users'),
       isEventsEnabled);
     this.cfg = cfg;
@@ -147,6 +148,7 @@ export class UserService extends ServiceBase {
     this.logger = logger;
     this.roleService = roleService;
     this.authZ = authZ;
+    this.redisClient = redisClient;
   }
 
   /**
@@ -201,68 +203,59 @@ export class UserService extends ServiceBase {
     const insertedUsers = [];
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
-    let authContext = call.request.auth_context;
-    let id, scope, hierarchical_scopes, role_associations;
-    if (authContext) {
-      scope = authContext.scope;
-      hierarchical_scopes = authContext.hierarchical_scopes;
-      role_associations = authContext.role_associations;
-      id = authContext.id;
-      // update user session context with scope, role assocs and HR scopes
-      context = {
-        session: {
-          data: {
-            id,
-            scope,
-            role_associations,
-            hierarchical_scope: hierarchical_scopes
-          }
-        }
-      };
-      // update context with authZ object
-      context = Object.assign({}, context, { authZ: this.authZ });
+    let subject = call.request.subject;
+    console.log('Subject received is...', subject);
+    if (subject && subject.id && !subject.hierarchical_scopes) {
+      subject = getSubjectRedis(subject.id, this);
     }
-    if (this.cfg.get('authorization:enabled')) {
+    let acsResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.CREATE, 'user');
+    } catch (err) {
+      this.logger.error('Error occured requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new errors.PermissionDenied(acsResponse.response.status.message);
+    }
+    if (acsResponse.decision === Decision.PERMIT) {
       try {
-        await this.verifyUserRoleAssociations(usersList, context, hierarchical_scopes);
+        await this.verifyUserRoleAssociations(usersList, subject);
       } catch (err) {
         // for unhandled promise rejection
         throw err;
       }
-    }
 
-    for (let i = 0; i < usersList.length; i++) {
-      let user: User = usersList[i];
-      user.activation_code = '';
-      user.active = true;
-      user.unauthenticated = false;
-      if (user.invite) {
-        user.active = false;
-        user.activation_code = this.idGen();
-        user.unauthenticated = true;
+      for (let i = 0; i < usersList.length; i++) {
+        let user: User = usersList[i];
+        user.activation_code = '';
+        user.active = true;
+        user.unauthenticated = false;
+        if (user.invite) {
+          user.active = false;
+          user.activation_code = this.idGen();
+          user.unauthenticated = true;
+        }
+        insertedUsers.push(await this.createUser(user, context));
+        if (this.emailEnabled && user.invite) {
+          // send render request for user Invitation
+          const renderRequest = this.makeInvitationEmailData(user);
+          await this.topics.rendering.emit('renderRequest', renderRequest);
+        }
       }
-      insertedUsers.push(await this.createUser(user, context));
-      if (this.emailEnabled && user.invite) {
-        // send render request for user Invitation
-        const renderRequest = this.makeInvitationEmailData(user);
-        await this.topics.rendering.emit('renderRequest', renderRequest);
-      }
+      return insertedUsers;
     }
-    return insertedUsers;
   }
 
-  private async verifyUserRoleAssociations(usersList: User[], context: any,
-    hierarchical_scopes: HierarchicalScope[]): Promise<void> {
+  private async verifyUserRoleAssociations(usersList: User[], subject: any): Promise<void> {
     let validateRoleScope = false;
+    let hierarchical_scopes = subject.hierarchical_scopes;
     let createAccessRole = [];
     try {
       // Make whatIsAllowedACS request to retreive the set of applicable
       // policies and check for role scoping entity, if it exists then validate
       // the user role associations if not skip validation
-      let policySetRQ: PolicySetRQ = await accessRequest(AuthZAction.CREATE, {
-        entity: 'user',
-        args: { filter: [] }
-      }, context) as PolicySetRQ;
+      let policySetRQ: PolicySetRQ = await checkAccessRequest(subject, {}, AuthZAction.CREATE, 'user');
       const policiesList = policySetRQ.policies;
       for (let policy of policiesList) {
         for (let rule of policy.rules) {
@@ -890,8 +883,22 @@ export class UserService extends ServiceBase {
       || _.isEmpty(call.request.items)) {
       throw new errors.InvalidArgument('No items were provided for update');
     }
-
     const items = call.request.items;
+    let subject = call.request.subject;
+    if (subject && subject.id && !subject.hierarchical_scopes) {
+      subject = getSubjectRedis(subject.id, this);
+    }
+    let acsResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY, 'user');
+    } catch (err) {
+      this.logger.error('Error occured requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new errors.PermissionDenied(acsResponse.response.status.message);
+    }
+
     for (let i = 0; i < items.length; i += 1) {
       // read the user from DB and update the special fields from DB
       // for user modification
@@ -931,67 +938,58 @@ export class UserService extends ServiceBase {
     }
 
     const usersList = call.request.items;
+    let subject = call.request.subject;
     // verify the assigned role_associations with the HR scope data before creating
-    let id, scope, hierarchical_scopes, role_associations;
-    let authContext = call.request.auth_context;
-    if (authContext) {
-      scope = authContext.scope;
-      hierarchical_scopes = authContext.hierarchical_scopes;
-      role_associations = authContext.role_associations;
-      id = authContext.id;
-      // update user session context with scope, role assocs and HR scopes
-      context = {
-        session: {
-          data: {
-            id,
-            scope,
-            role_associations,
-            hierarchical_scope: hierarchical_scopes
-          }
-        }
-      };
-      // update context with authZ object
-      context = Object.assign({}, context, { authZ: this.authZ });
+    if (subject && subject.id && !subject.hierarchical_scopes) {
+      subject = getSubjectRedis(subject, this);
     }
-    if (this.cfg.get('authorization:enabled')) {
+
+    let acsResponse;
+    try {
+      // TODO check if resource exists then pass action as CREATE / MODIFY
+      acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.MODIFY, 'user');
+    } catch (err) {
+      this.logger.error('Error occured requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision === Decision.PERMIT) {
       try {
-        await this.verifyUserRoleAssociations(usersList, context, hierarchical_scopes);
+        await this.verifyUserRoleAssociations(usersList, subject);
       } catch (err) {
         // for unhandled promise rejection
         throw err;
       }
-    }
-
-    let result = [];
-    const items = call.request.items;
-    for (let i = 0; i < items.length; i += 1) {
-      // read the user from DB and update the special fields from DB
-      // for user modification
-      const user = items[i];
-      const filter = toStruct({
-        $or: [
-          {
-            name: {
-              $eq: user.name
+      let result = [];
+      const items = call.request.items;
+      for (let i = 0; i < items.length; i += 1) {
+        // read the user from DB and update the special fields from DB
+        // for user modification
+        const user = items[i];
+        const filter = toStruct({
+          $or: [
+            {
+              name: {
+                $eq: user.name
+              }
+            },
+            {
+              email: {
+                $eq: user.email
+              }
             }
-          },
-          {
-            email: {
-              $eq: user.email
-            }
-          }
-        ]
-      });
-      const users = await super.read({ request: { filter } }, context);
-      if (users.total_count === 0) {
-        // call the create method, checks all conditions before inserting
-        result.push(await this.createUser(user));
-      } else {
-        let updateResponse = await this.update({ request: { items: [user] } });
-        result.push(updateResponse.items[0]);
+          ]
+        });
+        const users = await super.read({ request: { filter } }, context);
+        if (users.total_count === 0) {
+          // call the create method, checks all conditions before inserting
+          result.push(await this.createUser(user));
+        } else {
+          let updateResponse = await this.update({ request: { items: [user] } });
+          result.push(updateResponse.items[0]);
+        }
       }
+      return { items: result };
     }
-    return { items: result };
   }
 
   /**
@@ -1477,9 +1475,12 @@ export class UserService extends ServiceBase {
 
 export class RoleService extends ServiceBase {
   logger: Logger;
-  constructor(db: any, roleTopic: kafkaClient.Topic, logger: any, isEventsEnabled: boolean) {
+  redisClient: RedisClient;
+  constructor(db: any, roleTopic: kafkaClient.Topic, logger: any, isEventsEnabled: boolean,
+    redisClient?: RedisClient) {
     super('role', roleTopic, logger, new ResourcesAPIBase(db, 'roles'), isEventsEnabled);
     this.logger = logger;
+    this.redisClient = redisClient;
   }
 
   async create(call: any, context?: any): Promise<any> {

@@ -5,6 +5,7 @@ import { Logger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { UserService, RoleService } from './service';
 import { ACSAuthZ, UnAuthZ, initAuthZ } from '@restorecommerce/acs-client';
+import { RedisClient, createClient } from 'redis';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
@@ -71,6 +72,7 @@ export class Worker {
   offsetStore: chassis.OffsetStore;
   userService: UserService;
   authZ: ACSAuthZ | UnAuthZ;
+  redisClient: RedisClient;
   constructor(cfg?: any) {
     this.cfg = cfg || sconfig(process.cwd());
     this.logger = new Logger(this.cfg.get('logger'));
@@ -166,12 +168,17 @@ export class Worker {
       }
     }
 
+    // init redis client
+    const redisConfig = cfg.get('redis');
+    redisConfig.db = this.cfg.get('redis:db-indexes:db-subject');
+    this.redisClient = createClient(redisConfig);
+
     // user service
     logger.verbose('Setting up user and role services');
     const roleService = new RoleService(db,
-      this.topics['role.resource'], logger, true);
+      this.topics['role.resource'], logger, true, this.redisClient);
     const userService = new UserService(cfg,
-      this.topics, db, logger, true, roleService, this.authZ);
+      this.topics, db, logger, true, roleService, this.authZ, this.redisClient);
     this.userService = userService;
 
     await server.bind(serviceNamesCfg.user, userService);
