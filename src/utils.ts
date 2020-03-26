@@ -3,6 +3,8 @@ import {
 } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
 import { UserService } from './service';
+import { ACSAuthZ } from '@restorecommerce/acs-client';
+import { UnAuthZ } from '@restorecommerce/acs-client';
 
 export interface HierarchicalScope {
   id: string;
@@ -53,8 +55,8 @@ export interface ReadPolicyResponse extends AccessResponse {
  * @param entity The entity type to check access against
  */
 /* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
-export async function checkAccessRequest(subject: any,
-  resources: any, action: AuthZAction, entity: string): Promise<AccessResponse | ReadPolicyResponse> {
+export async function checkAccessRequest(subject: any, resources: any, action: AuthZAction,
+  entity: string, authZ: ACSAuthZ): Promise<AccessResponse | ReadPolicyResponse> {
   let data: any;
   if (typeof (resources) === 'object') {
     data = resources;
@@ -62,7 +64,7 @@ export async function checkAccessRequest(subject: any,
     if (action === AuthZAction.DELETE) {
       resources = (resources as any)[0].ids;
     }
-    data = parseResourceList(resources, action, entity);
+    data = parseResourceList(subject, resources, action, entity);
   } else if (action === AuthZAction.READ) {
     let preparedInput: any = {};
 
@@ -83,7 +85,7 @@ export async function checkAccessRequest(subject: any,
 
   let result: Decision | PolicySetRQ;
   try {
-    result = await accessRequest(subject, data, action);
+    result = await accessRequest(subject, data, action, authZ);
   } catch (err) {
     return {
       decision: Decision.DENY,
@@ -113,7 +115,7 @@ export async function checkAccessRequest(subject: any,
 }
 
 export const getSubjectRedis = async (userID: string, service: UserService) => {
-  let redisKey = `subject:${userID}`;
+  let redisKey = `subject:${userID}:hrScope`;
   let hierarchical_scopes: HierarchicalScope[];
   let subject: any;
   // update ctx with HR scope from redis
@@ -121,14 +123,14 @@ export const getSubjectRedis = async (userID: string, service: UserService) => {
     service.redisClient.get(redisKey, async (err, response) => {
       if (!err && response) {
         // update user HR scope from redis
-        subject = JSON.parse(response);
+        subject.hierarchical_scopes = JSON.parse(response);
         resolve(subject);
       }
       // when not set in redis use default_scope as hrScope
       if (err || (!err && !response)) {
         // disable authorization to read data
         let isAuthZEnabled = this.cfg.get('authorization:enabled');
-        if (isAuthZEnabled){
+        if (isAuthZEnabled) {
           this.cfg.set('authorization:enabled', false);
           updateConfig(this.cfg);
         }

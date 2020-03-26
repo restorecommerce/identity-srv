@@ -7,9 +7,9 @@ import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from '@restorecommerce/logger';
-import { PolicySetRQ, ACSAuthZ, UnAuthZ, AuthZAction, Decision } from '@restorecommerce/acs-client';
+import { ACSAuthZ, UnAuthZ, AuthZAction, Decision, Subject } from '@restorecommerce/acs-client';
 import { RedisClient } from 'redis';
-import { getSubjectRedis, checkAccessRequest } from './utils';
+import { getSubjectRedis, checkAccessRequest, ReadPolicyResponse } from './utils';
 import { errors } from '@restorecommerce/chassis-srv';
 
 const password = {
@@ -67,6 +67,7 @@ export interface FindUser {
   id?: string;
   email?: string;
   name?: string;
+  subject?: Subject;
 }
 
 export interface ActivateUser {
@@ -135,10 +136,10 @@ export class UserService extends ServiceBase {
   emailEnabled: boolean;
   emailStyle: string;
   roleService: RoleService;
-  authZ: ACSAuthZ | UnAuthZ;
+  authZ: ACSAuthZ;
   redisClient: RedisClient;
   constructor(cfg: any, topics: any, db: any, logger: Logger,
-    isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ | UnAuthZ,
+    isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ,
     redisClient: RedisClient) {
     super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users'),
       isEventsEnabled);
@@ -157,16 +158,28 @@ export class UserService extends ServiceBase {
    * @return the list of users found
    */
   async find(call: Call<FindUser>, context?: any): Promise<any> {
-    const request = call.request;
+    let { id, name, email, subject } = call.request;
+    console.log('Subject received is...', subject);
+    if (subject && subject.id && !subject.hierarchical_scopes) {
+      subject = await getSubjectRedis(subject.id, this);
+    }
+    let acsResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, { id, name, email },
+        AuthZAction.CREATE, 'user', this.authZ);
+    } catch (err) {
+      this.logger.error('Error occured requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new errors.PermissionDenied(acsResponse.response.status.message);
+    }
     const logger = this.logger;
-    let userID = request.id || '';
-    let userName = request.name || '';
-    let mailID = request.email || '';
     const filter = toStruct({
       $or: [
-        { id: { $eq: userID } },
-        { name: { $eq: userName } },
-        { email: { $eq: mailID } }
+        { id: { $eq: id } },
+        { name: { $eq: name } },
+        { email: { $eq: email } }
       ]
     });
     const users = await super.read({ request: { filter } }, context);
@@ -174,7 +187,7 @@ export class UserService extends ServiceBase {
       logger.silly('found user(s)', { users });
       return users;
     }
-    logger.silly('user(s) could not be found for request', request);
+    logger.silly('user(s) could not be found for request', call.request);
     throw new errors.NotFound('user not found');
   }
 
@@ -206,11 +219,12 @@ export class UserService extends ServiceBase {
     let subject = call.request.subject;
     console.log('Subject received is...', subject);
     if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = getSubjectRedis(subject.id, this);
+      subject = await getSubjectRedis(subject.id, this);
     }
     let acsResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.CREATE, 'user');
+      acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.CREATE,
+        'user', this.authZ);
     } catch (err) {
       this.logger.error('Error occured requesting access-control-srv:', err);
       throw err;
@@ -255,7 +269,9 @@ export class UserService extends ServiceBase {
       // Make whatIsAllowedACS request to retreive the set of applicable
       // policies and check for role scoping entity, if it exists then validate
       // the user role associations if not skip validation
-      let policySetRQ: PolicySetRQ = await checkAccessRequest(subject, {}, AuthZAction.CREATE, 'user');
+      let acsResponse: ReadPolicyResponse = await checkAccessRequest(subject, {},
+        AuthZAction.CREATE, 'user', this.authZ) as ReadPolicyResponse;
+      let policySetRQ = acsResponse.policySet;
       const policiesList = policySetRQ.policies;
       for (let policy of policiesList) {
         for (let rule of policy.rules) {
@@ -886,11 +902,12 @@ export class UserService extends ServiceBase {
     const items = call.request.items;
     let subject = call.request.subject;
     if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = getSubjectRedis(subject.id, this);
+      subject = await getSubjectRedis(subject.id, this);
     }
     let acsResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY, 'user');
+      acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY,
+        'user', this.authZ);
     } catch (err) {
       this.logger.error('Error occured requesting access-control-srv:', err);
       throw err;
@@ -941,13 +958,14 @@ export class UserService extends ServiceBase {
     let subject = call.request.subject;
     // verify the assigned role_associations with the HR scope data before creating
     if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = getSubjectRedis(subject, this);
+      subject = await getSubjectRedis(subject, this);
     }
 
     let acsResponse;
     try {
       // TODO check if resource exists then pass action as CREATE / MODIFY
-      acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.MODIFY, 'user');
+      acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.MODIFY,
+        'user', this.authZ);
     } catch (err) {
       this.logger.error('Error occured requesting access-control-srv:', err);
       throw err;

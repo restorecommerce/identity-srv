@@ -71,7 +71,7 @@ export class Worker {
   topics: any;
   offsetStore: chassis.OffsetStore;
   userService: UserService;
-  authZ: ACSAuthZ | UnAuthZ;
+  authZ: ACSAuthZ;
   redisClient: RedisClient;
   constructor(cfg?: any) {
     this.cfg = cfg || sconfig(process.cwd());
