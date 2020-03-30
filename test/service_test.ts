@@ -366,7 +366,23 @@ describe('testing identity-srv', () => {
       });
 
       describe('login', function login(): void {
-        it('without activation should throw an error', async function login(): Promise<void> {
+        it('without activation should throw an error that user not activated',
+          async function login(): Promise<void> {
+            const result = await (userService.login({
+              identifier: user.name,
+              password: user.password,
+            }));
+            should.exist(result);
+            should.not.exist(result.data);
+            should.exist(result.error);
+            should.exist(result.error.name);
+            result.error.name.should.equal('FailedPrecondition');
+            should.exist(result.error.details);
+            result.error.details.should.equal('9 FAILED_PRECONDITION: user not activated');
+          });
+        it('without activation should throw an error that user not authenticated' +
+        ' when error message is obfuscated', async function login(): Promise<void> {
+          cfg.set('obfuscateAuthNErrorReason', true);
           const result = await (userService.login({
             identifier: user.name,
             password: user.password,
@@ -377,7 +393,8 @@ describe('testing identity-srv', () => {
           should.exist(result.error.name);
           result.error.name.should.equal('FailedPrecondition');
           should.exist(result.error.details);
-          result.error.details.should.equal('9 FAILED_PRECONDITION: user not activated');
+          result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
+          cfg.set('obfuscateAuthNErrorReason', false);
         });
         it('should activate the user', async function activateUser(): Promise<void> {
           const offset = await topic.$offset(-1);

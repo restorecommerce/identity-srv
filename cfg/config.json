@@ -66,6 +66,7 @@
       "db-offsetStore": 0
     }
   },
+  "obfuscateAuthNErrorReason": false,
   "authorization": {
     "service": "acs-srv",
     "enabled": true,
