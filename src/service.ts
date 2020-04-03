@@ -269,7 +269,7 @@ export class UserService extends ServiceBase {
       // Make whatIsAllowedACS request to retreive the set of applicable
       // policies and check for role scoping entity, if it exists then validate
       // the user role associations if not skip validation
-      let acsResponse: ReadPolicyResponse = await checkAccessRequest(subject, {},
+      let acsResponse: ReadPolicyResponse = await checkAccessRequest(subject, { entity: 'user' },
         AuthZAction.CREATE, 'user', this.authZ) as ReadPolicyResponse;
       let policySetRQ = acsResponse.policySet;
       const policiesList = policySetRQ.policies;
