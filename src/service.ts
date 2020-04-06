@@ -7,7 +7,7 @@ import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from '@restorecommerce/logger';
-import { ACSAuthZ, AuthZAction, Decision, Subject, updateConfig } from '@restorecommerce/acs-client';
+import { ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest, PolicySetRQ } from '@restorecommerce/acs-client';
 import { RedisClient } from 'redis';
 import { getSubjectRedis, checkAccessRequest, ReadPolicyResponse } from './utils';
 import { errors } from '@restorecommerce/chassis-srv';
@@ -270,12 +270,10 @@ export class UserService extends ServiceBase {
       // Make whatIsAllowedACS request to retreive the set of applicable
       // policies and check for role scoping entity, if it exists then validate
       // the user role associations if not skip validation
-      let acsResponse: ReadPolicyResponse = await checkAccessRequest(subject, [{ entity: 'user' }],
-        AuthZAction.CREATE, 'user', this.authZ) as ReadPolicyResponse;
-      if(acsResponse.decision === Decision.DENY) {
-        throw new errors.PermissionDenied(acsResponse.response.status.message);
-      }
-      let policySetRQ = acsResponse.policySet;
+      let policySetRQ: PolicySetRQ = await accessRequest(subject, {
+        entity: 'user',
+        args: { filter: [] }
+      }, AuthZAction.CREATE, this.authZ) as PolicySetRQ;
       const policiesList = policySetRQ.policies;
       for (let policy of policiesList) {
         for (let rule of policy.rules) {
@@ -347,7 +345,7 @@ export class UserService extends ServiceBase {
         }
       }
       for (let user of usersList) {
-        this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, context);
+        this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, subject);
       }
     }
   }
@@ -358,7 +356,7 @@ export class UserService extends ServiceBase {
    * @param user
    */
   private validateUserRoleAssociations(userRoleAssocs: RoleAssociation[],
-    hrScopes: HierarchicalScope[], userName: string, context) {
+    hrScopes: HierarchicalScope[], userName: string, subject: Subject) {
     if (userRoleAssocs && !_.isEmpty(userRoleAssocs)) {
       for (let userRoleAssoc of userRoleAssocs) {
         let validUserRoleAssoc = false;
@@ -386,8 +384,8 @@ export class UserService extends ServiceBase {
           }
           if (!validUserRoleAssoc) {
             // check the context role assoc - scope matches with requested scope
-            if (context && context.session && context.session.data) {
-              const creatorRoleAssocs = context.session.data.role_associations;
+            if (subject.role_associations) {
+              const creatorRoleAssocs = subject.role_associations;
               for (let role of creatorRoleAssocs) {
                 if (role.role === userRole) {
                   // check if the target scope matches
