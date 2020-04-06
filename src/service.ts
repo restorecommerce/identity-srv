@@ -7,7 +7,7 @@ import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from '@restorecommerce/logger';
-import { ACSAuthZ, UnAuthZ, AuthZAction, Decision, Subject } from '@restorecommerce/acs-client';
+import { ACSAuthZ, AuthZAction, Decision, Subject, updateConfig } from '@restorecommerce/acs-client';
 import { RedisClient } from 'redis';
 import { getSubjectRedis, checkAccessRequest, ReadPolicyResponse } from './utils';
 import { errors } from '@restorecommerce/chassis-srv';
@@ -138,6 +138,7 @@ export class UserService extends ServiceBase {
   roleService: RoleService;
   authZ: ACSAuthZ;
   redisClient: RedisClient;
+  authZCheck: boolean;
   constructor(cfg: any, topics: any, db: any, logger: Logger,
     isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ,
     redisClient: RedisClient) {
@@ -150,6 +151,7 @@ export class UserService extends ServiceBase {
     this.roleService = roleService;
     this.authZ = authZ;
     this.redisClient = redisClient;
+    this.authZCheck = this.cfg.get('authorization:enabled');
   }
 
   /**
@@ -159,7 +161,6 @@ export class UserService extends ServiceBase {
    */
   async find(call: Call<FindUser>, context?: any): Promise<any> {
     let { id, name, email, subject } = call.request;
-    console.log('Subject received is...', subject);
     if (subject && subject.id && !subject.hierarchical_scopes) {
       subject = await getSubjectRedis(subject.id, this);
     }
@@ -217,7 +218,6 @@ export class UserService extends ServiceBase {
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
     let subject = call.request.subject;
-    console.log('Subject received is...', subject);
     if (subject && subject.id && !subject.hierarchical_scopes) {
       subject = await getSubjectRedis(subject.id, this);
     }
@@ -232,14 +232,15 @@ export class UserService extends ServiceBase {
     if (acsResponse.decision != Decision.PERMIT) {
       throw new errors.PermissionDenied(acsResponse.response.status.message);
     }
-    if (acsResponse.decision === Decision.PERMIT) {
+    if (this.cfg.get('authorization:enabled')) {
       try {
         await this.verifyUserRoleAssociations(usersList, subject);
       } catch (err) {
         // for unhandled promise rejection
         throw err;
       }
-
+    }
+    if (acsResponse.decision === Decision.PERMIT) {
       for (let i = 0; i < usersList.length; i++) {
         let user: User = usersList[i];
         user.activation_code = '';
@@ -269,8 +270,11 @@ export class UserService extends ServiceBase {
       // Make whatIsAllowedACS request to retreive the set of applicable
       // policies and check for role scoping entity, if it exists then validate
       // the user role associations if not skip validation
-      let acsResponse: ReadPolicyResponse = await checkAccessRequest(subject, { entity: 'user' },
+      let acsResponse: ReadPolicyResponse = await checkAccessRequest(subject, [{ entity: 'user' }],
         AuthZAction.CREATE, 'user', this.authZ) as ReadPolicyResponse;
+      if(acsResponse.decision === Decision.DENY) {
+        throw new errors.PermissionDenied(acsResponse.response.status.message);
+      }
       let policySetRQ = acsResponse.policySet;
       const policiesList = policySetRQ.policies;
       for (let policy of policiesList) {
@@ -569,7 +573,9 @@ export class UserService extends ServiceBase {
     const userInviteReq: UserInviationReq = call.request || call;
     // find the actual user object from DB using the UserInvitationReq username
     // activate user and update password
+    this.disableAC();
     let user: User = (await this.find({ request: { name: userInviteReq.name } })).items[0];
+    this.enableAC();
 
     if ((!userInviteReq.activation_code) || userInviteReq.activation_code !== user.activation_code) {
       this.logger.debug('wrong activation code', { user });
@@ -741,10 +747,11 @@ export class UserService extends ServiceBase {
    */
   async requestPasswordChange(call: Call<ForgotPassword>, context?: any): Promise<any> {
     const logger = this.logger;
-
+    this.disableAC();
     const user: User = (await this.find({
       request: call.request
     })).items[0]; // NotFound exception is thrown when length is 0
+    this.enableAC();
 
     logger.verbose('Received a password change request for user', user.id);
 
@@ -775,12 +782,13 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     const { name, activation_code } = call.request;
     const newPassword = call.request.password;
-
+    this.disableAC();
     const user: User = (await this.find({
       request: {
         name
       }
     })).items[0];
+    this.enableAC();
 
     if (!user.activation_code || user.activation_code !== activation_code) {
       logger.debug('wrong activation code upon password change confirmation for user', user.name);
@@ -853,12 +861,13 @@ export class UserService extends ServiceBase {
     const name = request.name;
     const activationCode = request.activation_code;
 
-
+    this.disableAC();
     const users = await this.find({
       request: {
         name
       }
     });
+    this.enableAC();
     if (users.total_count === 0) {
       logger.debug('user does not exist', name);
       throw new errors.NotFound('user does not exist');
@@ -970,13 +979,15 @@ export class UserService extends ServiceBase {
       this.logger.error('Error occured requesting access-control-srv:', err);
       throw err;
     }
-    if (acsResponse.decision === Decision.PERMIT) {
+    if (this.cfg.get('authorization:enabled')) {
       try {
         await this.verifyUserRoleAssociations(usersList, subject);
       } catch (err) {
         // for unhandled promise rejection
         throw err;
       }
+    }
+    if (acsResponse.decision === Decision.PERMIT) {
       let result = [];
       const items = call.request.items;
       for (let i = 0; i < items.length; i += 1) {
@@ -1364,6 +1375,26 @@ export class UserService extends ServiceBase {
 
   async disableUsers(orgIDs: string[]): Promise<void> {
     await this.modifyUsers(orgIDs, true);
+  }
+
+  private disableAC() {
+    try {
+      this.cfg.set('authorization:enabled', false);
+      updateConfig(this.cfg);
+    } catch (err) {
+      this.logger.error('Error caught disabling authorization:', err);
+      this.cfg.set('authorization:enabled', this.authZCheck);
+    }
+  }
+
+  private enableAC() {
+    try {
+      this.cfg.set('authorization:enabled', this.authZCheck);
+      updateConfig(this.cfg);
+    } catch (err) {
+      this.logger.error('Error caught enabling authorization:', err);
+      this.cfg.set('authorization:enabled', this.authZCheck);
+    }
   }
 
   private async modifyUsers(orgIds: string[], deactivate: boolean,

@@ -58,9 +58,7 @@ export interface ReadPolicyResponse extends AccessResponse {
 export async function checkAccessRequest(subject: any, resources: any, action: AuthZAction,
   entity: string, authZ: ACSAuthZ): Promise<AccessResponse | ReadPolicyResponse> {
   let data: any;
-  if (typeof (resources) === 'object') {
-    data = resources;
-  } else if (action != AuthZAction.READ) {
+  if (action != AuthZAction.READ) {
     if (action === AuthZAction.DELETE) {
       resources = (resources as any)[0].ids;
     }
