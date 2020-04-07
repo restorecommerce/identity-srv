@@ -113,7 +113,7 @@ export async function checkAccessRequest(subject: any, resources: any, action: A
 }
 
 export const getSubjectRedis = async (userID: string, service: UserService) => {
-  let redisKey = `subject:${userID}:hrScope`;
+  let redisKey = `gql-cache:${userID}:subject`;
   let hierarchical_scopes: HierarchicalScope[];
   let subject: any;
   // update ctx with HR scope from redis
