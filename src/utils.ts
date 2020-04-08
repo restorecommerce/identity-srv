@@ -1,5 +1,5 @@
 import {
-  AuthZAction, Decision, PolicySetRQ, parseResourceList, accessRequest, updateConfig
+  AuthZAction, Decision, PolicySetRQ, parseResourceList, accessRequest, updateConfig, Subject
 } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
 import { UserService } from './service';
@@ -36,15 +36,11 @@ export interface FilterType {
 export interface ReadPolicyResponse extends AccessResponse {
   policySet?: PolicySetRQ;
   filter?: FilterType[];
-  custom_query_args: {
+  custom_query_args?: {
     custom_queries: any;
     custom_arguments: any;
   };
 }
-
-// export async function GQLAccessRequest(args: any, ctx: Context, action: AuthZAction.READ, entity: string | Resource | ReadRequest): Promise<GQLReadPolicyResponse>;
-// export async function GQLAccessRequest(args: any, ctx: Context, action: AuthZAction.CREATE | AuthZAction.MODIFY, entity: ReadRequest): Promise<GQLReadPolicyResponse>;
-// export async function GQLAccessRequest(args: any, ctx: Context, action: Omit<AuthZAction, AuthZAction.READ>, entity: string | Resource, tenantOverride?: string): Promise<GQLAccessResponse>;
 
 /**
  * Perform an access request using inputs from a GQL request
@@ -55,13 +51,13 @@ export interface ReadPolicyResponse extends AccessResponse {
  * @param entity The entity type to check access against
  */
 /* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
-export async function checkAccessRequest(subject: any, resources: any, action: AuthZAction,
+export async function checkAccessRequest(subject: Subject, resources: any, action: AuthZAction,
   entity: string, authZ: ACSAuthZ): Promise<AccessResponse | ReadPolicyResponse> {
   let data: any;
   if (action != AuthZAction.READ) {
-    if (action === AuthZAction.DELETE) {
-      resources = (resources as any)[0].ids;
-    }
+    // if (action === AuthZAction.DELETE) {
+    //   resources = (resources as any)[0].ids;
+    // }
     data = parseResourceList(subject, resources, action, entity);
   } else if (action === AuthZAction.READ) {
     let preparedInput: any = {};
@@ -127,17 +123,10 @@ export const getSubjectRedis = async (userID: string, service: UserService) => {
       // when not set in redis use default_scope as hrScope
       if (err || (!err && !response)) {
         // disable authorization to read data
-        let isAuthZEnabled = this.cfg.get('authorization:enabled');
-        if (isAuthZEnabled) {
-          this.cfg.set('authorization:enabled', false);
-          updateConfig(this.cfg);
-        }
+        service.disableAC();
         const result = await service.find({ request: { id: userID } });
-        // enable authorization back
-        if (isAuthZEnabled) {
-          this.cfg.set('authorization:enabled', true);
-          updateConfig(this.cfg);
-        }
+        // enable / resotre authorization back
+        service.enableAC();
         if (result.data && result.data.items) {
           let data = result.data.items[0];
           if (!subject.role_associations) {
