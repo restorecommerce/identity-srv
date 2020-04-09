@@ -4,7 +4,7 @@ import * as util from 'util';
 import * as uuid from 'uuid';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as fetch from 'node-fetch';
-import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
+import { ServiceBase, ResourcesAPIBase, toStruct, toObject } from '@restorecommerce/resource-base-interface';
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from '@restorecommerce/logger';
 import { ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest, PolicySetRQ } from '@restorecommerce/acs-client';
@@ -220,7 +220,7 @@ export class UserService extends ServiceBase {
 
   /**
    * Extends ServiceBase.read()
-   * @param  {any} call request containing a list of Users
+   * @param  {any} call request contains read request
    * @param {context}
    * @return type is any since it can be guest or user type
    */
@@ -232,7 +232,6 @@ export class UserService extends ServiceBase {
     }
     let acsResponse: ReadPolicyResponse;
     try {
-      console.log('Read Request is:', JSON.stringify(readRequest));
       acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
         'user', this.authZ);
     } catch (err) {
@@ -244,12 +243,6 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
-      console.log('ACS Response is:', JSON.stringify(acsResponse));
-      readRequest.filter = acsResponse.filter;
-      if (acsResponse.custom_query_args) {
-        readRequest.custom_queries = acsResponse.custom_query_args.custom_queries;
-        readRequest.custom_arguments = acsResponse.custom_query_args.custom_arguments;
-      }
       return await super.read({request: readRequest});
     }
   }

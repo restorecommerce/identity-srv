@@ -1,10 +1,9 @@
 import {
-  AuthZAction, Decision, PolicySetRQ, parseResourceList, accessRequest, updateConfig, Subject
+  AuthZAction, Decision, PolicySetRQ, parseResourceList, accessRequest, Subject, Resource, ReadRequest
 } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
 import { UserService } from './service';
 import { ACSAuthZ } from '@restorecommerce/acs-client';
-import { UnAuthZ } from '@restorecommerce/acs-client';
 
 export interface HierarchicalScope {
   id: string;
@@ -98,13 +97,12 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
       decision: result
     };
   }
-  let custom_queries = data.args && data.args.custom_queries ? data.args.custom_queries : undefined;
-  let custom_arguments = data.args && data.args.custom_arguments ? data.args.custom_arguments : undefined;
-  return {
+  resources.custom_queries = data.args && data.args.custom_queries ? data.args.custom_queries : undefined;
+  resources.custom_arguments = data.args && data.args.custom_arguments ? data.args.custom_arguments : undefined;
+  resources.filter = data.args && data.args.filter ? data.args.filter : undefined;
+  return  {
     decision: Decision.PERMIT,
-    policySet: result,
-    filter: data.args && data.args.filter ? data.args.filter : undefined,
-    custom_query_args: { custom_queries, custom_arguments }
+    policySet: result
   };
 }
 
