@@ -840,7 +840,7 @@ describe('testing identity-srv', () => {
           should.exist(result.error.name);
           result.error.name.should.equal('PermissionDenied');
           should.exist(result.error.details);
-          result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for a request from user admin_user_id for resource user; the response was DENY');
+          result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:user, action:CREATE; the response was DENY');
           // stop mock acs-srv
           stopGrpcMockServer();
           // delete user and roles collection
