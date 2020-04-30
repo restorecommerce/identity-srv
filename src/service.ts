@@ -1029,7 +1029,7 @@ export class UserService extends ServiceBase {
     }
     const user = users.items[0];
     if (!user.active) {
-      throw new errors.FailedPrecondition('user not activated');
+      throw new errors.FailedPrecondition('user is inactive');
     }
     const match = password.verify(user.password_hash, call.request.password);
     if (!match) {
