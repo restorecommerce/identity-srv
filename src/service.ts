@@ -1103,8 +1103,7 @@ export class UserService extends ServiceBase {
 
     let acsResponse;
     try {
-      // TODO check if resource exists then pass action as CREATE / MODIFY
-      acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.MODIFY,
+      acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.CREATE,
         'user', this.authZ);
     } catch (err) {
       this.logger.error('Error occured requesting access-control-srv:', err);
@@ -1144,7 +1143,7 @@ export class UserService extends ServiceBase {
           // call the create method, checks all conditions before inserting
           result.push(await this.createUser(user));
         } else {
-          let updateResponse = await this.update({ request: { items: [user] } });
+          let updateResponse = await this.update({ request: { items: [user], subject } });
           result.push(updateResponse.items[0]);
         }
       }
