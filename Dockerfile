@@ -5,10 +5,12 @@ ENV APP_HOME=/home/node/identity-srv
 RUN mkdir $APP_HOME
 WORKDIR $APP_HOME
 RUN cd $APP_HOME
-# Chown all the files to the app node.
+# Bundle app source
+COPY . $APP_HOME
+# Chown all the files to node user.
 RUN chown -R node:node $HOME
 RUN pwd
-# Change to the node user.
+# switch to the node user.
 USER node
 RUN npm install
 RUN npm run build
