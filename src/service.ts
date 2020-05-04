@@ -1038,7 +1038,7 @@ export class UserService extends ServiceBase {
       if (obfuscateAuthNErrorReason) {
         throw new errors.FailedPrecondition('Invalid credentials provided, user inactive or account does not exist');
       } else {
-        throw new errors.FailedPrecondition('user not activated');
+        throw new errors.FailedPrecondition('user is inactive');
       }
     }
     const match = password.verify(user.password_hash, call.request.password);
