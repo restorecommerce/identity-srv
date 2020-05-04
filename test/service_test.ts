@@ -366,7 +366,7 @@ describe('testing identity-srv', () => {
       });
 
       describe('login', function login(): void {
-        it('without activation should throw an error that user not activated',
+        it('without activation should throw an error that user is inactive',
           async function login(): Promise<void> {
             const result = await (userService.login({
               identifier: user.name,
@@ -378,7 +378,7 @@ describe('testing identity-srv', () => {
             should.exist(result.error.name);
             result.error.name.should.equal('FailedPrecondition');
             should.exist(result.error.details);
-            result.error.details.should.equal('9 FAILED_PRECONDITION: user not activated');
+            result.error.details.should.equal('9 FAILED_PRECONDITION: user is inactive');
           });
         it('without activation should throw an error that user not authenticated' +
         ' when error message is obfuscated', async function login(): Promise<void> {
