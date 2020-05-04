@@ -366,6 +366,33 @@ describe('testing identity-srv', () => {
       });
 
       describe('login', function login(): void {
+        it('should return an error for invalid user identifier', async function login(): Promise<void> {
+          const result = await (userService.login({
+            identifier: 'invalid_id',
+            password: 'invalid_pw',
+          }));
+          should.exist(result);
+          should.exist(result.error);
+          should.not.exist(result.data);
+          should.exist(result.error.message);
+          result.error.message.should.containEql('not found');
+          result.error.details.should.containEql('user not found');
+        });
+        it('should return an obfuscated error for invalid user identifier', async function login(): Promise<void> {
+          cfg.set('obfuscateAuthNErrorReason', true);
+          const result = await (userService.login({
+            identifier: 'invalid_id',
+            password: 'invalid_pw',
+          }));
+          should.exist(result);
+          should.not.exist(result.data);
+          should.exist(result.error);
+          should.exist(result.error.name);
+          result.error.name.should.equal('FailedPrecondition');
+          should.exist(result.error.details);
+          result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
+          cfg.set('obfuscateAuthNErrorReason', false);
+        });
         it('without activation should throw an error that user is inactive',
           async function login(): Promise<void> {
             const result = await (userService.login({
@@ -443,7 +470,22 @@ describe('testing identity-srv', () => {
           const userDBDoc = compareResult.data.items[0];
           result.data.should.deepEqual(userDBDoc);
         });
-        it('should return an error in case the passwords don`t match', async function login(): Promise<void> {
+        it('should return an obfuscated error in case the passwords don`t match', async function login(): Promise<void> {
+          cfg.set('obfuscateAuthNErrorReason', true);
+          const result = await (userService.login({
+            identifier: user.name,
+            password: 'invalid_pw',
+          }));
+          should.exist(result);
+          should.not.exist(result.data);
+          should.exist(result.error);
+          should.exist(result.error.name);
+          result.error.name.should.equal('FailedPrecondition');
+          should.exist(result.error.details);
+          result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
+          cfg.set('obfuscateAuthNErrorReason', false);
+        });
+        it('should return concise error in case the passwords don`t match', async function login(): Promise<void> {
           const result = await (userService.login({
             identifier: user.name,
             password: 'invalid_pw',
@@ -451,8 +493,6 @@ describe('testing identity-srv', () => {
           should.exist(result);
           should.exist(result.error);
           should.not.exist(result.data);
-
-
           should.exist(result.error.message);
           result.error.message.should.containEql('unauthenticated');
           result.error.details.should.containEql('password does not match');
