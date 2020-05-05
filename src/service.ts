@@ -333,6 +333,12 @@ export class UserService extends ServiceBase {
           }
         }
       }
+      // if there are no valid HR scopes matching the createAccessRole which
+      // gives the subject to create users, then no need to further
+      // validate the role associations
+      if (_.isEmpty(hrScopes)) {
+        throw new errors.InvalidArgument('No Hierarchical Scopes could be found');
+      }
       for (let user of usersList) {
         this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, context);
       }
@@ -1007,8 +1013,8 @@ export class UserService extends ServiceBase {
       throw new errors.InvalidArgument('Missing credentials');
     }
     const identifier = call.request.identifier;
-    const obfuscateAuthNErrorReason = this.cfg.get('obfuscateAuthNErrorReason')?
-      this.cfg.get('obfuscateAuthNErrorReason'): false;
+    const obfuscateAuthNErrorReason = this.cfg.get('obfuscateAuthNErrorReason') ?
+      this.cfg.get('obfuscateAuthNErrorReason') : false;
     // check for the identifier against name or email in DB
     const filter = toStruct({
       $or: [
