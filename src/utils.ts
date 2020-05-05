@@ -2,7 +2,7 @@ import {
   AuthZAction, Decision, PolicySetRQ, parseResourceList, accessRequest, Subject, Resource, ReadRequest
 } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
-import { UserService } from './service';
+import { UserService, RoleService, User } from './service';
 import { ACSAuthZ } from '@restorecommerce/acs-client';
 
 export interface HierarchicalScope {
@@ -100,56 +100,61 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
   resources.custom_queries = data.args && data.args.custom_queries ? data.args.custom_queries : undefined;
   resources.custom_arguments = data.args && data.args.custom_arguments ? data.args.custom_arguments : undefined;
   resources.filter = data.args && data.args.filter ? data.args.filter : undefined;
-  return  {
+  return {
     decision: Decision.PERMIT,
     policySet: result
   };
 }
 
-export const getSubjectRedis = async (userID: string, service: UserService) => {
-  let redisKey = `gql-cache:${userID}:subject`;
-  let hierarchical_scopes: HierarchicalScope[];
-  let subject: any;
-  // update ctx with HR scope from redis
-  subject = await new Promise((resolve, reject) => {
-    service.redisClient.get(redisKey, async (err, response) => {
-      if (!err && response) {
-        // update user HR scope from redis
-        subject.hierarchical_scopes = JSON.parse(response);
-        resolve(subject);
-      }
-      // when not set in redis use default_scope as hrScope
-      if (err || (!err && !response)) {
-        // disable authorization to read data
-        service.disableAC();
-        const result = await service.find({ request: { id: userID } });
-        // enable / resotre authorization back
-        service.enableAC();
-        if (result.data && result.data.items) {
-          let data = result.data.items[0];
-          if (!subject.role_associations) {
-            subject.role_associations = data.role_associations;
-          }
-          if (data.default_scope) {
-            // find the role matching default scope and use the first one
-            // in case of multiple roles with same scope
-            const userRoleAssocs = data.role_associations;
-            let defaultRole;
-            for (let role of userRoleAssocs) {
-              if (role.attributes[1] && role.attributes[1].value &&
-                role.attributes[1].value === data.default_scope) {
-                defaultRole = role.role;
-                break;
-              }
-            }
-            hierarchical_scopes = [{ id: data.default_scope, role: defaultRole }];
-          }
-          subject.hierarchical_scopes = hierarchical_scopes;
+export const getSubjectFromRedis = async (call: any, service: UserService | RoleService) => {
+  let subject = call.request.subject;
+  let api_key = call.request.api_key;
+  if (subject && subject.id && !subject.hierarchical_scopes) {
+    let redisKey = `gql-cache:${subject.id}:subject`;
+    let hierarchical_scopes: HierarchicalScope[];
+    // update ctx with HR scope from redis
+    subject = await new Promise((resolve, reject) => {
+      service.redisClient.get(redisKey, async (err, response) => {
+        if (!err && response) {
+          // update user HR scope from redis
+          subject.hierarchical_scopes = JSON.parse(response);
           resolve(subject);
-          return subject;
         }
-      }
+        // when not set in redis use default_scope as hrScope
+        if ((err || (!err && !response)) && (service as UserService).find) {
+          // disable authorization to read data
+          service.disableAC();
+          const result = await (service as UserService).find({ request: { id: subject.id } });
+          // enable / resotre authorization back
+          service.enableAC();
+          if (result.data && result.data.items) {
+            let data = result.data.items[0];
+            if (!subject.role_associations) {
+              subject.role_associations = data.role_associations;
+            }
+            if (data.default_scope) {
+              // find the role matching default scope and use the first one
+              // in case of multiple roles with same scope
+              const userRoleAssocs = data.role_associations;
+              let defaultRole;
+              for (let role of userRoleAssocs) {
+                if (role.attributes[1] && role.attributes[1].value &&
+                  role.attributes[1].value === data.default_scope) {
+                  defaultRole = role.role;
+                  break;
+                }
+              }
+              hierarchical_scopes = [{ id: data.default_scope, role: defaultRole }];
+            }
+            subject.hierarchical_scopes = hierarchical_scopes;
+            resolve(subject);
+            return subject;
+          }
+        }
+      });
     });
-  });
+  } else if (!subject && api_key) {
+    subject = { api_key };
+  }
   return subject;
 };

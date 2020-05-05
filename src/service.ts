@@ -9,7 +9,7 @@ import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-i
 import { Logger } from '@restorecommerce/logger';
 import { ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest, PolicySetRQ } from '@restorecommerce/acs-client';
 import { RedisClient } from 'redis';
-import { getSubjectRedis, checkAccessRequest, ReadPolicyResponse, AccessResponse } from './utils';
+import { getSubjectFromRedis, checkAccessRequest, ReadPolicyResponse, AccessResponse } from './utils';
 import { errors } from '@restorecommerce/chassis-srv';
 
 const password = {
@@ -68,18 +68,21 @@ export interface FindUser {
   email?: string;
   name?: string;
   subject?: Subject;
+  api_key?: string;
 }
 
 export interface ActivateUser {
   name: string;
   activation_code: string;
   subject?: Subject;
+  api_key?: string;
 }
 
 export interface ConfirmEmailChange {
   name: string;
   activation_code: string;
   subject?: Subject;
+  api_key?: string;
 }
 
 export interface RoleAssociation {
@@ -106,6 +109,7 @@ export interface ForgotPassword {
   name?: string; // username
   password?: string;
   subject?: Subject;
+  api_key?: string;
 }
 
 export interface ChangePassword {
@@ -113,6 +117,7 @@ export interface ChangePassword {
   password: string;
   new_password?: string;
   subject?: Subject;
+  api_key?: string;
 }
 
 export interface ConfirmPasswordChange {
@@ -120,6 +125,7 @@ export interface ConfirmPasswordChange {
   password: string;
   activation_code: string;
   subject?: Subject;
+  api_key?: string;
 }
 
 const marshallProtobufAny = (msg: any): any => {
@@ -170,16 +176,14 @@ export class UserService extends ServiceBase {
    * @return the list of users found
    */
   async find(call: Call<FindUser>, context?: any): Promise<any> {
-    let { id, name, email, subject } = call.request;
-    if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = await getSubjectRedis(subject.id, this);
-    }
+    let { id, name, email } = call.request;
+    let subject = await getSubjectFromRedis(call, this);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id, name, email },
-        AuthZAction.CREATE, 'user', this.authZ);
+        AuthZAction.READ, 'user', this.authZ);
     } catch (err) {
-      this.logger.error('Error occured requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -226,16 +230,13 @@ export class UserService extends ServiceBase {
    */
   async read(call: any, context?: any): Promise<any> {
     const readRequest = call.request;
-    let subject = call.request.subject;
-    if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = await getSubjectRedis(subject.id, this);
-    }
+    let subject = await getSubjectFromRedis(call, this);
     let acsResponse: ReadPolicyResponse;
     try {
       acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
         'user', this.authZ);
     } catch (err) {
-      this.logger.error('Error occured requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -243,7 +244,7 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
-      return await super.read({request: readRequest});
+      return await super.read({ request: readRequest });
     }
   }
 
@@ -258,16 +259,13 @@ export class UserService extends ServiceBase {
     const insertedUsers = [];
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
-    let subject = call.request.subject;
-    if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = await getSubjectRedis(subject.id, this);
-    }
+    let subject = await getSubjectFromRedis(call, this);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.CREATE,
         'user', this.authZ);
     } catch (err) {
-      this.logger.error('Error occured requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -353,7 +351,8 @@ export class UserService extends ServiceBase {
       });
       let rolesData = await this.roleService.read({
         request: {
-          filter
+          filter,
+          subject
         }
       });
       if (rolesData.items.length === 0) {
@@ -621,10 +620,7 @@ export class UserService extends ServiceBase {
       throw new errors.FailedPrecondition('wrong activation code');
     }
 
-    let subject = call.request.subject;
-    if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = await getSubjectRedis(subject.id, this);
-    }
+    let subject = await getSubjectFromRedis(call, this);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, {
@@ -633,7 +629,7 @@ export class UserService extends ServiceBase {
         activation_code: userInviteReq.activation_code
       }, AuthZAction.MODIFY, 'user', this.authZ);
     } catch (err) {
-      this.logger.error('Error occured requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -716,22 +712,19 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     const userName = request.name;
     const activationCode = request.activation_code;
-    let subject = request.subject;
     if (!userName) {
       throw new errors.InvalidArgument('argument id is empty');
     }
     if (!activationCode) {
       throw new errors.InvalidArgument('argument activation_code is empty');
     }
-    if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = await getSubjectRedis(subject.id, this);
-    }
+    let subject = await getSubjectFromRedis(call, this);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { name: userName, activation_code: activationCode },
         AuthZAction.MODIFY, 'user', this.authZ);
     } catch (err) {
-      this.logger.error('Error occured requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
 
@@ -788,16 +781,13 @@ export class UserService extends ServiceBase {
 
     const pw = request.password;
     const newPw = request.new_password;
-    let subject = request.subject;
-    if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = await getSubjectRedis(subject.id, this);
-    }
+    let subject = await getSubjectFromRedis(call, this);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id: userID, password: pw, new_password: newPw },
         AuthZAction.MODIFY, 'user', this.authZ);
     } catch (err) {
-      this.logger.error('Error occured requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
 
@@ -879,10 +869,7 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     const { name, activation_code } = call.request;
     const newPassword = call.request.password;
-    let subject = call.request.subject;
-    if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = await getSubjectRedis(subject.id, this);
-    }
+    let subject = await getSubjectFromRedis(call, this);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, {
@@ -890,7 +877,7 @@ export class UserService extends ServiceBase {
         password_hash: password.hash(newPassword)
       }, AuthZAction.MODIFY, 'user', this.authZ);
     } catch (err) {
-      this.logger.error('Error occured requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -988,10 +975,7 @@ export class UserService extends ServiceBase {
     }
 
     const user: User = users.items[0];
-    let subject = call.request.subject;
-    if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = await getSubjectRedis(subject.id, this);
-    }
+    let subject = await getSubjectFromRedis(call, this);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, {
@@ -999,7 +983,7 @@ export class UserService extends ServiceBase {
         email: user.new_email
       }, AuthZAction.MODIFY, 'user', this.authZ);
     } catch (err) {
-      this.logger.error('Error occured requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -1038,16 +1022,13 @@ export class UserService extends ServiceBase {
       throw new errors.InvalidArgument('No items were provided for update');
     }
     const items = call.request.items;
-    let subject = call.request.subject;
-    if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = await getSubjectRedis(subject.id, this);
-    }
+    let subject = await getSubjectFromRedis(call, this);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY,
         'user', this.authZ);
     } catch (err) {
-      this.logger.error('Error occured requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -1095,18 +1076,14 @@ export class UserService extends ServiceBase {
     }
 
     const usersList = call.request.items;
-    let subject = call.request.subject;
-    // verify the assigned role_associations with the HR scope data before creating
-    if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = await getSubjectRedis(subject, this);
-    }
+    let subject = await getSubjectFromRedis(call, this);
 
     let acsResponse;
     try {
       acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.CREATE,
         'user', this.authZ);
     } catch (err) {
-      this.logger.error('Error occured requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
     if (this.cfg.get('authorization:enabled')) {
@@ -1208,16 +1185,13 @@ export class UserService extends ServiceBase {
     const userID = request.id;
     logger.silly('unregister', userID);
 
-    let subject = call.request.subject;
-    if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = await getSubjectRedis(subject.id, this);
-    }
+    let subject = await getSubjectFromRedis(call, this);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id: userID }, AuthZAction.DELETE,
         'user', this.authZ);
     } catch (err) {
-      this.logger.error('Error occured requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -1258,16 +1232,13 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     let userIDs = request.ids;
 
-    let subject = call.request.subject;
-    if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = await getSubjectRedis(subject.id, this);
-    }
+    let subject = await getSubjectFromRedis(call, this);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id: userIDs }, AuthZAction.DELETE,
         'user', this.authZ);
     } catch (err) {
-      this.logger.error('Error occured requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -1316,8 +1287,23 @@ export class UserService extends ServiceBase {
 
   async deleteUsersByOrg(call: any, context?: any): Promise<any> {
     const orgIDs = call.request.org_ids;
-    const deletedUserIDs = await this.modifyUsers(orgIDs, false, context);
-    return { user_ids: deletedUserIDs.map((user) => { return user.id; }) };
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: ReadPolicyResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, { id: orgIDs }, AuthZAction.DELETE,
+        'user', this.authZ);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new errors.PermissionDenied(acsResponse.response.status.message);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      const deletedUserIDs = await this.modifyUsers(orgIDs, false, context, subject);
+      return { user_ids: deletedUserIDs.map((user) => { return user.id; }) };
+    }
   }
 
   /**
@@ -1332,16 +1318,13 @@ export class UserService extends ServiceBase {
     }
 
     const reqAttributes: any[] = call.attributes || call.request.attributes || [];
-    let subject = call.request.subject;
-    if (subject && subject.id && !subject.hierarchical_scopes) {
-      subject = await getSubjectRedis(subject.id, this);
-    }
+    let subject = await getSubjectFromRedis(call, this);
     let acsResponse: ReadPolicyResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { role }, AuthZAction.READ,
         'user', this.authZ);
     } catch (err) {
-      this.logger.error('Error occured requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -1357,7 +1340,8 @@ export class UserService extends ServiceBase {
           field: [{
             name: 'id',
             include: true
-          }]
+          }],
+          subject
         }
       });
 
@@ -1582,14 +1566,14 @@ export class UserService extends ServiceBase {
   }
 
   private async modifyUsers(orgIds: string[], deactivate: boolean,
-    context?: any): Promise<User[]> {
+    context?: any, subject?: any): Promise<User[]> {
     const ROLE_SCOPING_ENTITY = this.cfg.get('urns:roleScopingEntity');
     const ORGANIZATION_URN = this.cfg.get('urns:organization');
     const ROLE_SCOPING_INSTANCE = this.cfg.get('urns:roleScopingInstance');
 
     const eligibleUsers = [];
 
-    const roleID = await this.getNormalUserRoleID(context);
+    const roleID = await this.getNormalUserRoleID(context, subject);
     for (let org of orgIds) {
       const result = await super.read({
         request: {
@@ -1654,13 +1638,13 @@ export class UserService extends ServiceBase {
    * @param {ctx} User context
    * @return {roleID}
    */
-  private async getNormalUserRoleID(context: any): Promise<any> {
+  private async getNormalUserRoleID(context: any, subject: Subject): Promise<any> {
     let roleID;
     const roleName = this.cfg.get('roles:normalUser');
     const filter = toStruct(
       { name: { $eq: roleName } },
     );
-    const role: any = await this.roleService.read({ request: { filter } }, context);
+    const role: any = await this.roleService.read({ request: { filter, subject } }, context);
     if (role) {
       roleID = role.items[0].id;
     }
@@ -1709,11 +1693,17 @@ export class UserService extends ServiceBase {
 export class RoleService extends ServiceBase {
   logger: Logger;
   redisClient: RedisClient;
-  constructor(db: any, roleTopic: kafkaClient.Topic, logger: any, isEventsEnabled: boolean,
-    redisClient?: RedisClient) {
+  cfg: any;
+  authZ: ACSAuthZ;
+  authZCheck: boolean;
+  constructor(cfg: any, db: any, roleTopic: kafkaClient.Topic, logger: any,
+    isEventsEnabled: boolean, authZ: ACSAuthZ, redisClient?: RedisClient) {
     super('role', roleTopic, logger, new ResourcesAPIBase(db, 'roles'), isEventsEnabled);
     this.logger = logger;
     this.redisClient = redisClient;
+    this.authZ = authZ;
+    this.cfg = cfg;
+    this.authZCheck = this.cfg.get('authorization:enabled');
   }
 
   async create(call: any, context?: any): Promise<any> {
@@ -1721,24 +1711,65 @@ export class RoleService extends ServiceBase {
       throw new errors.InvalidArgument('No role was provided for creation');
     }
 
-    for (let role of call.request.items) {
-      // check unique constraint for role name
-      if (!role.name) {
-        throw new errors.InvalidArgument('argument role name is empty');
-      }
-      const result = await super.read({
-        request: {
-          filter: toStruct({
-            name: { $eq: role.name }
-          })
-        }
-      }, context);
-      if (result && result.items && result.items.length > 0) {
-        throw new errors.AlreadyExists(`Role ${role.name} already exists`);
-      }
+    const items = call.request.items;
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, items, AuthZAction.CREATE,
+        'role', this.authZ);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new errors.PermissionDenied(acsResponse.response.status.message);
     }
 
-    return super.create(call, context);
+    if (acsResponse.decision === Decision.PERMIT) {
+      for (let role of items) {
+        // check unique constraint for role name
+        if (!role.name) {
+          throw new errors.InvalidArgument('argument role name is empty');
+        }
+        const result = await super.read({
+          request: {
+            filter: toStruct({
+              name: { $eq: role.name }
+            })
+          }
+        }, context);
+        if (result && result.items && result.items.length > 0) {
+          throw new errors.AlreadyExists(`Role ${role.name} already exists`);
+        }
+      }
+      return super.create(call, context);
+    }
+  }
+
+  /**
+   * Extends ServiceBase.read()
+   * @param  {any} call request contains read request
+   * @param {context}
+   * @return type is any since it can be guest or user type
+   */
+  async read(call: any, context?: any): Promise<any> {
+    const readRequest = call.request;
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: ReadPolicyResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
+        'role', this.authZ);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new errors.PermissionDenied(acsResponse.response.status.message);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      return await super.read({ request: readRequest });
+    }
   }
 
   /**
@@ -1753,18 +1784,34 @@ export class RoleService extends ServiceBase {
     }
 
     const items = call.request.items;
-    for (let i = 0; i < items.length; i += 1) {
-      // read the role from DB and check if it exists
-      const role = items[i];
-      const filter = toStruct({
-        id: { $eq: role.id }
-      });
-      const roles = await super.read({ request: { filter } }, context);
-      if (roles.total_count === 0) {
-        throw new errors.NotFound('roles not found for updating');
-      }
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY,
+        'role', this.authZ);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
     }
-    return super.update(call, context);
+
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new errors.PermissionDenied(acsResponse.response.status.message);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      for (let i = 0; i < items.length; i += 1) {
+        // read the role from DB and check if it exists
+        const role = items[i];
+        const filter = toStruct({
+          id: { $eq: role.id }
+        });
+        const roles = await super.read({ request: { filter } }, context);
+        if (roles.total_count === 0) {
+          throw new errors.NotFound('roles not found for updating');
+        }
+      }
+      return super.update(call, context);
+    }
   }
 
   /**
@@ -1777,7 +1824,24 @@ export class RoleService extends ServiceBase {
       || _.isEmpty(call.request.items)) {
       throw new errors.InvalidArgument('No items were provided for upsert');
     }
-    return super.upsert(call, context);
+
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.CREATE,
+        'role', this.authZ);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new errors.PermissionDenied(acsResponse.response.status.message);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      return super.upsert(call, context);
+    }
   }
 
   /**
@@ -1790,41 +1854,57 @@ export class RoleService extends ServiceBase {
     const request = call.request;
     const logger = this.logger;
     let roleIDs = request.ids;
-    if (request.collection) {
-      // delete collection and return
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.DELETE,
+        'role', this.authZ);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new errors.PermissionDenied(acsResponse.response.status.message);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      if (request.collection) {
+        // delete collection and return
+        const serviceCall = {
+          request: {
+            collection: request.collection
+          }
+        };
+        await super.delete(serviceCall, context);
+        logger.info('Role collection deleted:');
+        return {};
+      }
+      if (!_.isArray(roleIDs)) {
+        roleIDs = [roleIDs];
+      }
+      logger.silly('deleting Role IDs:', { roleIDs });
+      // Check each user exist if one of the user does not exist throw an error
+      for (let roleID of roleIDs) {
+        const filter = toStruct({
+          id: { $eq: roleID }
+        });
+        const roles = await super.read({ request: { filter } }, context);
+        if (roles.total_count === 0) {
+          logger.debug('Role does not exist for deleting:', { roleID });
+          throw new errors.NotFound(`Role with ${roleID} does not exist for deleting`);
+        }
+      }
+      // delete users
       const serviceCall = {
         request: {
-          collection: request.collection
+          ids: roleIDs
         }
       };
       await super.delete(serviceCall, context);
-      logger.info('Role collection deleted:');
+      logger.info('Roles deleted:', roleIDs);
       return {};
     }
-    if (!_.isArray(roleIDs)) {
-      roleIDs = [roleIDs];
-    }
-    logger.silly('deleting Role IDs:', { roleIDs });
-    // Check each user exist if one of the user does not exist throw an error
-    for (let roleID of roleIDs) {
-      const filter = toStruct({
-        id: { $eq: roleID }
-      });
-      const roles = await super.read({ request: { filter } }, context);
-      if (roles.total_count === 0) {
-        logger.debug('Role does not exist for deleting:', { roleID });
-        throw new errors.NotFound(`Role with ${roleID} does not exist for deleting`);
-      }
-    }
-    // delete users
-    const serviceCall = {
-      request: {
-        ids: roleIDs
-      }
-    };
-    await super.delete(serviceCall, context);
-    logger.info('Roles deleted:', roleIDs);
-    return {};
   }
 
   async verifyRoles(roleAssociations: RoleAssociation[]): Promise<boolean> {
@@ -1845,5 +1925,25 @@ export class RoleService extends ServiceBase {
     }
 
     return true;
+  }
+
+  disableAC() {
+    try {
+      this.cfg.set('authorization:enabled', false);
+      updateConfig(this.cfg);
+    } catch (err) {
+      this.logger.error('Error caught disabling authorization:', err);
+      this.cfg.set('authorization:enabled', this.authZCheck);
+    }
+  }
+
+  enableAC() {
+    try {
+      this.cfg.set('authorization:enabled', this.authZCheck);
+      updateConfig(this.cfg);
+    } catch (err) {
+      this.logger.error('Error caught enabling authorization:', err);
+      this.cfg.set('authorization:enabled', this.authZCheck);
+    }
   }
 }
