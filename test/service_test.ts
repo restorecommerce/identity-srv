@@ -875,6 +875,32 @@ describe('testing identity-srv', () => {
           should.exist(result.error.details);
           result.error.details.should.equal('3 INVALID_ARGUMENT: The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id does not have permissions');
         });
+        it('should throw an error when hierarchical do not match creator role', async () => {
+          testUser.role_associations[0].role = 'user-r-id';
+          // auth_context not containing valid creator role (admin-r-id)
+          auth_context.hierarchical_scopes = [
+            {
+              id: 'mainOrg',
+              role: 'user-r-id',
+              children: [{
+                id: 'orgA',
+                children: [{
+                  id: 'orgB',
+                  children: [{
+                    id: 'orgC'
+                  }]
+                }]
+              }]
+            }
+          ];
+          const result = await userService.create({ items: testUser, auth_context });
+          should.not.exist(result.data);
+          should.exist(result.error);
+          should.exist(result.error.name);
+          result.error.name.should.equal('InvalidArgument');
+          should.exist(result.error.details);
+          result.error.details.should.equal('3 INVALID_ARGUMENT: No Hierarchical Scopes could be found');
+        });
         it('should not allow to create a User with role assocation with invalid hierarchical_scope', async () => {
           testUser.role_associations[0].role = 'user-r-id';
           // auth_context missing orgC in HR scope
