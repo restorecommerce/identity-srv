@@ -1,5 +1,5 @@
 name: identity-srv
-title: Identity Server
+title: Identity Service
 version: master
 nav:
   - modules/ROOT/nav.adoc
