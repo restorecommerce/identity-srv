@@ -1,0 +1,28 @@
+= Running
+
+[#running-docker]
+== As a Container
+
+This service depends on a set of _backing services_ that can be started using a
+dedicated https://github.com/restorecommerce/system[docker compose definition].
+
+[source,sh]
+----
+docker run \
+ --name restorecommerce_identity_srv \
+ --hostname identity-srv \
+ --network=restorecommerce \
+ -e NODE_ENV=production \
+ -p 50051:50051 \
+ restorecommerce/<service name>-srv
+----
+
+[#locally]
+== Locally
+
+Install dependencies:
+
+[source,sh]
+----
+npm install
+----

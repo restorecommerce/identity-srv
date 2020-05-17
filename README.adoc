@@ -1,48 +1,44 @@
-= identity-srv
+= Identity Service
 
 https://travis-ci.org/restorecommerce/identity-srv?branch=master[image:http://img.shields.io/travis/restorecommerce/identity-srv/master.svg?style=flat-square[Build Status]]
 https://david-dm.org/restorecommerce/identity-srv[image:https://img.shields.io/david/restorecommerce/identity-srv.svg?style=flat-square[Dependencies]]
 https://coveralls.io/github/restorecommerce/identity-srv?branch=master[image:http://img.shields.io/coveralls/restorecommerce/identity-srv/master.svg?style=flat-square[Coverage Status]]
 
-Features:
+A microservice for identity management.
 
-* Management of _User Accounts_ and _Roles_ entities
+[#features]
+== Features
+
+* Management of _User Account_ and _Role_ entities
 * User-to-Role associations with arbitrary scoping
 * User account creation (self-service, by privileged user, by invitation)
-* Password change (self-service)
-* Password recovery (self-service)
-* Un-registration (self-service)
+* Password change as self-service
+* Password recovery as self-service
+* Un-registration as self-service
 * Customizable, optional email notifications to drive processes
-
-The microservice exposes a https://grpc.io/docs[gRPC] interface for handling CRUD operations and user-specific functionalities.
-This service persists user data within an https://www.arangodb.com/[ArangoDB] instance and generic asynchronous communication
-is performed with https://kafka.apache.org/[Apache Kafka], using an event-driven approach with message interfaces defined with
-https://developers.google.com/protocol-buffers/[Protocol Buffers] (see https://github.com/restorecommerce/kafka-client[kafka-client] for more information).
-Resource-handling operations are implemented and exposed through the link:src/service.ts[UserService and the RoleService], which extend
-the https://github.com/restorecommerce/resource-base-interface[resource-base-interface] generic class `ServiceBase`.
 
 [#configuration]
 == Configuration
 
-The following service specific configuration properties under the `service` property are available:
+The following service specific configuration properties are available:
 
-* `userActivationRequired` [`true`]: if set to `false`, users do not require account activation to be able to log in and use their account
-* `register` [`true`]: if set to `false`, the `Register` endpoint is disabled and users can only be created through the bulk creation method `Create`, which can be seen as an admin-only operation
-* `enableEmail` [`true`]: if set to `true`, emails are sent out upon specific events, like account creation and email change
-* `activationURL`: URL to show link in activation email to activate the account
-* `emailConfirmationURL`: URL to show link in confirmation email to confirm email address change
-* `invitationURL`: URL to show link in invitation email to accept invitation
+* `userActivationRequired` [`true`]: if set to `false`, users do not require account activation to be able to log in and use their account.
+* `register` [`true`]: if set to `false`, the `Register` endpoint is disabled and users can only be created through the bulk creation method `Create`, which can be seen as an admin-only operation.
+* `enableEmail` [`true`]: if set to `true`, emails are sent out upon specific events, like account creation and email change.
+* `activationURL`: URL to show link in activation email to activate the account.
+* `emailConfirmationURL`: URL to show link in confirmation email to confirm email address change.
+* `invitationURL`: URL to show link in invitation email to accept invitation.
 * `hbsTemplates`: contains URLs for https://handlebarsjs.com/[Handlebars templates] and served via external web application. These templates are used in email sent by system for different user operations like `Register`, `RequestEmailChange` and `RequestPasswordChange`.
-* `minUsernameLength`: minimum length for the user’s `name`
-* `maxUsernameLength`: maximum length for the user’s `name`
+* `minUsernameLength`: minimum length for the user’s `name`.
+* `maxUsernameLength`: maximum length for the user’s `name`.
 * `obfuscateAuthNErrorReason`: default value is `false`, if set to `true` the login error details are obfuscated and generalized error message is shown.
 
-[#grpc-interface]
-== gRPC Interface
+[#API]
+== API
 
 This microservice exposes the following gRPC endpoints:
 
-[#grpc-interface_user]
+[#api_user]
 === User
 
 A User resource.
@@ -153,7 +149,7 @@ A list of User resources.
 |children |`io.restorecommerce.user.HierarchicalScope`[] |optional |hierarchical organizational tree
 |========================================================================================================
 
-[#grpc-interface_user_crud]
+[#api_user_crud]
 ==== CRUD Operations
 
 The microservice exposes the below CRUD operations for creating or modifying User resources.
@@ -170,7 +166,7 @@ The microservice exposes the below CRUD operations for creating or modifying Use
 |Upsert |`io.restorecommerce.user.UserList` |`io.restorecommerce.user.UserList` |Create or Update a list of User resources
 |=========================================================================================================================
 
-[#grpc-interface_user_create]
+[#api_user_create]
 ==== `Create`
 
 Used to create a User (usually by previleged user). Requests are performed providing `io.restorecommerce.user.UserList`
@@ -183,7 +179,7 @@ The User is allowed to create other Users with valid User-to-Role associations `
 with in his `io.restorecommerce.user.HierarchicalScope`. The creating User can assign roles if `io.restorecommerce.role.Role.assignable_by_roles`
 is with in his hierarchical scope context `io.restorecommerce.user.HierarchicalScope.role`.
 
-[#grpc-interface_user_register]
+[#api_user_register]
 ==== `Register`
 
 Used to register a User. Requests are performed providing `io.restorecommerce.user.RegisterRequest` protobuf message as
@@ -218,7 +214,7 @@ configuration value. If disabled, the only endpoint for user creation is `Create
 |role_associations |`io.restorecommerce.user.RoleAssociation`[] |required |A list of roles with their associated attributes
 |==========================================================================================================================
 
-[#grpc-interface_user_activate]
+[#api_user_activate]
 ==== `Activate`
 
 Used to activate a User. The `service.userActivationRequired` config value turns the user activation process on or off.
@@ -233,7 +229,7 @@ Requests are performed providing `io.restorecommerce.user.ActiveRequest` protobu
 |activation_code |string |required |activation code for User
 |===========================================================
 
-[#grpc-interface_user_change-password]
+[#api_user_change-password]
 ==== `ChangePassword`
 
 Used to change password for the User (User should be activated to perform this operation).
@@ -249,7 +245,7 @@ Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest`
 |new_password |string |required |new password
 |============================================
 
-[#grpc-interface_user_request-password-change]
+[#api_user_request-password-change]
 ==== `RequestPasswordChange`
 
 Used to change password for the User in case they forget it. It generates and persists an activation code for the user
@@ -266,7 +262,7 @@ specified upon the request.
 |email |string |optional |User email
 |===================================
 
-[#grpc-interface_user_confirm-password-change]
+[#api_user_confirm-password-change]
 ==== `ConfirmPasswordChange`
 
 Used to confirm the user’s password change request. The input is a `io.restorecommerce.user.ConfirmPasswordChangeRequest`
@@ -284,7 +280,7 @@ activation code is reset.
 |password |string |required |New password
 |==================================================
 
-[#grpc-interface_user_request-email-change]
+[#api_user_request-email-change]
 ==== `RequestEmailChange`
 
 Used to change the user’s email. Requests are performed providing the `io.restorecommerce.user.ChangeEmailRequest`
@@ -301,7 +297,7 @@ a newly-generated activation code.
 |email |string |required |New email
 |==================================
 
-[#grpc-interface_user_confirm-email-change]
+[#api_user_confirm-email-change]
 ==== `ConfirmEmailChange`
 
 Used to confirm the user’s email change request. The input is a `io.restorecommerce.user.ConfirmEmailChangeRequest`
@@ -318,7 +314,7 @@ generated activation code, the value assigned to the `new_email` property is the
 |activation_code |string |required |Activation code
 |==================================================
 
-[#grpc-interface_user_confirm-user-invitation]
+[#api_user_confirm-user-invitation]
 ==== `ConfirmUserInvitation`
 
 Used to confirm user invitation. Requests are performed providing `io.restorecommerce.user.ConfirmUserInvitationRequest`
@@ -336,7 +332,7 @@ configuration values are setup accordingly.
 |activation_code |string |required |User’s activation_code sent via email
 |========================================================================
 
-[#grpc-interface_user_login]
+[#api_user_login]
 ==== `Login`
 
 Used to verify the User name or email with password and return User’s information in case the operation is successful.
@@ -352,7 +348,7 @@ Requests are performed providing `io.restorecommerce.user.LoginRequest` protobuf
 |password |string |required |Raw password
 |=====================================================
 
-[#grpc-interface_user_unregister]
+[#api_user_unregister]
 ==== `Unregister`
 
 Used to unregister a User. Requests are performed providing `io.restorecommerce.user.UnregisterRequest` protobuf message
@@ -366,7 +362,7 @@ as input and responses are a `google.protobuf.Empty` message.
 |id |string |required |User ID
 |===============================
 
-[#grpc-interface_user_find]
+[#api_user_find]
 ==== `Find`
 
 A simplified version of `read`, which only filters users by username, email and/or ID. Requests are performed providing
@@ -382,7 +378,7 @@ A simplified version of `read`, which only filters users by username, email and/
 |email |string |required |User EmailID
 |=====================================
 
-[#grpc-interface_user_find-by-role]
+[#api_user_find-by-role]
 ==== `FindByRole`
 
 A custom endpoint in order to filter a user by its role and any attributes associated with it. Requests are performed
@@ -398,7 +394,7 @@ providing `io.restorecommerce.user.FindByRoleRequest` protobuf message as input 
 |attributes |`io.restorecommerce.user.RoleAssociation.Attribute`[] |optional |Role attributes
 |============================================================================================
 
-[#grpc-interface_role]
+[#api_role]
 === `Role`
 
 A Role resource.
@@ -416,7 +412,7 @@ A Role resource.
 |assignable_by_roles |string[] |optional |role identifier’s who can assign this role
 |====================================================================================
 
-[#grpc-interface_role_crud]
+[#api_role_crud]
 ==== CRUD Operations
 
 The microservice exposes the below CRUD operations for creating or modifying Role resources.
@@ -436,20 +432,11 @@ The microservice exposes the below CRUD operations for creating or modifying Rol
 For the detailed protobuf message structure of `io.restorecommerce.resourcebase.ReadRequest` and
 `io.restorecommerce.resourcebase.DeleteRequest` refer https://github.com/restorecommerce/resource-base-interface[resource-base-interface].
 
-[#kafka-events]
-== Kafka Events
+[#events]
+== Events
 
-This microservice subscribes to the following events by topic:
-
-[width="100%",cols="31%,33%,36%",options="header",]
-|=====================================================================================
-|Topic Name |Event Name |Description
-|`io.restorecommerce.command` |`restoreCommand` |for triggering for system restore
-| |`resetCommand` |for triggering system reset
-| |`healthCheckCommand` |to get system health check
-| |`versionCommand` |to get system version
-|`io.restorecommerce.rendering` |`renderResponse` |to get response from render request
-|=====================================================================================
+[#emitted-events]
+== Emitted
 
 List of events emitted by this microservice for below topics:
 
@@ -480,71 +467,18 @@ List of events emitted by this microservice for below topics:
 For `renderRequest` and `renderResponse` the message structures are defined in https://github.com/restorecommerce/rendering-srv[rendering-srv]
 and for `sendEmail` they are defined in https://github.com/restorecommerce/notification-srv[notification-srv],
 
-[#chassis-service]
-== Chassis Service
+[#subscribed-events]
+== Subscribed
 
-This service uses http://github.com/restorecommerce/chassis-srv[chassis-srv], a base module for https://github.com/restorecommerce[restorecommerce]
-microservices, in order to provide the following functionalities:
+This microservice subscribes to the following events by topic:
 
-* exposure of all previously mentioned gRPC endpoints
-* implementation of a https://github.com/restorecommerce/chassis-srv/blob/master/command-interface.md[command-interface] which provides endpoints for retrieving the system status and resetting/restoring the system in case of failure. These endpoints can be called via gRPC or Kafka events (through the `io.restorecommerce.command` topic).
-* database access, which is abstracted by the https://github.com/restorecommerce/resource-base-interface[resource-base-interface]
-* stores the offset values for Kafka topics at regular intervals to https://redis.io/[Redis].
+[width="100%",cols="31%,33%,36%",options="header",]
+|=====================================================================================
+|Topic Name |Event Name |Description
+|`io.restorecommerce.command` |`restoreCommand` |for triggering for system restore
+| |`resetCommand` |for triggering system reset
+| |`healthCheckCommand` |to get system health check
+| |`versionCommand` |to get system version
+|`io.restorecommerce.rendering` |`renderResponse` |to get response from render request
+|=====================================================================================
 
-[#development]
-== Development
-
-[#development_tests]
-=== Tests
-
-See link:test/[tests]. To execute the tests a set of _backing services_ are needed. Refer to https://github.com/restorecommerce/system[System]
-repository to start the backing-services before running the tests.
-
-* To run tests
-
-[source,sh]
-----
-npm run test
-----
-
-[#running-docker]
-== Running as Docker Container
-
-This service depends on a set of _backing services_ that can be started using a dedicated https://github.com/restorecommerce/system[docker compose definition].
-
-[source,sh]
-----
-docker run \
- --name restorecommerce_identity_srv \
- --hostname identity-srv \
- --network=system_test \
- -e NODE_ENV=production \
- -p 50051:50051 \
- restorecommerce/identity-srv
-----
-
-[#running-local]
-== Running Locally
-
-Install dependencies
-
-[source,sh]
-----
-npm install
-----
-
-Build service
-
-[source,sh]
-----
-# compile the code
-npm run build
-----
-
-Start service
-
-[source,sh]
-----
-# run compiled service
-npm start
-----

@@ -1,0 +1,77 @@
+= Development
+
+To run the service, a running instance of the following backing services is required:
+
+- [Kafka](https://kafka.apache.org/)
+- [ArangoDB](https://www.arangodb.com/)
+- [Redis](https://redis.io/)
+- [ElasticSearch](https://www.elastic.co/products/elasticsearch)
+
+Refer to [System](https://github.com/restorecommerce/system) repository to start
+the backing-services before running the tests.
+
+== Building
+
+Install dependencies:
+
+[source,sh]
+----
+npm install
+----
+
+Build the service:
+
+[source,sh]
+----
+# compile the code
+npm run build
+----
+
+[#running]
+== Running
+
+Run the service in development mode:
+
+[source,sh]
+----
+# start service in development mode
+npm run dev
+----
+
+Run the service in production mode:
+
+[source,sh]
+----
+# run compiled service
+npm start
+----
+
+[#environment]
+== Environment Definition
+
+The environment is defined by the `NODE_ENV` environment variable
+and there are environment specific configuration files.
+
+[source,sh]
+----
+# Linux
+export NODE_ENV="development"
+
+# Windows
+set NODE_ENV=development
+----
+
+Valid environment identifiers are:
+
+- `development`
+- `production`
+
+[#testing]
+== Testing
+
+Running the unit tests:
+
+[source,sh]
+----
+npm run test
+----
