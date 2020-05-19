@@ -234,7 +234,7 @@ export class UserService extends ServiceBase {
     for (let i = 0; i < usersList.length; i++) {
       let user: User = usersList[i];
       user.activation_code = '';
-      user.active = true;
+      user.active = user.active;
       user.unauthenticated = false;
       if (user.invite) {
         user.active = false;
