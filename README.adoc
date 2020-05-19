@@ -436,7 +436,7 @@ For the detailed protobuf message structure of `io.restorecommerce.resourcebase.
 == Events
 
 [#emitted-events]
-== Emitted
+=== Emitted
 
 List of events emitted by this microservice for below topics:
 
@@ -468,7 +468,7 @@ For `renderRequest` and `renderResponse` the message structures are defined in h
 and for `sendEmail` they are defined in https://github.com/restorecommerce/notification-srv[notification-srv],
 
 [#subscribed-events]
-== Subscribed
+=== Subscribed
 
 This microservice subscribes to the following events by topic:
 
