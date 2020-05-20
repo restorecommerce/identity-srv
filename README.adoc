@@ -171,8 +171,8 @@ The microservice exposes the below CRUD operations for creating or modifying Use
 
 Used to create a User (usually by previleged user). Requests are performed providing `io.restorecommerce.user.UserList`
 protobuf message as input and responses are a `io.restorecommerce.user.UserList` message. The User-to-Role associations
-assignment is optionally secured by https://github.com/restorecommerce/access-control-srv[`access-control-srv`] with
-link:./cfg/config.json#L71[configuration]. If authorization is enabled this service uses https://github.com/restorecommerce/acs-client/[`acs-client`]
+assignment is optionally secured by https://github.com/restorecommerce/access-control-srv[access-control-srv] with
+link:./cfg/config.json#L71[configuration]. If authorization is enabled this service uses https://github.com/restorecommerce/acs-client/[acs-client]
 to invoke `access-control-srv` to verify the role and its assocations are valid. When authorization is enabled the creating
 user should have a valid authentication context `io.restorecommerce.user.Context` in request else the request is denied.
 The User is allowed to create other Users with valid User-to-Role associations `io.restorecommerce.user.RoleAssociation.Attribute`
