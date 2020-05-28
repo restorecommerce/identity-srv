@@ -366,7 +366,50 @@ describe('testing identity-srv', () => {
       });
 
       describe('login', function login(): void {
-        it('without activation should throw an error', async function login(): Promise<void> {
+        it('should return an error for invalid user identifier', async function login(): Promise<void> {
+          const result = await (userService.login({
+            identifier: 'invalid_id',
+            password: 'invalid_pw',
+          }));
+          should.exist(result);
+          should.exist(result.error);
+          should.not.exist(result.data);
+          should.exist(result.error.message);
+          result.error.message.should.containEql('not found');
+          result.error.details.should.containEql('user not found');
+        });
+        it('should return an obfuscated error for invalid user identifier', async function login(): Promise<void> {
+          cfg.set('obfuscateAuthNErrorReason', true);
+          const result = await (userService.login({
+            identifier: 'invalid_id',
+            password: 'invalid_pw',
+          }));
+          should.exist(result);
+          should.not.exist(result.data);
+          should.exist(result.error);
+          should.exist(result.error.name);
+          result.error.name.should.equal('FailedPrecondition');
+          should.exist(result.error.details);
+          result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
+          cfg.set('obfuscateAuthNErrorReason', false);
+        });
+        it('without activation should throw an error that user is inactive',
+          async function login(): Promise<void> {
+            const result = await (userService.login({
+              identifier: user.name,
+              password: user.password,
+            }));
+            should.exist(result);
+            should.not.exist(result.data);
+            should.exist(result.error);
+            should.exist(result.error.name);
+            result.error.name.should.equal('FailedPrecondition');
+            should.exist(result.error.details);
+            result.error.details.should.equal('9 FAILED_PRECONDITION: user is inactive');
+          });
+        it('without activation should throw an error that user not authenticated' +
+        ' when error message is obfuscated', async function login(): Promise<void> {
+          cfg.set('obfuscateAuthNErrorReason', true);
           const result = await (userService.login({
             identifier: user.name,
             password: user.password,
@@ -377,7 +420,8 @@ describe('testing identity-srv', () => {
           should.exist(result.error.name);
           result.error.name.should.equal('FailedPrecondition');
           should.exist(result.error.details);
-          result.error.details.should.equal('9 FAILED_PRECONDITION: user not activated');
+          result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
+          cfg.set('obfuscateAuthNErrorReason', false);
         });
         it('should activate the user', async function activateUser(): Promise<void> {
           const offset = await topic.$offset(-1);
@@ -426,7 +470,22 @@ describe('testing identity-srv', () => {
           const userDBDoc = compareResult.data.items[0];
           result.data.should.deepEqual(userDBDoc);
         });
-        it('should return an error in case the passwords don`t match', async function login(): Promise<void> {
+        it('should return an obfuscated error in case the passwords don`t match', async function login(): Promise<void> {
+          cfg.set('obfuscateAuthNErrorReason', true);
+          const result = await (userService.login({
+            identifier: user.name,
+            password: 'invalid_pw',
+          }));
+          should.exist(result);
+          should.not.exist(result.data);
+          should.exist(result.error);
+          should.exist(result.error.name);
+          result.error.name.should.equal('FailedPrecondition');
+          should.exist(result.error.details);
+          result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
+          cfg.set('obfuscateAuthNErrorReason', false);
+        });
+        it('should return concise error in case the passwords don`t match', async function login(): Promise<void> {
           const result = await (userService.login({
             identifier: user.name,
             password: 'invalid_pw',
@@ -434,8 +493,6 @@ describe('testing identity-srv', () => {
           should.exist(result);
           should.exist(result.error);
           should.not.exist(result.data);
-
-
           should.exist(result.error.message);
           result.error.message.should.containEql('unauthenticated');
           result.error.details.should.containEql('password does not match');
@@ -818,6 +875,32 @@ describe('testing identity-srv', () => {
           should.exist(result.error.details);
           result.error.details.should.equal('3 INVALID_ARGUMENT: The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id does not have permissions');
         });
+        it('should throw an error when hierarchical do not match creator role', async () => {
+          testUser.role_associations[0].role = 'user-r-id';
+          // auth_context not containing valid creator role (admin-r-id)
+          auth_context.hierarchical_scopes = [
+            {
+              id: 'mainOrg',
+              role: 'user-r-id',
+              children: [{
+                id: 'orgA',
+                children: [{
+                  id: 'orgB',
+                  children: [{
+                    id: 'orgC'
+                  }]
+                }]
+              }]
+            }
+          ];
+          const result = await userService.create({ items: testUser, auth_context });
+          should.not.exist(result.data);
+          should.exist(result.error);
+          should.exist(result.error.name);
+          result.error.name.should.equal('InvalidArgument');
+          should.exist(result.error.details);
+          result.error.details.should.equal('3 INVALID_ARGUMENT: No Hierarchical Scopes could be found');
+        });
         it('should not allow to create a User with role assocation with invalid hierarchical_scope', async () => {
           testUser.role_associations[0].role = 'user-r-id';
           // auth_context missing orgC in HR scope
@@ -840,7 +923,7 @@ describe('testing identity-srv', () => {
           should.exist(result.error.name);
           result.error.name.should.equal('PermissionDenied');
           should.exist(result.error.details);
-          result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for a request from user admin_user_id for resource user; the response was DENY');
+          result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:user, action:CREATE; the response was DENY');
           // stop mock acs-srv
           stopGrpcMockServer();
           // delete user and roles collection

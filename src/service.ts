@@ -384,6 +384,12 @@ export class UserService extends ServiceBase {
           }
         }
       }
+      // if there are no valid HR scopes matching the createAccessRole which
+      // gives the subject to create users, then no need to further
+      // validate the role associations
+      if (_.isEmpty(hrScopes)) {
+        throw new errors.InvalidArgument('No Hierarchical Scopes could be found');
+      }
       for (let user of usersList) {
         this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, subject);
       }
@@ -1141,6 +1147,8 @@ export class UserService extends ServiceBase {
       throw new errors.InvalidArgument('Missing credentials');
     }
     const identifier = call.request.identifier;
+    const obfuscateAuthNErrorReason = this.cfg.get('obfuscateAuthNErrorReason') ?
+      this.cfg.get('obfuscateAuthNErrorReason') : false;
     // check for the identifier against name or email in DB
     const filter = toStruct({
       $or: [
@@ -1159,15 +1167,27 @@ export class UserService extends ServiceBase {
 
     const users = await super.read({ request: { filter } }, context);
     if (users.total_count === 0) {
-      throw new errors.NotFound('user not found');
+      if (obfuscateAuthNErrorReason) {
+        throw new errors.FailedPrecondition('Invalid credentials provided, user inactive or account does not exist');
+      } else {
+        throw new errors.NotFound('user not found');
+      }
     }
     const user = users.items[0];
     if (!user.active) {
-      throw new errors.FailedPrecondition('user not activated');
+      if (obfuscateAuthNErrorReason) {
+        throw new errors.FailedPrecondition('Invalid credentials provided, user inactive or account does not exist');
+      } else {
+        throw new errors.FailedPrecondition('user is inactive');
+      }
     }
     const match = password.verify(user.password_hash, call.request.password);
     if (!match) {
-      throw new errors.Unauthenticated('password does not match');
+      if (obfuscateAuthNErrorReason) {
+        throw new errors.FailedPrecondition('Invalid credentials provided, user inactive or account does not exist');
+      } else {
+        throw new errors.Unauthenticated('password does not match');
+      }
     }
     return user;
   }

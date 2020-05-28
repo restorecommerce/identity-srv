@@ -67,6 +67,7 @@
       "db-subject": 4
     }
   },
+  "obfuscateAuthNErrorReason": false,
   "authorization": {
     "service": "acs-srv",
     "enabled": true,

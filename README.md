@@ -32,6 +32,8 @@ The following service specific configuration properties under the `service` prop
 - `hbsTemplates`: contains URLs for [Handlebars templates](https://handlebarsjs.com/) and served via external web application. These templates are used in email sent by system for different user operations like `Register`, `RequestEmailChange` and `RequestPasswordChange`.
 - `minUsernameLength`: minimum length for the user's `name`
 - `maxUsernameLength`: maximum length for the user's `name`
+- `obfuscateAuthNErrorReason`: default value is `false`, if set to `true` the login error details are obfuscated and
+generalized error message is shown.
 
 ## gRPC Interface
 
