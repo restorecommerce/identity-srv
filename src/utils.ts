@@ -1,5 +1,5 @@
 import {
-  AuthZAction, Decision, PolicySetRQ, parseResourceList, accessRequest, Subject, Resource, ReadRequest
+  AuthZAction, Decision, PolicySetRQ, accessRequest, Subject
 } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
 import { UserService, RoleService, User } from './service';
