@@ -181,7 +181,7 @@ export class UserService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id, name, email },
-        AuthZAction.READ, 'user', this.authZ);
+        AuthZAction.READ, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -234,7 +234,7 @@ export class UserService extends ServiceBase {
     let acsResponse: ReadPolicyResponse;
     try {
       acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
-        'user', this.authZ);
+        'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -263,7 +263,7 @@ export class UserService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.CREATE,
-        'user', this.authZ);
+        'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -633,7 +633,7 @@ export class UserService extends ServiceBase {
         name: userInviteReq.name,
         password_hash: password.hash(userInviteReq.password),
         activation_code: userInviteReq.activation_code
-      }, AuthZAction.MODIFY, 'user', this.authZ);
+      }, AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -728,7 +728,7 @@ export class UserService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { name: userName, activation_code: activationCode },
-        AuthZAction.MODIFY, 'user', this.authZ);
+        AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -791,7 +791,7 @@ export class UserService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id: userID, password: pw, new_password: newPw },
-        AuthZAction.MODIFY, 'user', this.authZ);
+        AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -881,7 +881,7 @@ export class UserService extends ServiceBase {
       acsResponse = await checkAccessRequest(subject, {
         activation_code,
         password_hash: password.hash(newPassword)
-      }, AuthZAction.MODIFY, 'user', this.authZ);
+      }, AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -987,7 +987,7 @@ export class UserService extends ServiceBase {
       acsResponse = await checkAccessRequest(subject, {
         activation_code: activationCode,
         email: user.new_email
-      }, AuthZAction.MODIFY, 'user', this.authZ);
+      }, AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -1032,7 +1032,7 @@ export class UserService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY,
-        'user', this.authZ);
+        'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -1087,7 +1087,7 @@ export class UserService extends ServiceBase {
     let acsResponse;
     try {
       acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.CREATE,
-        'user', this.authZ);
+        'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -1209,7 +1209,7 @@ export class UserService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id: userID }, AuthZAction.DELETE,
-        'user', this.authZ);
+        'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -1256,7 +1256,7 @@ export class UserService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id: userIDs }, AuthZAction.DELETE,
-        'user', this.authZ);
+        'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -1311,7 +1311,7 @@ export class UserService extends ServiceBase {
     let acsResponse: ReadPolicyResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id: orgIDs }, AuthZAction.DELETE,
-        'user', this.authZ);
+        'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -1342,7 +1342,7 @@ export class UserService extends ServiceBase {
     let acsResponse: ReadPolicyResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { role }, AuthZAction.READ,
-        'user', this.authZ);
+        'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -1736,7 +1736,7 @@ export class RoleService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, items, AuthZAction.CREATE,
-        'role', this.authZ);
+        'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -1778,7 +1778,7 @@ export class RoleService extends ServiceBase {
     let acsResponse: ReadPolicyResponse;
     try {
       acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
-        'role', this.authZ);
+        'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -1808,7 +1808,7 @@ export class RoleService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY,
-        'role', this.authZ);
+        'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -1849,7 +1849,7 @@ export class RoleService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.CREATE,
-        'role', this.authZ);
+        'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -1878,7 +1878,7 @@ export class RoleService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.DELETE,
-        'role', this.authZ);
+        'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
