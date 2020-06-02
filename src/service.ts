@@ -260,12 +260,14 @@ export class UserService extends ServiceBase {
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
     let subject = await getSubjectFromRedis(call, this);
+    // update meta data for owner information
+    await this.createMetadata(usersList, AuthZAction.CREATE, subject);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.CREATE,
         'user', this);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv', err);
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -1029,6 +1031,8 @@ export class UserService extends ServiceBase {
     }
     const items = call.request.items;
     let subject = await getSubjectFromRedis(call, this);
+    // update meta data for owner information
+    await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY,
@@ -1083,10 +1087,10 @@ export class UserService extends ServiceBase {
 
     const usersList = call.request.items;
     let subject = await getSubjectFromRedis(call, this);
-
+    await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.CREATE,
+      acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.MODIFY,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -1206,6 +1210,7 @@ export class UserService extends ServiceBase {
     logger.silly('unregister', userID);
 
     let subject = await getSubjectFromRedis(call, this);
+    await this.createMetadata(call.request.items, AuthZAction.DELETE, subject);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id: userID }, AuthZAction.DELETE,
@@ -1708,22 +1713,20 @@ export class UserService extends ServiceBase {
     return user;
   }
 
-  private async createOwnerAttributes(subject: Subject) {
-    const urns = this.cfg.get('authorization:urns');
-    let ownUser = false;
-    let foundEntity = false;
-    for (let attribute of ownerAttributes) {
-      if (attribute.id == urns.ownerIndicatoryEntity && attribute.value == urns.user) {
-        foundEntity = true;
-      } else if (attribute.id == urns.ownerInstance && attribute.value == subject.id && foundEntity) {
-        ownUser = true;
-        break;
-      }
+  /**
+   * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
+   * @param reaources list of resources
+   * @param entity entity name
+   * @param action resource action
+   */
+  private async createMetadata(resources: any, action: string, subject?: Subject): Promise<any> {
+    let ownerAttributes = [];
+    if (!_.isArray(resources)) {
+      resources = [resources];
     }
-
-    // if no owner attributes specified then by default add the subject scope and user as default owner
-    if (!ownUser && subject && ownerAttributes.length === 0) {
-      // subject owner
+    const urns = this.cfg.get('authorization:urns');
+    if (subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
+      // add user and subject scope as default owner
       ownerAttributes.push(
         {
           id: urns.ownerIndicatoryEntity,
@@ -1733,7 +1736,6 @@ export class UserService extends ServiceBase {
           id: urns.ownerInstance,
           value: subject.scope
         });
-      // user owner
       ownerAttributes.push(
         {
           id: urns.ownerIndicatoryEntity,
@@ -1744,45 +1746,17 @@ export class UserService extends ServiceBase {
           value: subject.id
         });
     }
-  }
 
-  /**
- * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
- * @param reaources list of resources
- * @param entity entity name
- * @param action resource action
- */
-  private async createMetadata(resources: any, action: string, subject?: Subject): Promise<any> {
-    let ownerAttributes = [];
-    let ids = [];
-    if (!_.isArray(resources)) {
-      resources = [resources];
-    }
-    for (let resource of resources) {
-      // if (resource) {
-      //   ids.push(resource.id);
-      // }
-      if (!resource.id && action === AuthZAction.CREATE) {
-        if (resource)
-      }
-    }
-    // need to add resource meta for all if it does not exist
     for (let resource of resources) {
       if (!resource.meta) {
         resource.meta = {};
       }
-      if (resource.meta && resource.meta.owner) {
-        ownerAttributes = resource.meta.owner;
-      }
-
-      // read the entity to use owner information from exising value in DB for
-      // UPDATE and DELETE actions
-      if (resource.id && action != AuthZAction.CREATE) {
+      if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
         let result = await super.read({
           request: {
             filter: toStruct({
               id: {
-                $in: ids
+                $eq: resource.id
               }
             })
           }
@@ -1790,12 +1764,11 @@ export class UserService extends ServiceBase {
         // update owner info
         if (result.items.length === 1) {
           let item = result.items[0];
-          if (!resource.meta) {
-            resource.meta = {};
-          }
           resource.meta.owner = item.meta.owner;
+        } else if (result.items.length === 0) {
+          resource.meta.owner = ownerAttributes;
         }
-      } else {
+      } else if (action === AuthZAction.CREATE && !resource.meta.owner) {
         resource.meta.owner = ownerAttributes;
       }
     }
@@ -1828,6 +1801,7 @@ export class RoleService extends ServiceBase {
 
     const items = call.request.items;
     let subject = await getSubjectFromRedis(call, this);
+    await this.createMetadata(call.request.items, AuthZAction.CREATE, subject);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, items, AuthZAction.CREATE,
@@ -1900,6 +1874,8 @@ export class RoleService extends ServiceBase {
 
     const items = call.request.items;
     let subject = await getSubjectFromRedis(call, this);
+    // update owner information
+    await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY,
@@ -1941,9 +1917,10 @@ export class RoleService extends ServiceBase {
     }
 
     let subject = await getSubjectFromRedis(call, this);
+    await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.CREATE,
+      acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.MODIFY,
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -1970,6 +1947,8 @@ export class RoleService extends ServiceBase {
     const logger = this.logger;
     let roleIDs = request.ids;
     let subject = await getSubjectFromRedis(call, this);
+    // update owner information
+    await this.createMetadata(call.request.items, AuthZAction.DELETE, subject);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.DELETE,
@@ -2040,6 +2019,68 @@ export class RoleService extends ServiceBase {
     }
 
     return true;
+  }
+
+  /**
+   * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
+   * @param reaources list of resources
+   * @param entity entity name
+   * @param action resource action
+   */
+  private async createMetadata(resources: any, action: string, subject?: Subject): Promise<any> {
+    let ownerAttributes = [];
+    if (!_.isArray(resources)) {
+      resources = [resources];
+    }
+    const urns = this.cfg.get('authorization:urns');
+    if (subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
+      // add user and subject scope as default owner
+      ownerAttributes.push(
+        {
+          id: urns.ownerIndicatoryEntity,
+          value: urns.organization
+        },
+        {
+          id: urns.ownerInstance,
+          value: subject.scope
+        });
+      ownerAttributes.push(
+        {
+          id: urns.ownerIndicatoryEntity,
+          value: urns.user
+        },
+        {
+          id: urns.ownerInstance,
+          value: subject.id
+        });
+    }
+
+    for (let resource of resources) {
+      if (!resource.meta) {
+        resource.meta = {};
+      }
+      if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
+        let result = await super.read({
+          request: {
+            filter: toStruct({
+              id: {
+                $eq: resource.id
+              }
+            })
+          }
+        });
+        // update owner info
+        if (result.items.length === 1) {
+          let item = result.items[0];
+          resource.meta.owner = item.meta.owner;
+        } else if (result.items.length === 0) {
+          resource.meta.owner = ownerAttributes;
+        }
+      } else if (action === AuthZAction.CREATE && !resource.meta.owner) {
+        resource.meta.owner = ownerAttributes;
+      }
+    }
+    return resources;
   }
 
   disableAC() {
