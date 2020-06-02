@@ -1707,7 +1707,102 @@ export class UserService extends ServiceBase {
     user.meta = meta;
     return user;
   }
+
+  private async createOwnerAttributes(subject: Subject) {
+    const urns = this.cfg.get('authorization:urns');
+    let ownUser = false;
+    let foundEntity = false;
+    for (let attribute of ownerAttributes) {
+      if (attribute.id == urns.ownerIndicatoryEntity && attribute.value == urns.user) {
+        foundEntity = true;
+      } else if (attribute.id == urns.ownerInstance && attribute.value == subject.id && foundEntity) {
+        ownUser = true;
+        break;
+      }
+    }
+
+    // if no owner attributes specified then by default add the subject scope and user as default owner
+    if (!ownUser && subject && ownerAttributes.length === 0) {
+      // subject owner
+      ownerAttributes.push(
+        {
+          id: urns.ownerIndicatoryEntity,
+          value: urns.organization
+        },
+        {
+          id: urns.ownerInstance,
+          value: subject.scope
+        });
+      // user owner
+      ownerAttributes.push(
+        {
+          id: urns.ownerIndicatoryEntity,
+          value: urns.user
+        },
+        {
+          id: urns.ownerInstance,
+          value: subject.id
+        });
+    }
+  }
+
+  /**
+ * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
+ * @param reaources list of resources
+ * @param entity entity name
+ * @param action resource action
+ */
+  private async createMetadata(resources: any, action: string, subject?: Subject): Promise<any> {
+    let ownerAttributes = [];
+    let ids = [];
+    if (!_.isArray(resources)) {
+      resources = [resources];
+    }
+    for (let resource of resources) {
+      // if (resource) {
+      //   ids.push(resource.id);
+      // }
+      if (!resource.id && action === AuthZAction.CREATE) {
+        if (resource)
+      }
+    }
+    // need to add resource meta for all if it does not exist
+    for (let resource of resources) {
+      if (!resource.meta) {
+        resource.meta = {};
+      }
+      if (resource.meta && resource.meta.owner) {
+        ownerAttributes = resource.meta.owner;
+      }
+
+      // read the entity to use owner information from exising value in DB for
+      // UPDATE and DELETE actions
+      if (resource.id && action != AuthZAction.CREATE) {
+        let result = await super.read({
+          request: {
+            filter: toStruct({
+              id: {
+                $in: ids
+              }
+            })
+          }
+        });
+        // update owner info
+        if (result.items.length === 1) {
+          let item = result.items[0];
+          if (!resource.meta) {
+            resource.meta = {};
+          }
+          resource.meta.owner = item.meta.owner;
+        }
+      } else {
+        resource.meta.owner = ownerAttributes;
+      }
+    }
+    return resources;
+  }
 }
+
 
 
 export class RoleService extends ServiceBase {

@@ -42,95 +42,6 @@ export interface ReadPolicyResponse extends AccessResponse {
 }
 
 /**
- * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
- * @param reaources list of resources
- * @param entity entity name
- * @param action resource action
- */
-const createMetadata = async (resource: any, entity: string, action: string,
-  service: UserService | RoleService, subject?: Subject): Promise<any> => {
-  let ownerAttributes = [];
-  if (!resource.meta) {
-    resource.meta = {};
-  }
-  if (resource.meta && resource.meta.owner) {
-    ownerAttributes = resource.meta.owner;
-  }
-
-  const urns = service.cfg.get('authorization:urns');
-
-  let ownUser = false;
-  let foundEntity = false;
-  for (let attribute of ownerAttributes) {
-    if (attribute.id == urns.ownerIndicatoryEntity && attribute.value == urns.user) {
-      foundEntity = true;
-    } else if (attribute.id == urns.ownerInstance && attribute.value == subject.id && foundEntity) {
-      ownUser = true;
-      break;
-    }
-  }
-
-  // if no owner attributes specified then by default add the subject scope and user as default owner
-  if (!ownUser && subject && ownerAttributes.length === 0) {
-    // subject owner
-    ownerAttributes.push(
-      {
-        id: urns.ownerIndicatoryEntity,
-        value: urns.organization
-      },
-      {
-        id: urns.ownerInstance,
-        value: subject.scope
-      });
-    // user owner
-    ownerAttributes.push(
-      {
-        id: urns.ownerIndicatoryEntity,
-        value: urns.user
-      },
-      {
-        id: urns.ownerInstance,
-        value: subject.id
-      });
-  }
-
-  // read the entity to use owner information from exising value in DB for
-  // UPDATE and DELETE actions
-  if (resource.id && action != AuthZAction.CREATE && service.resourceapi) {
-    let result = await service.resourceapi.read({
-      filter: toStruct({
-        id: {
-          $eq: resource.id
-        }
-      })
-    });
-    // update owner info
-    if (result.length === 1) {
-      let item = result[0];
-      if (!resource.meta) {
-        resource.meta = {};
-      }
-      resource.meta.owner = item.meta.owner;
-    }
-  }
-  return resource;
-};
-
-const convertToObject = (resources: any | any[]): any | any[] => {
-  let resourcesArr = _.cloneDeep(resources);
-  if (!_.isArray(resourcesArr)) {
-    return JSON.parse(JSON.stringify(resourcesArr));
-  }
-  // GraphQL object is a pseudo-object;
-  // when processing its fields, we get an exception from gRPC
-  // so this fix is to sanitize all fields
-  return resourcesArr.map((resource) => {
-    const stringified = JSON.stringify(resource);
-    return JSON.parse(stringified);
-  });
-};
-
-/**
  * parses the input resources list and adds entity meta data to object
  * and returns resource list Resource[]
  * @param {Array<any>} input input resources list
@@ -139,10 +50,9 @@ const convertToObject = (resources: any | any[]): any | any[] => {
  * @param {UserService | RoleService} service service object
  * @return {Resource[]}
  */
-export const parseResourceList = async (input: any, action: AuthZAction,
+export const parseResourceList = async (resources: any, action: AuthZAction,
   entity: string, service: UserService | RoleService, subject?: Subject): Promise<any[]> => {
   let resourceListWithMeta = [];
-  let resources = convertToObject(input.payload);
   for (let resource of resources) {
     resource = await createMetadata(resource, entity, action, service, subject);
     resourceListWithMeta.push({
@@ -168,6 +78,9 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
   entity: string, service: UserService | RoleService): Promise<AccessResponse | ReadPolicyResponse> {
   let data: any;
   let authZ = service.authZ;
+  if (!_.isArray(resources)) {
+    resources = [resources];
+  }
   if (action != AuthZAction.READ) {
     data = parseResourceList(resources, action, entity, service, subject);
   } else if (action === AuthZAction.READ) {
