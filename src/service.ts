@@ -1491,6 +1491,13 @@ export class UserService extends ServiceBase {
     user.meta = meta;
     return user;
   }
+  
+  async sendInvitationEmail(call: any, context?: any): Promise<any> {
+    const user = call.request;
+    const renderRequest = this.makeInvitationEmailData(user);
+    await this.topics.rendering.emit('renderRequest', renderRequest);
+    return {};
+  }
 }
 
 
