@@ -111,9 +111,9 @@ A User resource.
 |filename |string |optional |image file name
 |content_type |string |optional |image content type
 |url |string |required |image URL
-|url |string |optional |image width
-|url |string |optional |image height
-|url |string |optional |image length
+|width |string |optional |image width
+|height |string |optional |image height
+|length |string |optional |image length
 |==================================================
 
 A list of User resources.
