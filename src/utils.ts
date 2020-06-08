@@ -54,7 +54,7 @@ export const parseResourceList = async (resources: any, action: AuthZAction,
   entity: string, service: UserService | RoleService, subject?: Subject): Promise<any[]> => {
   let resourceListWithMeta = [];
   for (let resource of resources) {
-    resource = await createMetadata(resource, entity, action, service, subject);
+    resource = await service.createMetadata(resource, action, subject);
     resourceListWithMeta.push({
       fields: _.keys(resource),
       instance: resource,

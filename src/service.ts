@@ -1719,7 +1719,7 @@ export class UserService extends ServiceBase {
    * @param entity entity name
    * @param action resource action
    */
-  private async createMetadata(resources: any, action: string, subject?: Subject): Promise<any> {
+  async createMetadata(resources: any, action: string, subject?: Subject): Promise<any> {
     let ownerAttributes = [];
     if (!_.isArray(resources)) {
       resources = [resources];
@@ -2027,7 +2027,7 @@ export class RoleService extends ServiceBase {
    * @param entity entity name
    * @param action resource action
    */
-  private async createMetadata(resources: any, action: string, subject?: Subject): Promise<any> {
+  async createMetadata(resources: any, action: string, subject?: Subject): Promise<any> {
     let ownerAttributes = [];
     if (!_.isArray(resources)) {
       resources = [resources];
