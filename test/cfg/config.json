@@ -476,6 +476,11 @@
             "grpcIdentity"
           ]
         },
+        "sendInvitationEmail": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
         "find": {
           "transport": [
             "grpcIdentity"

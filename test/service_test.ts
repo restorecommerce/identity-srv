@@ -183,6 +183,7 @@ describe('testing identity-srv', () => {
   describe('testing User service', () => {
     describe('with test client', () => {
       let userService;
+      let notificationService;
       let testUserID;
       let upserUserID;
       let user;
@@ -748,6 +749,55 @@ describe('testing identity-srv', () => {
           should.equal(result.error.message, 'not found');
         });
       });
+      describe('calling sendInvitationEmail', function sendInvitationEmail(): void {
+        let sampleUser, invitingUser
+        before(async () => {
+          sampleUser = {
+            id: '345testuser2id',
+            name: 'sampleuser1',
+            first_name: 'sampleUser7_first',
+            last_name: 'user',
+            password: 'notsecure3443',
+            email: 'sampleUser3@ms.restorecommerce.io',
+            role_associations: [{
+              role: 'user-r-id',
+              attributes: []
+            }]
+          };
+          invitingUser = {
+            id: '123invitingUserId',
+            name: 'invitinguser',
+            first_name: 'invitingUser_first',
+            last_name: 'invitingUser_last',
+            password: 'notsecure',
+            email: 'invitingUser@ms.restorecommerce.io',
+            role_associations: [{
+              role: 'user-r-id',
+              attributes: []
+            }]
+          };
+          await userService.create({ items: [sampleUser, invitingUser] });
+          notificationService = await connect('client:service-user', 'rendering');
+        });
+        it('should sendEmail', async function sendInvitationEmail(): Promise<void> {
+
+          const listener = function listener(message: any, context: any): void {
+            message.id.should.equal(`identity#${sampleUser.email}`);
+          };
+
+          const offset = await topic.$offset(0);
+          await topic.on('renderRequest', listener);
+          const result = await (userService.sendInvitationEmail({user_id:sampleUser.id, invited_by_user_id: invitingUser.id}));
+          await topic.$wait(offset);
+
+          should.exist(result);
+          should.not.exist(result.error);
+    
+          await topic.removeListener('renderRequest', listener);
+        });
+      });
+
+      
       describe('calling upsert', function upsert(): void {
         it('should upsert (create) user', async function upsert(): Promise<void> {
           let result = await userService.upsert([{
@@ -785,6 +835,7 @@ describe('testing identity-srv', () => {
           });
         });
       });
+
       // HR scoping tests
       describe('testing hierarchical scopes with authroization enabled', function registerUser(): void {
         // mainOrg -> orgA -> orgB -> orgC
