@@ -1496,18 +1496,18 @@ export class UserService extends ServiceBase {
     const { user_id, invited_by_user_id } = data;
     let user, invitedByUser;
 
-    const userRes = await super.read({ request: { filter: toStruct({id: { $eq: user_id }}) } });
-    if (userRes && userRes.items && userRes.items.length === 1) {
-      user = userRes.items[0];
+    const users = await super.read({ request: { filter: toStruct({id: { $eq: user_id }}) } });
+    if (users.total_count === 1) {
+      user = users.items[0];
     } else {
       throw new errors.NotFound(`user with id ${user_id} not found`);
     }
 
-    const invitedByRes = await super.read({ request: { filter: toStruct({id: { $eq: invited_by_user_id }}) } });
-    if (invitedByRes && invitedByRes.items && invitedByRes.items.length === 1) {
-      invitedByUser = invitedByRes.items[0];
+    const invitedByUsers = await super.read({ request: { filter: toStruct({id: { $eq: invited_by_user_id }}) } });
+    if (invitedByUsers.total_count === 1) {
+      invitedByUser = invitedByUsers.items[0];
     } else {
-      throw new errors.NotFound(`user with id ${user_id} not found`);
+      throw new errors.NotFound(`user with id ${invited_by_user_id} not found`);
     }
 
     return {

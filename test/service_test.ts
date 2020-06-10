@@ -779,7 +779,7 @@ describe('testing identity-srv', () => {
           await userService.create({ items: [sampleUser, invitingUser] });
           notificationService = await connect('client:service-user', 'rendering');
         });
-        it('should sendEmail', async function sendInvitationEmail(): Promise<void> {
+        it('should emit a renderRequest for sending the email', async function sendInvitationEmail(): Promise<void> {
 
           const listener = function listener(message: any, context: any): void {
             message.id.should.equal(`identity#${sampleUser.email}`);
