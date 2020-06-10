@@ -1494,11 +1494,21 @@ export class UserService extends ServiceBase {
 
   private async makeUserForInvitationData(data): Promise<any> {
     const { user_id, invited_by_user_id } = data;
+    let user, invitedByUser;
 
     const userRes = await super.read({ request: { filter: toStruct({id: { $eq: user_id }}) } });
-    const user = userRes.items[0];
-    const invitedRes = await super.read({ request: { filter: toStruct({id: { $eq: invited_by_user_id }}) } });
-    const invitedByUser = invitedRes.items[0];
+    if (userRes && userRes.items && userRes.items.length === 1) {
+      user = userRes.items[0];
+    } else {
+      throw new errors.NotFound(`user with id ${user_id} not found`);
+    }
+
+    const invitedByRes = await super.read({ request: { filter: toStruct({id: { $eq: invited_by_user_id }}) } });
+    if (invitedByRes && invitedByRes.items && invitedByRes.items.length === 1) {
+      invitedByUser = invitedByRes.items[0];
+    } else {
+      throw new errors.NotFound(`user with id ${user_id} not found`);
+    }
 
     return {
       name: user.name,
