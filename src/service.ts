@@ -1492,9 +1492,31 @@ export class UserService extends ServiceBase {
     return user;
   }
 
+  private async makeUserForInvitationData(data): Promise<any> {
+    const { user_id, invited_by_user_id } = data;
+
+    const userRes = await super.read({ request: { filter: toStruct({id: { $eq: user_id }}) } });
+    const user = userRes.items[0];
+    const invitedRes = await super.read({ request: { filter: toStruct({id: { $eq: invited_by_user_id }}) } });
+    const invitedByUser = invitedRes.items[0];
+
+    return {
+      name: user.name,
+      email:user.email,
+      last_name: user.last_name,
+      first_name: user.first_name,
+      activation_code: user.activation_code,
+      invited_by_user_name: invitedByUser.name,
+      invited_by_user_first_name: invitedByUser.first_name,
+      invited_by_user_last_name: invitedByUser.last_name
+    };
+  }
+
   async sendInvitationEmail(call: any, context?: any): Promise<any> {
     const user = call.request;
-    const renderRequest = this.makeInvitationEmailData(user);
+
+    const userForInvitation = await this.makeUserForInvitationData(user);
+    const renderRequest = this.makeInvitationEmailData(userForInvitation);
     await this.topics.rendering.emit('renderRequest', renderRequest);
     return {};
   }
