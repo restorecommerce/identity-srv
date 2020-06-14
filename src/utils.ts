@@ -41,29 +41,6 @@ export interface ReadPolicyResponse extends AccessResponse {
   };
 }
 
-/**
- * parses the input resources list and adds entity meta data to object
- * and returns resource list Resource[]
- * @param {Array<any>} input input resources list
- * @param {AuthZAction} action action to be performed on resource
- * @param {string} entity target entity
- * @param {UserService | RoleService} service service object
- * @return {Resource[]}
- */
-export const parseResourceList = async (resources: any, action: AuthZAction,
-  entity: string, service: UserService | RoleService, subject?: Subject): Promise<any[]> => {
-  let resourceListWithMeta = [];
-  for (let resource of resources) {
-    resource = await service.createMetadata(resource, action, subject);
-    resourceListWithMeta.push({
-      fields: _.keys(resource),
-      instance: resource,
-      type: entity
-    });
-  }
-  return resourceListWithMeta;
-};
-
 
 /**
  * Perform an access request using inputs from a GQL request
@@ -75,35 +52,19 @@ export const parseResourceList = async (resources: any, action: AuthZAction,
  */
 /* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
 export async function checkAccessRequest(subject: Subject, resources: any, action: AuthZAction,
-  entity: string, service: UserService | RoleService): Promise<AccessResponse | ReadPolicyResponse> {
-  let data: any;
+  entity: string, service: UserService | RoleService, resourceNameSpace?: string): Promise<AccessResponse | ReadPolicyResponse> {
   let authZ = service.authZ;
-  if (!_.isArray(resources)) {
-    resources = [resources];
-  }
-  if (action != AuthZAction.READ) {
-    data = parseResourceList(resources, action, entity, service, subject);
+  let data = _.cloneDeep(resources);
+  if (!_.isArray(resources) && action != AuthZAction.READ) {
+    data = [resources];
   } else if (action === AuthZAction.READ) {
-    let preparedInput: any = {};
-
-    if (resources) {
-      preparedInput = _.cloneDeep(resources);
-      if (preparedInput.filter) {
-        if (!Array.isArray(preparedInput.filter)) {
-          preparedInput.filter = [preparedInput.filter];
-        }
-      }
-    }
-
-    data = {
-      entity,
-      args: preparedInput
-    };
+    data.args = resources;
+    data.entity = entity;
   }
 
   let result: Decision | PolicySetRQ;
   try {
-    result = await accessRequest(subject, data, action, authZ);
+    result = await accessRequest(subject, data, action, authZ, entity, resourceNameSpace);
   } catch (err) {
     return {
       decision: Decision.DENY,
@@ -122,17 +83,21 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
       decision: result
     };
   }
-  resources.custom_queries = data.args && data.args.custom_queries ? data.args.custom_queries : undefined;
-  resources.custom_arguments = data.args && data.args.custom_arguments ? data.args.custom_arguments : undefined;
-  resources.filter = data.args && data.args.filter ? data.args.filter : undefined;
+  let custom_queries = data.args.custom_queries;
+  let custom_arguments = data.args.custom_arguments;
   return {
     decision: Decision.PERMIT,
-    policySet: result
+    policySet: result,
+    filter: data.args.filter,
+    custom_query_args: { custom_queries, custom_arguments }
   };
 }
 
 export const getSubjectFromRedis = async (call: any, service: UserService | RoleService) => {
   let subject = call.request.subject;
+  if (!subject) {
+    subject = {};
+  }
   let api_key = call.request.api_key;
   if (subject && subject.id && !subject.hierarchical_scopes) {
     let redisKey = `gql-cache:${subject.id}:subject`;
@@ -178,7 +143,7 @@ export const getSubjectFromRedis = async (call: any, service: UserService | Role
         }
       });
     });
-  } else if (!subject && api_key) {
+  } else if (api_key) {
     subject = { api_key };
   }
   return subject;

@@ -9,6 +9,7 @@ import * as sconfig from '@restorecommerce/service-config';
 import { User } from '../lib/service';
 import { Topic } from '@restorecommerce/kafka-client/lib/events/provider/kafka';
 import { createMockServer } from 'grpc-mock';
+import { updateConfig } from '@restorecommerce/acs-client';
 
 const Events = kafkaClient.Events;
 
@@ -47,11 +48,11 @@ let meta = {
   modified_by: 'SYSTEM',
   owner: [{
     id: 'urn:restorecommerce:acs:names:ownerIndicatoryEntity',
-    value: 'urn:restorecommerce:acs:model:user.User'
+    value: 'urn:restorecommerce:acs:model:organization.Organization'
   },
   {
     id: 'urn:restorecommerce:acs:names:ownerInstance',
-    value: 'UserID'
+    value: 'orgC'
   }]
 };
 
@@ -61,7 +62,7 @@ interface serverRule {
   output: any
 };
 
-const permitRule = {
+const permitUserRule = {
   id: 'permit_rule_id',
   target: {
     action: [],
@@ -79,15 +80,15 @@ const permitRule = {
   effect: 'PERMIT'
 };
 
-let policySetRQ = {
+let userPolicySetRQ = {
   policy_sets:
     [{
       combining_algorithm: 'urn:oasis:names:tc:xacml:3.0:rule-combining-algorithm:permit-overrides',
-      id: 'test_policy_set_id',
+      id: 'user_test_policy_set_id',
       policies: [
         {
           combining_algorithm: 'urn:oasis:names:tc:xacml:3.0:rule-combining-algorithm:permit-overrides',
-          id: 'test_policy_id',
+          id: 'user_test_policy_id',
           target: {
             action: [],
             resources: [{
@@ -130,6 +131,7 @@ describe('testing identity-srv', () => {
     // disable authorization
     cfg.set('authorization:enabled', false);
     cfg.set('authorization:enforce', false);
+    updateConfig(cfg);
   });
 
 
@@ -222,6 +224,11 @@ describe('testing identity-srv', () => {
           data.email.should.equal(user.email);
           data.active.should.be.false();
           data.activation_code.should.not.be.empty();
+          userPolicySetRQ.policy_sets[0].policies[0].rules[0] = permitUserRule;
+          // start mock acs-srv - needed for read operation since acs-client makes a req to acs-srv
+          // to get applicable policies although acs-lookup is disabled
+          startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: userPolicySetRQ },
+          { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'PERMIT' } }]);
           const getResult = await userService.read({
             filter: grpcClient.toStruct({
               id: data.id
@@ -334,7 +341,7 @@ describe('testing identity-srv', () => {
           await userService.confirmUserInvitation({
             name: testuser2.name,
             password: testuser2.password, activation_code: result.data.items[0].activation_code
-          }, null);
+          });
           // read the user and now the status should be true
           const userData = await userService.find({ id: 'testuser2' });
           userData.data.items[0].active.should.equal(true);
@@ -408,21 +415,21 @@ describe('testing identity-srv', () => {
             result.error.details.should.equal('9 FAILED_PRECONDITION: user is inactive');
           });
         it('without activation should throw an error that user not authenticated' +
-        ' when error message is obfuscated', async function login(): Promise<void> {
-          cfg.set('obfuscateAuthNErrorReason', true);
-          const result = await (userService.login({
-            identifier: user.name,
-            password: user.password,
-          }));
-          should.exist(result);
-          should.not.exist(result.data);
-          should.exist(result.error);
-          should.exist(result.error.name);
-          result.error.name.should.equal('FailedPrecondition');
-          should.exist(result.error.details);
-          result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
-          cfg.set('obfuscateAuthNErrorReason', false);
-        });
+          ' when error message is obfuscated', async function login(): Promise<void> {
+            cfg.set('obfuscateAuthNErrorReason', true);
+            const result = await (userService.login({
+              identifier: user.name,
+              password: user.password,
+            }));
+            should.exist(result);
+            should.not.exist(result.data);
+            should.exist(result.error);
+            should.exist(result.error.name);
+            result.error.name.should.equal('FailedPrecondition');
+            should.exist(result.error.details);
+            result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
+            cfg.set('obfuscateAuthNErrorReason', false);
+          });
         it('should activate the user', async function activateUser(): Promise<void> {
           const offset = await topic.$offset(-1);
           const listener = function listener(message: any, context: any): void {
@@ -688,8 +695,7 @@ describe('testing identity-srv', () => {
           const result = await userService.update([{
             id: testUserID,
             name: 'test.user1', // existing user name
-            first_name: 'John',
-            meta
+            first_name: 'John'
           }]);
           await topic.$wait(offset);
           should.exist(result);
@@ -704,8 +710,7 @@ describe('testing identity-srv', () => {
             name: 'test.user1',
             email: 'update@restorecommerce.io',
             password: 'notsecure2',
-            first_name: 'John',
-            meta
+            first_name: 'John'
           }]);
           should.exist(result.data);
           should.not.exist(result.error);
@@ -720,8 +725,7 @@ describe('testing identity-srv', () => {
 
             let result = await userService.update([{
               id: testUserID,
-              name: 'new_name',
-              meta
+              name: 'new_name'
             }]);
             should.not.exist(result.data);
             should.exist(result.error);
@@ -771,8 +775,7 @@ describe('testing identity-srv', () => {
             email: 'upsert2@restorecommerce.io',
             password: 'testUpsert2',
             first_name: 'John',
-            last_name: 'upsert2',
-            meta
+            last_name: 'upsert2'
           }]);
           should.exist(result.data);
           should.not.exist(result.error);
@@ -808,7 +811,7 @@ describe('testing identity-srv', () => {
           }]
         };
 
-        let auth_context = {
+        let subject = {
           id: 'admin_user_id',
           scope: 'orgC',
           role_associations: [
@@ -840,15 +843,13 @@ describe('testing identity-srv', () => {
             }
           ]
         };
+
         it('should allow to create a User with valid role and valid valid HR scope', async () => {
           // enable and enforce authorization
           cfg.set('authorization:enabled', true);
           cfg.set('authorization:enforce', true);
-          policySetRQ.policy_sets[0].policies[0].rules[0] = permitRule;
-          // start mock acs-srv
-          startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: policySetRQ },
-          { method: 'IsAllowed', input: '.*', output: {} }]);
-          const result = await userService.create({ items: testUser, auth_context });
+          updateConfig(cfg);
+          const result = await userService.create({ items: testUser, subject });
           should.exist(result);
           should.exist(result.data);
           should.exist(result.data.items);
@@ -857,7 +858,7 @@ describe('testing identity-srv', () => {
         });
         it('should not allow to create a User with invalid role existing in system', async () => {
           testUser.role_associations[0].role = 'invalid_role';
-          const result = await userService.create({ items: testUser, auth_context });
+          const result = await userService.create({ items: testUser, subject });
           should.not.exist(result.data);
           should.exist(result.error);
           should.exist(result.error.name);
@@ -867,7 +868,7 @@ describe('testing identity-srv', () => {
         });
         it('should not allow to create a User with role assocation which is not assignable', async () => {
           testUser.role_associations[0].role = 'super-admin-r-id';
-          const result = await userService.create({ items: testUser, auth_context });
+          const result = await userService.create({ items: testUser, subject });
           should.not.exist(result.data);
           should.exist(result.error);
           should.exist(result.error.name);
@@ -878,7 +879,7 @@ describe('testing identity-srv', () => {
         it('should throw an error when hierarchical do not match creator role', async () => {
           testUser.role_associations[0].role = 'user-r-id';
           // auth_context not containing valid creator role (admin-r-id)
-          auth_context.hierarchical_scopes = [
+          subject.hierarchical_scopes = [
             {
               id: 'mainOrg',
               role: 'user-r-id',
@@ -893,7 +894,7 @@ describe('testing identity-srv', () => {
               }]
             }
           ];
-          const result = await userService.create({ items: testUser, auth_context });
+          const result = await userService.create({ items: testUser, subject });
           should.not.exist(result.data);
           should.exist(result.error);
           should.exist(result.error.name);
@@ -904,7 +905,7 @@ describe('testing identity-srv', () => {
         it('should not allow to create a User with role assocation with invalid hierarchical_scope', async () => {
           testUser.role_associations[0].role = 'user-r-id';
           // auth_context missing orgC in HR scope
-          auth_context.hierarchical_scopes = [
+          subject.hierarchical_scopes = [
             {
               id: 'mainOrg',
               role: 'admin-r-id',
@@ -917,15 +918,19 @@ describe('testing identity-srv', () => {
               }]
             }
           ];
-          const result = await userService.create({ items: testUser, auth_context });
+          const result = await userService.create({items: testUser, subject});
           should.not.exist(result.data);
           should.exist(result.error);
           should.exist(result.error.name);
           result.error.name.should.equal('PermissionDenied');
           should.exist(result.error.details);
-          result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:user, action:CREATE; the response was DENY');
-          // stop mock acs-srv
-          stopGrpcMockServer();
+          result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:user, action:CREATE, target_scope:orgC; the response was DENY');
+          
+           // disable authorization
+           cfg.set('authorization:enabled', false);
+           cfg.set('authorization:enforce', false);
+           updateConfig(cfg);
+
           // delete user and roles collection
           await userService.delete({
             collection: true
@@ -933,6 +938,8 @@ describe('testing identity-srv', () => {
           await roleService.delete({
             collection: true
           });
+          // stop mock acs-srv
+          stopGrpcMockServer();
         });
       });
     });

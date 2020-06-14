@@ -7,7 +7,7 @@ import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct, toObject } from '@restorecommerce/resource-base-interface';
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from '@restorecommerce/logger';
-import { ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest, PolicySetRQ } from '@restorecommerce/acs-client';
+import { ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest, PolicySetRQ, PermissionDenied } from '@restorecommerce/acs-client';
 import { RedisClient } from 'redis';
 import { getSubjectFromRedis, checkAccessRequest, ReadPolicyResponse, AccessResponse } from './utils';
 import { errors } from '@restorecommerce/chassis-srv';
@@ -240,7 +240,7 @@ export class UserService extends ServiceBase {
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, '401');
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -273,15 +273,16 @@ export class UserService extends ServiceBase {
     if (acsResponse.decision != Decision.PERMIT) {
       throw new errors.PermissionDenied(acsResponse.response.status.message);
     }
-    if (this.cfg.get('authorization:enabled')) {
-      try {
-        await this.verifyUserRoleAssociations(usersList, subject);
-      } catch (err) {
-        // for unhandled promise rejection
-        throw err;
-      }
-    }
+
     if (acsResponse.decision === Decision.PERMIT) {
+      if (this.cfg.get('authorization:enabled')) {
+        try {
+          await this.verifyUserRoleAssociations(usersList, subject);
+        } catch (err) {
+          // for unhandled promise rejection
+          throw err;
+        }
+      }
       for (let i = 0; i < usersList.length; i++) {
         let user: User = usersList[i];
         user.activation_code = '';
@@ -357,7 +358,7 @@ export class UserService extends ServiceBase {
           subject
         }
       });
-      if (rolesData.items.length === 0) {
+      if (rolesData && rolesData.total_count === 0) {
         let message = `One or more of the target role IDs are invalid ${targetUserRoleIds},` +
           ` no such role exist in system`;
         this.logger.verbose(message);
@@ -617,17 +618,6 @@ export class UserService extends ServiceBase {
 
   async confirmUserInvitation(call: any, context: any): Promise<any> {
     const userInviteReq: UserInviationReq = call.request || call;
-    // find the actual user object from DB using the UserInvitationReq username
-    // activate user and update password
-    this.disableAC();
-    let user: User = (await this.find({ request: { name: userInviteReq.name } })).items[0];
-    this.enableAC();
-
-    if ((!userInviteReq.activation_code) || userInviteReq.activation_code !== user.activation_code) {
-      this.logger.debug('wrong activation code', { user });
-      throw new errors.FailedPrecondition('wrong activation code');
-    }
-
     let subject = await getSubjectFromRedis(call, this);
     let acsResponse: AccessResponse;
     try {
@@ -645,6 +635,23 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
+      // find the actual user object from DB using the UserInvitationReq username
+      // activate user and update password
+      const filter = toStruct({
+        name: { $eq: userInviteReq.name }
+      });
+      let user;
+      const users = await super.read({ request: { filter } });
+      if (users && users.total_count === 1) {
+        user = users.items[0];
+      } else {
+        throw new errors.NotFound('user not found');
+      }
+
+      if ((!userInviteReq.activation_code) || userInviteReq.activation_code !== user.activation_code) {
+        this.logger.debug('wrong activation code', { user });
+        throw new errors.FailedPrecondition('wrong activation code');
+      }
       user.active = true;
       user.unauthenticated = false;
       user.activation_code = '';
@@ -720,12 +727,6 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     const userName = request.name;
     const activationCode = request.activation_code;
-    if (!userName) {
-      throw new errors.InvalidArgument('argument id is empty');
-    }
-    if (!activationCode) {
-      throw new errors.InvalidArgument('argument activation_code is empty');
-    }
     let subject = await getSubjectFromRedis(call, this);
     let acsResponse: AccessResponse;
     try {
@@ -741,6 +742,12 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
+      if (!userName) {
+        throw new errors.InvalidArgument('argument id is empty');
+      }
+      if (!activationCode) {
+        throw new errors.InvalidArgument('argument activation_code is empty');
+      }
       const filter = toStruct({
         name: { $eq: userName }
       });
@@ -842,11 +849,17 @@ export class UserService extends ServiceBase {
    */
   async requestPasswordChange(call: Call<ForgotPassword>, context?: any): Promise<any> {
     const logger = this.logger;
-    this.disableAC();
-    const user: User = (await this.find({
-      request: call.request
-    })).items[0]; // NotFound exception is thrown when length is 0
-    this.enableAC();
+    const reqName = call.request;
+    const filter = toStruct({
+      name: { $eq: reqName.name }
+    });
+    let user;
+    const users = await super.read({ request: { filter } });
+    if (users.total_count === 1) {
+      user = users.items[0];
+    } else {
+      throw new errors.NotFound('user not found');
+    }
 
     logger.verbose('Received a password change request for user', user.id);
 
@@ -893,13 +906,16 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
-      this.disableAC();
-      const user: User = (await this.find({
-        request: {
-          name
-        }
-      })).items[0];
-      this.enableAC();
+      const filter = toStruct({
+        name: { $eq: name }
+      });
+      let user;
+      const users = await super.read({ request: { filter } });
+      if (users.total_count === 1) {
+        user = users.items[0];
+      } else {
+        throw new errors.NotFound('user not found');
+      }
 
       if (!user.activation_code || user.activation_code !== activation_code) {
         logger.debug('wrong activation code upon password change confirmation for user', user.name);
@@ -970,14 +986,11 @@ export class UserService extends ServiceBase {
     const name = request.name;
     const activationCode = request.activation_code;
 
-    this.disableAC();
-    const users = await this.find({
-      request: {
-        name
-      }
+    const filter = toStruct({
+      name: { $eq: name }
     });
-    this.enableAC();
-    if (users.total_count === 0) {
+    const users = await super.read({ request: { filter } });
+    if (users && users.total_count === 0) {
       logger.debug('user does not exist', name);
       throw new errors.NotFound('user does not exist');
     }
@@ -1096,15 +1109,16 @@ export class UserService extends ServiceBase {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
     }
-    if (this.cfg.get('authorization:enabled')) {
-      try {
-        await this.verifyUserRoleAssociations(usersList, subject);
-      } catch (err) {
-        // for unhandled promise rejection
-        throw err;
-      }
-    }
+
     if (acsResponse.decision === Decision.PERMIT) {
+      if (this.cfg.get('authorization:enabled')) {
+        try {
+          await this.verifyUserRoleAssociations(usersList, subject);
+        } catch (err) {
+          // for unhandled promise rejection
+          throw err;
+        }
+      }
       let result = [];
       const items = call.request.items;
       for (let i = 0; i < items.length; i += 1) {
@@ -1228,7 +1242,7 @@ export class UserService extends ServiceBase {
         id: { $eq: userID }
       });
       const users = await super.read({ request: { filter } }, context);
-      if (users.total_count === 0) {
+      if (users && users.total_count === 0) {
         logger.debug('user does not exist', userID);
         throw new errors.NotFound(`user with ${userID} does not exist for unregistering`);
       }
@@ -1256,11 +1270,18 @@ export class UserService extends ServiceBase {
     const request = call.request;
     const logger = this.logger;
     let userIDs = request.ids;
-
+    let resources = {};
     let subject = await getSubjectFromRedis(call, this);
+    if (userIDs) {
+      Object.assign(resources, { id: userIDs });
+      await this.createMetadata({ id: userIDs }, AuthZAction.DELETE, subject);
+    }
+    if (request.collection) {
+      Object.assign(resources, { collection: request.collection });
+    }
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, { id: userIDs }, AuthZAction.DELETE,
+      acsResponse = await checkAccessRequest(subject, resources, AuthZAction.DELETE,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -1720,14 +1741,14 @@ export class UserService extends ServiceBase {
    * @param action resource action
    */
   async createMetadata(resources: any, action: string, subject?: Subject): Promise<any> {
-    let ownerAttributes = [];
-    if (!_.isArray(resources)) {
+    let orgOwnerAttributes = [];
+    if (resources && !_.isArray(resources)) {
       resources = [resources];
     }
     const urns = this.cfg.get('authorization:urns');
-    if (subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
+    if (subject && subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
       // add user and subject scope as default owner
-      ownerAttributes.push(
+      orgOwnerAttributes.push(
         {
           id: urns.ownerIndicatoryEntity,
           value: urns.organization
@@ -1736,40 +1757,53 @@ export class UserService extends ServiceBase {
           id: urns.ownerInstance,
           value: subject.scope
         });
-      ownerAttributes.push(
-        {
-          id: urns.ownerIndicatoryEntity,
-          value: urns.user
-        },
-        {
-          id: urns.ownerInstance,
-          value: subject.id
-        });
     }
 
-    for (let resource of resources) {
-      if (!resource.meta) {
-        resource.meta = {};
-      }
-      if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
-        let result = await super.read({
-          request: {
-            filter: toStruct({
-              id: {
-                $eq: resource.id
-              }
-            })
+    if (resources) {
+      for (let resource of resources) {
+        if (!resource.meta) {
+          resource.meta = {};
+        }
+        if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
+          let result = await super.read({
+            request: {
+              filter: toStruct({
+                id: {
+                  $eq: resource.id
+                }
+              })
+            }
+          });
+          // update owner info
+          if (result.items.length === 1) {
+            let item = result.items[0];
+            resource.meta.owner = item.meta.owner;
+          } else if (result.items.length === 0) {
+            let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+            ownerAttributes.push(
+              {
+                id: urns.ownerIndicatoryEntity,
+                value: urns.user
+              },
+              {
+                id: urns.ownerInstance,
+                value: resource.id
+              });
+            resource.meta.owner = ownerAttributes;
           }
-        });
-        // update owner info
-        if (result.items.length === 1) {
-          let item = result.items[0];
-          resource.meta.owner = item.meta.owner;
-        } else if (result.items.length === 0) {
+        } else if (action === AuthZAction.CREATE && !resource.meta.owner) {
+          let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+          ownerAttributes.push(
+            {
+              id: urns.ownerIndicatoryEntity,
+              value: urns.user
+            },
+            {
+              id: urns.ownerInstance,
+              value: resource.id
+            });
           resource.meta.owner = ownerAttributes;
         }
-      } else if (action === AuthZAction.CREATE && !resource.meta.owner) {
-        resource.meta.owner = ownerAttributes;
       }
     }
     return resources;
@@ -1946,12 +1980,18 @@ export class RoleService extends ServiceBase {
     const request = call.request;
     const logger = this.logger;
     let roleIDs = request.ids;
+    let resources = {};
     let subject = await getSubjectFromRedis(call, this);
-    // update owner information
-    await this.createMetadata(call.request.items, AuthZAction.DELETE, subject);
+    if (roleIDs) {
+      Object.assign(resources, { id: roleIDs });
+      await this.createMetadata({ id: roleIDs }, AuthZAction.DELETE, subject);
+    }
+    if (request.collection) {
+      Object.assign(resources, { collection: request.collection });
+    }
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.DELETE,
+      acsResponse = await checkAccessRequest(subject, resources, AuthZAction.DELETE,
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -2028,14 +2068,14 @@ export class RoleService extends ServiceBase {
    * @param action resource action
    */
   async createMetadata(resources: any, action: string, subject?: Subject): Promise<any> {
-    let ownerAttributes = [];
+    let orgOwnerAttributes = [];
     if (!_.isArray(resources)) {
       resources = [resources];
     }
     const urns = this.cfg.get('authorization:urns');
-    if (subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
+    if (subject && subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
       // add user and subject scope as default owner
-      ownerAttributes.push(
+      orgOwnerAttributes.push(
         {
           id: urns.ownerIndicatoryEntity,
           value: urns.organization
@@ -2043,15 +2083,6 @@ export class RoleService extends ServiceBase {
         {
           id: urns.ownerInstance,
           value: subject.scope
-        });
-      ownerAttributes.push(
-        {
-          id: urns.ownerIndicatoryEntity,
-          value: urns.user
-        },
-        {
-          id: urns.ownerInstance,
-          value: subject.id
         });
     }
 
@@ -2074,9 +2105,29 @@ export class RoleService extends ServiceBase {
           let item = result.items[0];
           resource.meta.owner = item.meta.owner;
         } else if (result.items.length === 0) {
+          let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+          ownerAttributes.push(
+            {
+              id: urns.ownerIndicatoryEntity,
+              value: urns.user
+            },
+            {
+              id: urns.ownerInstance,
+              value: resource.id
+            });
           resource.meta.owner = ownerAttributes;
         }
       } else if (action === AuthZAction.CREATE && !resource.meta.owner) {
+        let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+        ownerAttributes.push(
+          {
+            id: urns.ownerIndicatoryEntity,
+            value: urns.user
+          },
+          {
+            id: urns.ownerInstance,
+            value: resource.id
+          });
         resource.meta.owner = ownerAttributes;
       }
     }
