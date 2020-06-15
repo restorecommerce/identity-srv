@@ -1110,6 +1110,10 @@ export class UserService extends ServiceBase {
       throw err;
     }
 
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new errors.PermissionDenied(acsResponse.response.status.message);
+    }
+
     if (acsResponse.decision === Decision.PERMIT) {
       if (this.cfg.get('authorization:enabled')) {
         try {
@@ -1778,7 +1782,7 @@ export class UserService extends ServiceBase {
           if (result.items.length === 1) {
             let item = result.items[0];
             resource.meta.owner = item.meta.owner;
-          } else if (result.items.length === 0) {
+          } else if (result.items.length === 0 && !resource.meta.owner) {
             let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
             ownerAttributes.push(
               {
@@ -2104,7 +2108,7 @@ export class RoleService extends ServiceBase {
         if (result.items.length === 1) {
           let item = result.items[0];
           resource.meta.owner = item.meta.owner;
-        } else if (result.items.length === 0) {
+        } else if (result.items.length === 0 && !resource.meta.owner) {
           let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
           ownerAttributes.push(
             {
