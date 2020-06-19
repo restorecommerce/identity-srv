@@ -111,35 +111,10 @@ export const getSubjectFromRedis = async (call: any, service: UserService | Role
           resolve(subject);
         }
         // when not set in redis use default_scope as hrScope
-        if ((err || (!err && !response)) && (service as UserService).find) {
-          // disable authorization to read data
-          service.disableAC();
-          const result = await (service as UserService).find({ request: { id: subject.id } });
-          // enable / resotre authorization back
-          service.enableAC();
-          if (result.data && result.data.items) {
-            let data = result.data.items[0];
-            if (!subject.role_associations) {
-              subject.role_associations = data.role_associations;
-            }
-            if (data.default_scope) {
-              // find the role matching default scope and use the first one
-              // in case of multiple roles with same scope
-              const userRoleAssocs = data.role_associations;
-              let defaultRole;
-              for (let role of userRoleAssocs) {
-                if (role.attributes[1] && role.attributes[1].value &&
-                  role.attributes[1].value === data.default_scope) {
-                  defaultRole = role.role;
-                  break;
-                }
-              }
-              hierarchical_scopes = [{ id: data.default_scope, role: defaultRole }];
-            }
-            subject.hierarchical_scopes = hierarchical_scopes;
-            resolve(subject);
-            return subject;
-          }
+        if (err || (!err && !response)) {
+          subject.hierarchical_scopes = [];
+          resolve(subject);
+          return subject;
         }
       });
     });
