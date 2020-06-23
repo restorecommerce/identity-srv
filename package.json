@@ -24,7 +24,7 @@
     "@restorecommerce/kafka-client": "^0.1.9",
     "@restorecommerce/logger": "^0.1.16",
     "@restorecommerce/protos": "https://github.com/restorecommerce/protos#protos-acs",
-    "@restorecommerce/resource-base-interface": "^0.0.2",
+    "@restorecommerce/resource-base-interface": "^0.0.3",
     "@restorecommerce/service-config": "^0.1.6",
     "bcryptjs": "^2.4.3",
     "cross-env": "^7.0.2",
