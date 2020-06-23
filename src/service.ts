@@ -187,7 +187,7 @@ export class UserService extends ServiceBase {
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
     if (acsResponse.decision === Decision.PERMIT) {
       const logger = this.logger;
@@ -240,7 +240,7 @@ export class UserService extends ServiceBase {
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, '401');
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -271,7 +271,7 @@ export class UserService extends ServiceBase {
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -631,7 +631,7 @@ export class UserService extends ServiceBase {
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -738,7 +738,7 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -807,7 +807,7 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -902,7 +902,7 @@ export class UserService extends ServiceBase {
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1008,7 +1008,7 @@ export class UserService extends ServiceBase {
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1055,7 +1055,7 @@ export class UserService extends ServiceBase {
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1111,7 +1111,7 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1238,7 +1238,7 @@ export class UserService extends ServiceBase {
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1274,11 +1274,18 @@ export class UserService extends ServiceBase {
     const request = call.request;
     const logger = this.logger;
     let userIDs = request.ids;
-    let resources = {};
+    let resources = [];
     let subject = await getSubjectFromRedis(call, this);
     if (userIDs) {
+      if (_.isArray(userIDs)) {
+        for (let id of userIDs) {
+          resources.push({ id });
+        }
+      } else {
+        resources = [{ id: userIDs }];
+      }
       Object.assign(resources, { id: userIDs });
-      await this.createMetadata({ id: userIDs }, AuthZAction.DELETE, subject);
+      await this.createMetadata(resources, AuthZAction.DELETE, subject);
     }
     if (request.collection) {
       Object.assign(resources, { collection: request.collection });
@@ -1292,7 +1299,7 @@ export class UserService extends ServiceBase {
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1347,7 +1354,7 @@ export class UserService extends ServiceBase {
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1849,7 +1856,7 @@ export class RoleService extends ServiceBase {
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1891,7 +1898,7 @@ export class RoleService extends ServiceBase {
       throw err;
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1924,7 +1931,7 @@ export class RoleService extends ServiceBase {
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1966,7 +1973,7 @@ export class RoleService extends ServiceBase {
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -2003,7 +2010,7 @@ export class RoleService extends ServiceBase {
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
