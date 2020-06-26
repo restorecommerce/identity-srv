@@ -99,7 +99,7 @@ export const getSubjectFromRedis = async (call: any, service: UserService | Role
     subject = {};
   }
   let api_key = call.request.api_key;
-  if (subject && subject.id && !subject.hierarchical_scopes) {
+  if (subject && subject.id && _.isEmpty(subject.hierarchical_scopes)) {
     let redisKey = `cache:${subject.id}:subject`;
     // update ctx with HR scope from redis
     subject = await new Promise((resolve, reject) => {
