@@ -15,10 +15,12 @@ const Events = kafkaClient.Events;
 /*
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
  */
+
 let cfg: any;
 let worker: Worker;
 let client;
 let logger;
+
 // For event listeners
 let events;
 let topic: Topic;
@@ -59,7 +61,7 @@ interface serverRule {
   method: string,
   input: any,
   output: any
-};
+}
 
 const permitRule = {
   id: 'permit_rule_id',
@@ -125,6 +127,7 @@ const stopGrpcMockServer = async () => {
 };
 
 describe('testing identity-srv', () => {
+
   before(async function startServer(): Promise<void> {
     await start();
     // disable authorization
@@ -132,14 +135,12 @@ describe('testing identity-srv', () => {
     cfg.set('authorization:enforce', false);
   });
 
-
   after(async function stopServer(): Promise<void> {
     await worker.stop();
   });
 
   describe('testing Role service', () => {
     describe('with test client', () => {
-
       before(async function connectRoleService(): Promise<void> {
         roleService = await connect('client:service-role', 'role.resource');
       });
@@ -190,7 +191,7 @@ describe('testing identity-srv', () => {
       before(async function connectUserService(): Promise<void> {
         userService = await connect('client:service-user', 'user.resource');
         user = {
-          name: 'test.user1',
+          name: 'Test123_.-äöüÄÖÜß1', // this user is used in the next tests
           first_name: 'test',
           last_name: 'user',
           password: 'notsecure',
@@ -234,6 +235,7 @@ describe('testing identity-srv', () => {
           getResult.data.items[0].should.deepEqual(data);
           await topic.removeListener('registered', listener);
         });
+
         it('should create guest User', async function registerUserAgain(): Promise<void> {
           const guest_user = {
             id: 'guest_id',
@@ -255,6 +257,7 @@ describe('testing identity-srv', () => {
           result.data.guest.should.equal(true);
           await userService.unregister({ id: 'guest_id' });
         });
+
         it('should throw an error when registering same user', async function registerUserAgain(): Promise<void> {
           const result = await (userService.register(user));
           should.exist(result);
@@ -262,15 +265,42 @@ describe('testing identity-srv', () => {
           should.exist(result.error);
           result.error.name.should.equal('AlreadyExists');
         });
+
+        // Test creating a user with multiple invalid username inputs
         it('should not create a user with an invalid username format', async function registerUser(): Promise<void> {
+          // Test cases:
+          // 1. Should error if it does not start with one of the
+          // allowed letters: [a-zA-ZäöüÄÖÜß]
+          // 2. Should error if the string has 2 or more consecutive
+          // characters like for example: --, __ or ..
+          // 3. Should error if it contains other characters than the
+          // allowed characters in ranges a-z, A-Z, 0-9,
+          // german characters äöüÄÖÜß and _.-
+          // 4. Should error if the minimum or the maximum length is not met
+          // (8-20 characters)
+          let userNameList: string[] = [
+            '_Test', '-Test', '.Test', '2Test', '!Test', '?Test', '#Test', 'Test User', // 1
+            '__Test','--Test', '..Test', '___Test', '---Test', '...Test', // 2
+            'Test__', 'Test--', 'Test..', 'Test___', 'Test---', 'Test...',
+            'Test__test', 'Test--test', 'Test..test', 'Test___test',
+            'Test---test', 'Test...test',
+            'Test!', 'Test?', 'Test/', 'Test\\', 'Test,.;', // 3
+            'A123', 'A1234567891011121314151617181920' // 4
+          ];
+          const testInvalidUser = async (invalidUser: any) => {
+            const result = await userService.register(invalidUser);
+            should.exist(result);
+            should.not.exist(result.data);
+            should.exist(result.error);
+            result.error.name.should.equal('InvalidArgument');
+          };
           const invalidUser = _.cloneDeep(user);
-          invalidUser.name = 'Test User';
-          const result = await userService.register(invalidUser);
-          should.exist(result);
-          should.not.exist(result.data);
-          should.exist(result.error);
-          result.error.name.should.equal('InvalidArgument');
+          for (let user of userNameList) {
+            invalidUser.name = user;
+            await testInvalidUser(invalidUser);
+          }
         });
+
         it('should not create a user with no first or last name', async function registerUser(): Promise<void> {
           const invalidUser = _.cloneDeep(user);
           delete invalidUser.first_name;
@@ -281,6 +311,7 @@ describe('testing identity-srv', () => {
           result.error.name.should.equal('InvalidArgument');
         });
       });
+
       describe('calling createUsers', function createUser(): void {
         const testuser2: any = {
           id: 'testuser2',
@@ -294,12 +325,14 @@ describe('testing identity-srv', () => {
             attributes: []
           }]
         };
+
         it('should not create a user with empty password', async function createUser(): Promise<void> {
           const result = await userService.create({ items: [testuser2] });
           should.exist(result.error);
           result.error.name.should.equal('InvalidArgument');
           result.error.details.should.equal('3 INVALID_ARGUMENT: argument password is empty');
         });
+
         it('should not create a user with empty email', async function createUser(): Promise<void> {
           // append password, but no email
           Object.assign(testuser2, { password: 'notsecure' });
@@ -308,6 +341,7 @@ describe('testing identity-srv', () => {
           result.error.name.should.equal('InvalidArgument');
           result.error.details.should.equal('3 INVALID_ARGUMENT: argument email is empty');
         });
+
         it('should not create a user with empty name', async function createUser(): Promise<void> {
           // append email, but no name
           Object.assign(testuser2, { email: 'test2@ms.restorecommerce.io' });
@@ -316,6 +350,7 @@ describe('testing identity-srv', () => {
           result.error.name.should.equal('InvalidArgument');
           result.error.details.should.equal('3 INVALID_ARGUMENT: argument name is empty');
         });
+
         it('should create a user and unregister it', async function createUser(): Promise<void> {
           // append name
           Object.assign(testuser2, { name: 'test.user2' });
@@ -326,6 +361,7 @@ describe('testing identity-srv', () => {
           result.data.items[0].id.should.equal('testuser2');
           await userService.unregister({ id: 'testuser2' });
         });
+
         it('should invite a user and confirm User Invitation', async function inviteUser(): Promise<void> {
           Object.assign(testuser2, { invite: true });
           const result = await userService.create({ items: [testuser2] });
@@ -343,6 +379,7 @@ describe('testing identity-srv', () => {
           await userService.unregister({ id: 'testuser2' });
         });
       });
+
       describe('calling find', function findUser(): void {
         it('should return a user', async function findUser(): Promise<void> {
           const result = await (userService.find({
@@ -354,6 +391,7 @@ describe('testing identity-srv', () => {
           should.exist(result.data.items);
         });
       });
+
       describe('find by role', function findUserByRole(): void {
         it('should return a user', async function findUser(): Promise<void> {
           const result = await (userService.findByRole({
@@ -379,6 +417,7 @@ describe('testing identity-srv', () => {
           result.error.message.should.containEql('not found');
           result.error.details.should.containEql('user not found');
         });
+
         it('should return an obfuscated error for invalid user identifier', async function login(): Promise<void> {
           cfg.set('obfuscateAuthNErrorReason', true);
           const result = await (userService.login({
@@ -394,6 +433,7 @@ describe('testing identity-srv', () => {
           result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
           cfg.set('obfuscateAuthNErrorReason', false);
         });
+
         it('without activation should throw an error that user is inactive',
           async function login(): Promise<void> {
             const result = await (userService.login({
@@ -408,6 +448,7 @@ describe('testing identity-srv', () => {
             should.exist(result.error.details);
             result.error.details.should.equal('9 FAILED_PRECONDITION: user is inactive');
           });
+
         it('without activation should throw an error that user not authenticated' +
         ' when error message is obfuscated', async function login(): Promise<void> {
           cfg.set('obfuscateAuthNErrorReason', true);
@@ -424,6 +465,7 @@ describe('testing identity-srv', () => {
           result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
           cfg.set('obfuscateAuthNErrorReason', false);
         });
+
         it('should activate the user', async function activateUser(): Promise<void> {
           const offset = await topic.$offset(-1);
           const listener = function listener(message: any, context: any): void {
@@ -456,6 +498,7 @@ describe('testing identity-srv', () => {
           result.data.items[0].active.should.be.true();
           result.data.items[0].activation_code.should.be.empty();
         });
+
         it('should return verify password and return the user', async function login(): Promise<void> {
           const result = await (userService.login({
             identifier: user.name,
@@ -471,6 +514,7 @@ describe('testing identity-srv', () => {
           const userDBDoc = compareResult.data.items[0];
           result.data.should.deepEqual(userDBDoc);
         });
+
         it('should return an obfuscated error in case the passwords don`t match', async function login(): Promise<void> {
           cfg.set('obfuscateAuthNErrorReason', true);
           const result = await (userService.login({
@@ -486,6 +530,7 @@ describe('testing identity-srv', () => {
           result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
           cfg.set('obfuscateAuthNErrorReason', false);
         });
+
         it('should return concise error in case the passwords don`t match', async function login(): Promise<void> {
           const result = await (userService.login({
             identifier: user.name,
@@ -499,6 +544,7 @@ describe('testing identity-srv', () => {
           result.error.details.should.containEql('password does not match');
         });
       });
+
       describe('calling changePassword', function changePassword(): void {
         it('should change the password', async function changePassword(): Promise<void> {
           const offset = await topic.$offset(-1);
@@ -591,6 +637,7 @@ describe('testing identity-srv', () => {
           upUser.password_hash.should.not.equal(pwHashA);
         });
       });
+
       describe('calling changeEmail', function changeEmailId(): void {
         it('should request the email change and persist it without overriding the old email', async function requestEmailChange(): Promise<void> {
           this.timeout(3000);
@@ -673,6 +720,7 @@ describe('testing identity-srv', () => {
           dbUser.activation_code.should.be.empty();
         });
       });
+
       describe('calling update', function changeEmailId(): void {
         it('should update generic fields', async function changeEmailId(): Promise<void> {
           this.timeout(3000);
@@ -688,7 +736,7 @@ describe('testing identity-srv', () => {
           const offset = await topic.$offset(-1);
           const result = await userService.update([{
             id: testUserID,
-            name: 'test.user1', // existing user name
+            name: 'Test123_.-äöüÄÖÜß1', // existing user
             first_name: 'John',
             meta
           }]);
@@ -702,7 +750,7 @@ describe('testing identity-srv', () => {
 
           let result = await userService.update([{
             id: testUserID,
-            name: 'test.user1',
+            name: 'Test123_.-äöüÄÖÜß1', // existing user
             email: 'update@restorecommerce.io',
             password: 'notsecure2',
             first_name: 'John',
@@ -730,6 +778,7 @@ describe('testing identity-srv', () => {
             result.error.details.should.equal('3 INVALID_ARGUMENT: User name field cannot be updated');
           });
       });
+
       describe('calling unregister', function unregister(): void {
         it('should remove the user', async function unregister(): Promise<void> {
           await userService.unregister({
@@ -749,8 +798,9 @@ describe('testing identity-srv', () => {
           should.equal(result.error.message, 'not found');
         });
       });
+
       describe('calling sendInvitationEmail', function sendInvitationEmail(): void {
-        let sampleUser, invitingUser
+        let sampleUser, invitingUser;
         before(async () => {
           sampleUser = {
             id: '345testuser2id',
@@ -779,6 +829,7 @@ describe('testing identity-srv', () => {
           await userService.create({ items: [sampleUser, invitingUser] });
           notificationService = await connect('client:service-user', 'rendering');
         });
+
         it('should emit a renderRequest for sending the email', async function sendInvitationEmail(): Promise<void> {
 
           const listener = function listener(message: any, context: any): void {
@@ -792,12 +843,11 @@ describe('testing identity-srv', () => {
 
           should.exist(result);
           should.not.exist(result.error);
-    
+
           await topic.removeListener('renderRequest', listener);
         });
       });
 
-      
       describe('calling upsert', function upsert(): void {
         it('should upsert (create) user', async function upsert(): Promise<void> {
           let result = await userService.upsert([{
@@ -814,6 +864,7 @@ describe('testing identity-srv', () => {
           result.data.items[0].email.should.equal('upsert@restorecommerce.io');
           result.data.items[0].password.should.equal('');
         });
+
         it('should upsert (update) user and delete user collection', async function upsert(): Promise<void> {
           let result = await userService.upsert([{
             id: upserUserID,
@@ -891,6 +942,7 @@ describe('testing identity-srv', () => {
             }
           ]
         };
+
         it('should allow to create a User with valid role and valid valid HR scope', async () => {
           // enable and enforce authorization
           cfg.set('authorization:enabled', true);
@@ -906,6 +958,7 @@ describe('testing identity-srv', () => {
           result.data.items[0].id.should.equal('testuser');
           await userService.unregister({ id: 'testuser' });
         });
+
         it('should not allow to create a User with invalid role existing in system', async () => {
           testUser.role_associations[0].role = 'invalid_role';
           const result = await userService.create({ items: testUser, auth_context });
@@ -916,6 +969,7 @@ describe('testing identity-srv', () => {
           should.exist(result.error.details);
           result.error.details.should.equal('3 INVALID_ARGUMENT: One or more of the target role IDs are invalid invalid_role, no such role exist in system');
         });
+
         it('should not allow to create a User with role assocation which is not assignable', async () => {
           testUser.role_associations[0].role = 'super-admin-r-id';
           const result = await userService.create({ items: testUser, auth_context });
@@ -926,6 +980,7 @@ describe('testing identity-srv', () => {
           should.exist(result.error.details);
           result.error.details.should.equal('3 INVALID_ARGUMENT: The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id does not have permissions');
         });
+
         it('should throw an error when hierarchical do not match creator role', async () => {
           testUser.role_associations[0].role = 'user-r-id';
           // auth_context not containing valid creator role (admin-r-id)
@@ -952,6 +1007,7 @@ describe('testing identity-srv', () => {
           should.exist(result.error.details);
           result.error.details.should.equal('3 INVALID_ARGUMENT: No Hierarchical Scopes could be found');
         });
+
         it('should not allow to create a User with role assocation with invalid hierarchical_scope', async () => {
           testUser.role_associations[0].role = 'user-r-id';
           // auth_context missing orgC in HR scope
