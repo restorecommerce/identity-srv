@@ -1,5 +1,5 @@
 // INDEX
-* xref:index.adoc[Identity-srv]
+* xref:index.adoc[Identity Service]
 
 // FEATURES
 * xref:index.adoc#features[Features]
