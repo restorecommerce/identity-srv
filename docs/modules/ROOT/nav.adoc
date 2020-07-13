@@ -1,36 +1,33 @@
+// INDEX
 * xref:index.adoc[identity-srv]
 
+// FEATURES
+* xref:index.adoc#features[Features]
+
+// CONFIGURATION
 * xref:index.adoc#configuration[Configuration]
 
-* xref:index.adoc#grpc-interface[gRPC Interface]
+// API
+* xref:index.adoc#API[API]
+** xref:index.adoc#api_user[User]
+*** xref:index.adoc#api_user_crud[CRUD Operations]
+*** xref:index.adoc#api_user_create[`Create`]
+*** xref:index.adoc#api_user_register[`Register`]
+*** xref:index.adoc#api_user_activate[`Activate`]
+*** xref:index.adoc#api_user_change-password[`ChangePassword`]
+*** xref:index.adoc#api_user_request-password-change[`RequestPasswordChange`]
+*** xref:index.adoc#api_user_confirm-password-change[`ConfirmPasswordChange`]
+*** xref:index.adoc#api_user_request-email-change[`RequestEmailChange`]
+*** xref:index.adoc#api_user_confirm-email-change[`ConfirmEmailChange`]
+*** xref:index.adoc#api_user_confirm-user-invitation[`ConfirmUserInvitation`]
+*** xref:index.adoc#api_user_login[`Login`]
+*** xref:index.adoc#api_user_unregister[`Unregister`]
+*** xref:index.adoc#api_user_find[`Find`]
+*** xref:index.adoc#api_user_find-by-role[`FindByRole`]
+** xref:index.adoc#api_role[Role]
+*** xref:index.adoc#api_role_crud[CRUD Operations]
 
-** xref:index.adoc#grpc-interface_user[User]
-
-*** xref:index.adoc#grpc-interface_user_crud[CRUD Operations]
-*** xref:index.adoc#grpc-interface_user_create[`Create`]
-*** xref:index.adoc#grpc-interface_user_register[`Register`]
-*** xref:index.adoc#grpc-interface_user_activate[`Activate`]
-*** xref:index.adoc#grpc-interface_user_change-password[`ChangePassword`]
-*** xref:index.adoc#grpc-interface_user_request-password-change[`RequestPasswordChange`]
-*** xref:index.adoc#grpc-interface_user_confirm-password-change[`ConfirmPasswordChange`]
-*** xref:index.adoc#grpc-interface_user_request-email-change[`RequestEmailChange`]
-*** xref:index.adoc#grpc-interface_user_confirm-email-change[`ConfirmEmailChange`]
-*** xref:index.adoc#grpc-interface_user_confirm-user-invitation[`ConfirmUserInvitation`]
-*** xref:index.adoc#grpc-interface_user_login[`Login`]
-*** xref:index.adoc#grpc-interface_user_unregister[`Unregister`]
-*** xref:index.adoc#grpc-interface_user_find[`Find`]
-*** xref:index.adoc#grpc-interface_user_find-by-role[`FindByRole`]
-
-** xref:index.adoc#grpc-interface_role[Role]
-
-*** xref:index.adoc#grpc-interface_role_crud[CRUD Operations]
-
-* xref:index.adoc#kafka-events[Kafka Events]
-* xref:index.adoc#chassis-service[Chassis Service]
-* xref:index.adoc#development[Development]
-
-** xref:index.adoc#development_tests[Tests]
-
-* xref:index.adoc#running-docker[Running as Docker Container]
-* xref:index.adoc#running-local[Running Locally]
-
+// EVENTS
+* xref:index.adoc#events[Events]
+** xref:index.adoc#emitted-events[Emitted]
+** xref:index.adoc#subscribed-events[Subscribed]
