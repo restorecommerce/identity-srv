@@ -636,15 +636,15 @@ export class UserService extends ServiceBase {
   /**
     validUsername uses a Regex with the following configuration:
     1. [a-zA-ZäöüÄÖÜß] = First allowed character
-    2. (?!.*-.*-) = return false if -- is detected
-    3. (?!.*_.*_) = return false if __ is detected
-    4. (?!.*\\..*\\.) = return false if __ is detected
+    2. (?!.*--) = return false if -- is detected
+    3. (?!.*__) = return false if __ is detected
+    4. (?!.*\\.\\.) = return false if __ is detected
     5. [a-zA-Z0-9äöüÄÖÜß_.-] = Allowed characters in ranges a-z, A-Z, 0-9,
     german characters äöüÄÖÜß and _.-
     6. {${minLength},${maxLength}} = must respect the minimum and maximum length
    */
   private validUsername(username: string, minLength: number, maxLength: number): boolean {
-    const regex = `^[a-zA-ZäöüÄÖÜß](?!.*-.*-)(?!.*_.*_)(?!.*\\..*\\.)[a-zA-Z0-9äöüÄÖÜß_.-]{${minLength},${maxLength}}$`;
+    const regex = `^[a-zA-ZäöüÄÖÜß](?!.*--)(?!.*__)(?!.*\\.\\.)[a-zA-Z0-9äöüÄÖÜß_.-]{${minLength},${maxLength}}$`;
     const match = username.match(new RegExp(regex));
     return !!match && match.length > 0;
   }

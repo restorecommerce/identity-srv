@@ -285,7 +285,7 @@ describe('testing identity-srv', () => {
             'Test__test', 'Test--test', 'Test..test', 'Test___test',
             'Test---test', 'Test...test',
             'Test!', 'Test?', 'Test/', 'Test\\', 'Test,.;', // 3
-            'A123', 'A1234567891011121314151617181920' // 4
+            'A123', 'A1234567891011121314151617181920', 'schule_303256__user' // 4
           ];
           const testInvalidUser = async (invalidUser: any) => {
             const result = await userService.register(invalidUser);
