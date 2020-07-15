@@ -288,6 +288,9 @@ export class UserService extends ServiceBase {
     for (let user of usersList) {
       let userRoleAssocs = user.role_associations;
       let targetUserRoleIds = [];
+      if (userRoleAssocs.length === 0) {
+        continue;
+      }
       for (let roleAssoc of userRoleAssocs) {
         targetUserRoleIds.push(roleAssoc.role);
       }
@@ -339,7 +342,9 @@ export class UserService extends ServiceBase {
         throw new errors.InvalidArgument('No Hierarchical Scopes could be found');
       }
       for (let user of usersList) {
-        this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, context);
+        if (user.role_associations && user.role_associations.length > 0) {
+          this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, context);
+        }
       }
     }
   }
@@ -1510,14 +1515,14 @@ export class UserService extends ServiceBase {
     const { user_id, invited_by_user_id } = data;
     let user, invitedByUser;
 
-    const users = await super.read({ request: { filter: toStruct({id: { $eq: user_id }}) } });
+    const users = await super.read({ request: { filter: toStruct({ id: { $eq: user_id } }) } });
     if (users.total_count === 1) {
       user = users.items[0];
     } else {
       throw new errors.NotFound(`user with id ${user_id} not found`);
     }
 
-    const invitedByUsers = await super.read({ request: { filter: toStruct({id: { $eq: invited_by_user_id }}) } });
+    const invitedByUsers = await super.read({ request: { filter: toStruct({ id: { $eq: invited_by_user_id } }) } });
     if (invitedByUsers.total_count === 1) {
       invitedByUser = invitedByUsers.items[0];
     } else {
@@ -1526,7 +1531,7 @@ export class UserService extends ServiceBase {
 
     return {
       name: user.name,
-      email:user.email,
+      email: user.email,
       last_name: user.last_name,
       first_name: user.first_name,
       activation_code: user.activation_code,
