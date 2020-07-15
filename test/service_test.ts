@@ -743,14 +743,9 @@ describe('testing identity-srv', () => {
           const offset = await topic.$offset(-1);
           const result = await userService.update([{
             id: testUserID,
-<<<<<<< HEAD
-            name: 'test.user1', // existing user name
-            first_name: 'John'
-=======
             name: 'Test123_.-äöüÄÖÜß1', // existing user
             first_name: 'John',
             meta
->>>>>>> master
           }]);
           await topic.$wait(offset);
           should.exist(result);
