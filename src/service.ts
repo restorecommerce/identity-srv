@@ -342,6 +342,9 @@ export class UserService extends ServiceBase {
     for (let user of usersList) {
       let userRoleAssocs = user.role_associations;
       let targetUserRoleIds = [];
+      if (userRoleAssocs.length === 0) {
+        continue;
+      }
       for (let roleAssoc of userRoleAssocs) {
         targetUserRoleIds.push(roleAssoc.role);
       }
@@ -394,7 +397,9 @@ export class UserService extends ServiceBase {
         throw new errors.InvalidArgument('No Hierarchical Scopes could be found');
       }
       for (let user of usersList) {
-        this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, subject);
+        if (user.role_associations && user.role_associations.length > 0) {
+          this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, subject);
+        }
       }
     }
   }
@@ -507,8 +512,12 @@ export class UserService extends ServiceBase {
     const maxLength = serviceCfg.maxUsernameLength;
 
     if (!this.validUsername(user.name, minLength, maxLength)) {
-      throw new errors.InvalidArgument(`the user name is invalid - it should have a length between ${minLength} and ${maxLength}
-        and no capital characters, it can contain alphanumeric characters or any character of the following: ?!.*-_`);
+      throw new errors.InvalidArgument(
+        `${user.name} is invalid. The username should start with a letter, it can contain
+        alphanumeric characters, german characters or any character of the following: _.-
+        It must not contain character repetitions like __ or .. or --
+        It should have a length between ${minLength} and ${maxLength} characters`
+      );
     }
 
     if (_.isEmpty(user.first_name) || _.isEmpty(user.last_name)) {
@@ -710,8 +719,18 @@ export class UserService extends ServiceBase {
     return uuid.v4().replace(/-/g, '');
   }
 
+  /**
+    validUsername uses a Regex with the following configuration:
+    1. [a-zA-ZäöüÄÖÜß] = First allowed character
+    2. (?!.*--) = return false if -- is detected
+    3. (?!.*__) = return false if __ is detected
+    4. (?!.*\\.\\.) = return false if __ is detected
+    5. [a-zA-Z0-9äöüÄÖÜß_.-] = Allowed characters in ranges a-z, A-Z, 0-9,
+    german characters äöüÄÖÜß and _.-
+    6. {${minLength},${maxLength}} = must respect the minimum and maximum length
+   */
   private validUsername(username: string, minLength: number, maxLength: number): boolean {
-    const regex = `^(?!.*\\.\\.)[a-z0-9_.-]{${minLength},${maxLength}}$`;
+    const regex = `^[a-zA-ZäöüÄÖÜß](?!.*--)(?!.*__)(?!.*\\.\\.)[a-zA-Z0-9äöüÄÖÜß_.-]{${minLength - 1},${maxLength}}$`;
     const match = username.match(new RegExp(regex));
     return !!match && match.length > 0;
   }
@@ -1745,6 +1764,7 @@ export class UserService extends ServiceBase {
     return user;
   }
 
+<<<<<<< HEAD
   /**
    * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
    * @param reaources list of resources
@@ -1818,6 +1838,45 @@ export class UserService extends ServiceBase {
       }
     }
     return resources;
+=======
+  private async makeUserForInvitationData(data): Promise<any> {
+    const { user_id, invited_by_user_id } = data;
+    let user, invitedByUser;
+
+    const users = await super.read({ request: { filter: toStruct({ id: { $eq: user_id } }) } });
+    if (users.total_count === 1) {
+      user = users.items[0];
+    } else {
+      throw new errors.NotFound(`user with id ${user_id} not found`);
+    }
+
+    const invitedByUsers = await super.read({ request: { filter: toStruct({ id: { $eq: invited_by_user_id } }) } });
+    if (invitedByUsers.total_count === 1) {
+      invitedByUser = invitedByUsers.items[0];
+    } else {
+      throw new errors.NotFound(`user with id ${invited_by_user_id} not found`);
+    }
+
+    return {
+      name: user.name,
+      email: user.email,
+      last_name: user.last_name,
+      first_name: user.first_name,
+      activation_code: user.activation_code,
+      invited_by_user_name: invitedByUser.name,
+      invited_by_user_first_name: invitedByUser.first_name,
+      invited_by_user_last_name: invitedByUser.last_name
+    };
+  }
+
+  async sendInvitationEmail(call: any, context?: any): Promise<any> {
+    const user = call.request;
+
+    const userForInvitation = await this.makeUserForInvitationData(user);
+    const renderRequest = this.makeInvitationEmailData(userForInvitation);
+    await this.topics.rendering.emit('renderRequest', renderRequest);
+    return {};
+>>>>>>> master
   }
 }
 

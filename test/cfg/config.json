@@ -104,6 +104,7 @@
         "confirmUserInvitation": {},
         "requestPasswordChange": {},
         "confirmPasswordChange": {},
+        "sendInvitationEmail": {},
         "find": {},
         "register": {},
         "unregister": {},
@@ -483,6 +484,11 @@
           ]
         },
         "confirmPasswordChange": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "sendInvitationEmail": {
           "transport": [
             "grpcIdentity"
           ]
