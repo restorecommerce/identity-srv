@@ -1764,7 +1764,6 @@ export class UserService extends ServiceBase {
     return user;
   }
 
-<<<<<<< HEAD
   /**
    * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
    * @param reaources list of resources
@@ -1838,7 +1837,8 @@ export class UserService extends ServiceBase {
       }
     }
     return resources;
-=======
+  }
+
   private async makeUserForInvitationData(data): Promise<any> {
     const { user_id, invited_by_user_id } = data;
     let user, invitedByUser;
@@ -1876,7 +1876,6 @@ export class UserService extends ServiceBase {
     const renderRequest = this.makeInvitationEmailData(userForInvitation);
     await this.topics.rendering.emit('renderRequest', renderRequest);
     return {};
->>>>>>> master
   }
 }
 
