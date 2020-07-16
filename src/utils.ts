@@ -119,7 +119,7 @@ export const getSubjectFromRedis = async (call: any, service: UserService | Role
       });
     });
   } else if (api_key) {
-    subject = { api_key };
+    subject = api_key;
   }
   return subject;
 };
