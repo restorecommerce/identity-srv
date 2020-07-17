@@ -353,7 +353,7 @@ describe('testing identity-srv', () => {
 
         it('should create a user and unregister it', async function createUser(): Promise<void> {
           // append name
-          Object.assign(testuser2, { name: 'test.user2' });
+          Object.assign(testuser2, { name: 'test.user2@n-fuse.co' });
           const result = await userService.create({ items: [testuser2] });
           should.exist(result);
           should.exist(result.data);

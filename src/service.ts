@@ -459,7 +459,7 @@ export class UserService extends ServiceBase {
     if (!this.validUsername(user.name, minLength, maxLength)) {
       throw new errors.InvalidArgument(
         `${user.name} is invalid. The username should start with a letter, it can contain
-        alphanumeric characters, german characters or any character of the following: _.-
+        alphanumeric characters, german characters or any of the following: @_.-
         It must not contain character repetitions like __ or .. or --
         It should have a length between ${minLength} and ${maxLength} characters`
       );
@@ -644,12 +644,12 @@ export class UserService extends ServiceBase {
     2. (?!.*--) = return false if -- is detected
     3. (?!.*__) = return false if __ is detected
     4. (?!.*\\.\\.) = return false if __ is detected
-    5. [a-zA-Z0-9äöüÄÖÜß_.-] = Allowed characters in ranges a-z, A-Z, 0-9,
-    german characters äöüÄÖÜß and _.-
+    5. [a-zA-Z0-9äöüÄÖÜß@_.-] = Allowed characters in ranges a-z, A-Z, 0-9,
+    german characters äöüÄÖÜß and @_.-
     6. {${minLength},${maxLength}} = must respect the minimum and maximum length
    */
   private validUsername(username: string, minLength: number, maxLength: number): boolean {
-    const regex = `^[a-zA-ZäöüÄÖÜß](?!.*--)(?!.*__)(?!.*\\.\\.)[a-zA-Z0-9äöüÄÖÜß_.-]{${minLength - 1},${maxLength}}$`;
+    const regex = `^[a-zA-ZäöüÄÖÜß](?!.*--)(?!.*__)(?!.*\\.\\.)[a-zA-Z0-9äöüÄÖÜß@_.-]{${minLength - 1},${maxLength}}$`;
     const match = username.match(new RegExp(regex));
     return !!match && match.length > 0;
   }
