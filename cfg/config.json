@@ -322,6 +322,20 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.notification.Notification"
       },
+      "setApiKeyCommand": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
+      },
+      "setApiKeyResponse": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
+      },
       "topics": {
         "user.resource": {
           "topic": "io.restorecommerce.users.resource"
@@ -336,7 +350,8 @@
             "restoreCommand",
             "resetCommand",
             "versionCommand",
-            "configUpdateCommand"
+            "configUpdateCommand",
+            "setApiKeyCommand"
           ]
         },
         "rendering": {

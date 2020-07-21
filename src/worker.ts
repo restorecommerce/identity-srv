@@ -4,7 +4,7 @@ import { Events } from '@restorecommerce/kafka-client';
 import { Logger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { UserService, RoleService } from './service';
-import { ACSAuthZ, UnAuthZ, initAuthZ } from '@restorecommerce/acs-client';
+import { ACSAuthZ, initAuthZ, updateConfig } from '@restorecommerce/acs-client';
 import { RedisClient, createClient } from 'redis';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
@@ -60,6 +60,18 @@ class UserCommandInterface extends chassis.CommandInterface {
         return {};
       },
     };
+  }
+
+  async setApiKey(payload: any): Promise<any> {
+    const commandResponse = await super.setApiKey(payload);
+    updateConfig(this.config);
+    return commandResponse;
+  }
+
+  async configUpdate(payload: any): Promise<any> {
+    const commandResponse = await super.configUpdate(payload);
+    updateConfig(this.config);
+    return commandResponse;
   }
 }
 
@@ -131,7 +143,7 @@ export class Worker {
 
     let authZ = await initAuthZ(this.cfg) as ACSAuthZ;
     this.authZ = authZ;
-    const cis = new UserCommandInterface(server, this.cfg.get(), logger, events);
+    const cis = new UserCommandInterface(server, this.cfg, logger, events);
 
     const identityServiceEventListener = async (msg: any,
       context: any, config: any, eventName: string) => {
