@@ -29,6 +29,8 @@ FROM base as deployment
 RUN --mount=type=cache,target=/root/.npm npm ci --only=production
 
 COPY setupTopics.js $APP_HOME/setupTopics.js
+COPY filter_ownership.aql $APP_HOME/filter_ownership.aql
+COPY filter_role_association.aql $APP_HOME/filter_role_association.aql
 COPY cfg $APP_HOME/cfg
 COPY templates $APP_HOME/templates
 COPY --from=build $APP_HOME/lib $APP_HOME/lib
