@@ -287,7 +287,7 @@ describe('testing identity-srv', () => {
           // (8-20 characters)
           let userNameList: string[] = [
             '_Test', '-Test', '.Test', '2Test', '!Test', '?Test', '#Test', 'Test User', // 1
-            '__Test','--Test', '..Test', '___Test', '---Test', '...Test', // 2
+            '__Test', '--Test', '..Test', '___Test', '---Test', '...Test', // 2
             'Test__', 'Test--', 'Test..', 'Test___', 'Test---', 'Test...',
             'Test__test', 'Test--test', 'Test..test', 'Test___test',
             'Test---test', 'Test...test',
@@ -457,21 +457,21 @@ describe('testing identity-srv', () => {
           });
 
         it('without activation should throw an error that user not authenticated' +
-        ' when error message is obfuscated', async function login(): Promise<void> {
-          cfg.set('obfuscateAuthNErrorReason', true);
-          const result = await (userService.login({
-            identifier: user.name,
-            password: user.password,
-          }));
-          should.exist(result);
-          should.not.exist(result.data);
-          should.exist(result.error);
-          should.exist(result.error.name);
-          result.error.name.should.equal('FailedPrecondition');
-          should.exist(result.error.details);
-          result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
-          cfg.set('obfuscateAuthNErrorReason', false);
-        });
+          ' when error message is obfuscated', async function login(): Promise<void> {
+            cfg.set('obfuscateAuthNErrorReason', true);
+            const result = await (userService.login({
+              identifier: user.name,
+              password: user.password,
+            }));
+            should.exist(result);
+            should.not.exist(result.data);
+            should.exist(result.error);
+            should.exist(result.error.name);
+            result.error.name.should.equal('FailedPrecondition');
+            should.exist(result.error.details);
+            result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
+            cfg.set('obfuscateAuthNErrorReason', false);
+          });
 
         it('should activate the user', async function activateUser(): Promise<void> {
           const offset = await topic.$offset(-1);
@@ -843,7 +843,7 @@ describe('testing identity-srv', () => {
 
           const offset = await topic.$offset(0);
           await topic.on('renderRequest', listener);
-          const result = await (userService.sendInvitationEmail({user_id:sampleUser.id, invited_by_user_id: invitingUser.id}));
+          const result = await (userService.sendInvitationEmail({ user_id: sampleUser.id, invited_by_user_id: invitingUser.id }));
           await topic.$wait(offset);
 
           should.exist(result);
@@ -1025,18 +1025,18 @@ describe('testing identity-srv', () => {
               }]
             }
           ];
-          const result = await userService.create({items: testUser, subject});
+          const result = await userService.create({ items: testUser, subject });
           should.not.exist(result.data);
           should.exist(result.error);
           should.exist(result.error.name);
           result.error.name.should.equal('PermissionDenied');
           should.exist(result.error.details);
           result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:user, action:CREATE, target_scope:orgC; the response was DENY');
-          
-           // disable authorization
-           cfg.set('authorization:enabled', false);
-           cfg.set('authorization:enforce', false);
-           updateConfig(cfg);
+
+          // disable authorization
+          cfg.set('authorization:enabled', false);
+          cfg.set('authorization:enforce', false);
+          updateConfig(cfg);
 
           // delete user and roles collection
           await userService.delete({
