@@ -11,6 +11,15 @@ import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-i
 import { Logger } from '@restorecommerce/logger';
 import { PolicySetRQ, ACSAuthZ, UnAuthZ, accessRequest, AuthZAction } from '@restorecommerce/acs-client';
 
+import {
+  validateFirstChar,
+  validateSymbolRepeat,
+  validateAllChar,
+  validateStrLen,
+  validateAtSymbol,
+  validateEmail
+} from './validation';
+
 const errors = chassis.errors;
 
 const password = {
@@ -456,13 +465,13 @@ export class UserService extends ServiceBase {
     const minLength = serviceCfg.minUsernameLength;
     const maxLength = serviceCfg.maxUsernameLength;
 
-    if (!this.validUsername(user.name, minLength, maxLength)) {
-      throw new errors.InvalidArgument(
-        `${user.name} is invalid. The username should start with a letter, it can contain
-        alphanumeric characters, german characters or any of the following: @_.-
-        It must not contain character repetitions like __ or .. or --
-        It should have a length between ${minLength} and ${maxLength} characters`
-      );
+    try {
+      this.validUsername(user.name, minLength, maxLength, logger);
+    } catch (err) {
+      const errorMessage = `Error while validating username: ${user.name}, ` +
+        `error: ${err.name}, message:${err.details}`;
+      logger.error(errorMessage);
+      throw err;
     }
 
     if (_.isEmpty(user.first_name) || _.isEmpty(user.last_name)) {
@@ -638,20 +647,16 @@ export class UserService extends ServiceBase {
     return uuid.v4().replace(/-/g, '');
   }
 
-  /**
-    validUsername uses a Regex with the following configuration:
-    1. [a-zA-ZäöüÄÖÜß] = First allowed character
-    2. (?!.*--) = return false if -- is detected
-    3. (?!.*__) = return false if __ is detected
-    4. (?!.*\\.\\.) = return false if __ is detected
-    5. [a-zA-Z0-9äöüÄÖÜß@_.-] = Allowed characters in ranges a-z, A-Z, 0-9,
-    german characters äöüÄÖÜß and @_.-
-    6. {${minLength},${maxLength}} = must respect the minimum and maximum length
-   */
-  private validUsername(username: string, minLength: number, maxLength: number): boolean {
-    const regex = `^[a-zA-ZäöüÄÖÜß](?!.*--)(?!.*__)(?!.*\\.\\.)[a-zA-Z0-9äöüÄÖÜß@_.-]{${minLength - 1},${maxLength}}$`;
-    const match = username.match(new RegExp(regex));
-    return !!match && match.length > 0;
+  // validUsername validates user names using regular expressions
+  private validUsername(username: string, minLength: number, maxLength: number, logger: Logger) {
+    if (validateAtSymbol(username) == false) {
+      // false means that the username contains "@"
+      validateEmail(username, logger);
+    }
+    validateStrLen(username, minLength, maxLength, logger);
+    validateFirstChar(username, logger);
+    validateAllChar(username, logger);
+    validateSymbolRepeat(username, logger);
   }
 
   /**

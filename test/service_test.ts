@@ -191,7 +191,7 @@ describe('testing identity-srv', () => {
       before(async function connectUserService(): Promise<void> {
         userService = await connect('client:service-user', 'user.resource');
         user = {
-          name: 'Test123_.-äöüÄÖÜß1', // this user is used in the next tests
+          name: 'test.user1', // this user is used in the next tests
           first_name: 'test',
           last_name: 'user',
           password: 'notsecure',
@@ -266,27 +266,17 @@ describe('testing identity-srv', () => {
           result.error.name.should.equal('AlreadyExists');
         });
 
-        // Test creating a user with multiple invalid username inputs
-        it('should not create a user with an invalid username format', async function registerUser(): Promise<void> {
-          // Test cases:
-          // 1. Should error if it does not start with one of the
-          // allowed letters: [a-zA-ZäöüÄÖÜß]
-          // 2. Should error if the string has 2 or more consecutive
-          // characters like for example: --, __ or ..
-          // 3. Should error if it contains other characters than the
-          // allowed characters in ranges a-z, A-Z, 0-9,
-          // german characters äöüÄÖÜß and _.-
-          // 4. Should error if the minimum or the maximum length is not met
-          // (8-20 characters)
+        it('should not create a user with an invalid username format - should test character repetition', async function registerUser(): Promise<void> {
+          // the username should not contain --, __ or ..
           let userNameList: string[] = [
-            '_Test', '-Test', '.Test', '2Test', '!Test', '?Test', '#Test', 'Test User', // 1
-            '__Test','--Test', '..Test', '___Test', '---Test', '...Test', // 2
-            'Test__', 'Test--', 'Test..', 'Test___', 'Test---', 'Test...',
-            'Test__test', 'Test--test', 'Test..test', 'Test___test',
-            'Test---test', 'Test...test',
-            'Test!', 'Test?', 'Test/', 'Test\\', 'Test,.;', // 3
-            'A123', 'A1234567891011121314151617181920', 'schule_303256__user' // 4
+            '__TestUser', '--TestUser', '..TestUser',
+            'Test__User', 'Test--User', 'Test..User',
+            'TestUser__', 'TestUser--', 'TestUser..',
+            '___TestUser', '---TestUser', '...TestUser',
+            'Test___User', 'Test---User', 'Test...User',
+            'TestUser___', 'TestUser---', 'TestUser...',
           ];
+
           const testInvalidUser = async (invalidUser: any) => {
             const result = await userService.register(invalidUser);
             should.exist(result);
@@ -294,6 +284,125 @@ describe('testing identity-srv', () => {
             should.exist(result.error);
             result.error.name.should.equal('InvalidArgument');
           };
+
+          const invalidUser = _.cloneDeep(user);
+          for (let user of userNameList) {
+            invalidUser.name = user;
+            await testInvalidUser(invalidUser);
+          }
+        });
+
+        it('should not create a user with an invalid username format - should test first character', async function registerUser(): Promise<void> {
+          // the username first character should not be one of the following
+          // !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~ or whitespace
+          let userNameList: string[] = [
+            'Test User',
+          ];
+
+          const listOfCharacters = '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ ';
+          for (let character of listOfCharacters) {
+            let userNameStr = character + 'Testuser';
+            userNameList.push(userNameStr);
+          }
+
+          const testInvalidUser = async (invalidUser: any) => {
+            const result = await userService.register(invalidUser);
+            should.exist(result);
+            should.not.exist(result.data);
+            should.exist(result.error);
+            result.error.name.should.equal('InvalidArgument');
+          };
+
+          const invalidUser = _.cloneDeep(user);
+          for (let user of userNameList) {
+            invalidUser.name = user;
+            await testInvalidUser(invalidUser);
+          }
+        });
+
+        it('should not create a user with an invalid username format - should test allowed characters', async function registerUser(): Promise<void> {
+          // the username should not contain any of the following characters:
+          // !"#$%&\'()*+,/:;<=>?[\\]^`{|}~
+          let userNameList: string[] = [];
+
+          const listOfCharacters = '!"#$%&\'()*+,/:;<=>?[\\]^`{|}~ ';
+          for (let character of listOfCharacters) {
+            // character + 'TestUser' condition
+            // is checked in the "first char" unit test
+            let userNameStr_1 = 'TestUser' + character;
+            userNameList.push(userNameStr_1);
+            let userNameStr_2 = 'Test' + character + 'User';
+            userNameList.push(userNameStr_2);
+          }
+
+          const testInvalidUser = async (invalidUser: any) => {
+            const result = await userService.register(invalidUser);
+            should.exist(result);
+            should.not.exist(result.data);
+            should.exist(result.error);
+            result.error.name.should.equal('InvalidArgument');
+          };
+
+          const invalidUser = _.cloneDeep(user);
+          for (let user of userNameList) {
+            invalidUser.name = user;
+            await testInvalidUser(invalidUser);
+          }
+        });
+
+        it('should not create a user with an invalid username format - should test minimum and maximum characters', async function registerUser(): Promise<void> {
+          // the username should contain between 8 and 20 characters
+          let userNameList: string[] = ['test', 'TestQQwpnociqzkUyFOaTWPX'];
+
+          const testInvalidUser = async (invalidUser: any) => {
+            const result = await userService.register(invalidUser);
+            should.exist(result);
+            should.not.exist(result.data);
+            should.exist(result.error);
+            result.error.name.should.equal('InvalidArgument');
+          };
+
+          const invalidUser = _.cloneDeep(user);
+          for (let user of userNameList) {
+            invalidUser.name = user;
+            await testInvalidUser(invalidUser);
+          }
+        });
+
+        it('should not create a user with an invalid username format - should test valid email', async function registerUser(): Promise<void> {
+          // providing list of invalid email addresses
+          let userNameList: string[] = [
+            'invalid:email@example.com',
+            '@somewhere.com',
+            '@@example.com',
+            'a space@example.com',
+            'something@ex..ample.com',
+            'a\b@c',
+            'someone@somewhere.com.',
+            '\'\'test\blah\'\'@example.com',
+            '\'testblah\'@example.com',
+            'test@test.com_',
+            'test@test_com',
+            'test@some:test.com',
+            'F/s/f/a@feo+re.com',
+            'some+long+email+address@some+host-weird-/looking.com',
+            'a @p.com',
+            'a\u0020@p.com',
+            'a\u0009@p.com',
+            'a\u000B@p.com',
+            'a\u000C@p.com',
+            'a\u2003@p.com',
+            'a\u3000@p.com'
+          ];
+
+          const testInvalidUser = async (invalidUser: any) => {
+            const result = await userService.register(invalidUser);
+            should.exist(result);
+            should.not.exist(result.data);
+            should.exist(result.error);
+            result.error.name.should.equal('InvalidArgument');
+          };
+
           const invalidUser = _.cloneDeep(user);
           for (let user of userNameList) {
             invalidUser.name = user;
@@ -351,9 +460,63 @@ describe('testing identity-srv', () => {
           result.error.details.should.equal('3 INVALID_ARGUMENT: argument name is empty');
         });
 
+        it('should not create a user with invalid username - username contains "@" but is not valid email', async function createUser(): Promise<void> {
+          // append name
+          Object.assign(testuser2, { name: 'something@ex..ample.com' });
+          const result = await userService.create({ items: [testuser2] });
+          should.exist(result.error);
+          result.error.name.should.equal('InvalidArgument');
+          result.error.details.should.equal('3 INVALID_ARGUMENT: Username something@ex..ample.com is not a valid email!');
+        });
+
+        it('should not create a user with invalid username - minimum characters condition not met', async function createUser(): Promise<void> {
+          // append name
+          Object.assign(testuser2, { name: 'test123' });
+          const result = await userService.create({ items: [testuser2] });
+          should.exist(result.error);
+          result.error.name.should.equal('InvalidArgument');
+          result.error.details.should.equal('3 INVALID_ARGUMENT: Username test123 is invalid! The username length must be between 8 and 20 characters!');
+        });
+
+        it('should not create a user with invalid username - maximum characters condition not met', async function createUser(): Promise<void> {
+          // append name
+          Object.assign(testuser2, { name: 'TestQQwpnociqzkUyFOaTWPX' });
+          const result = await userService.create({ items: [testuser2] });
+          should.exist(result.error);
+          result.error.name.should.equal('InvalidArgument');
+          result.error.details.should.equal('3 INVALID_ARGUMENT: Username TestQQwpnociqzkUyFOaTWPX is invalid! The username length must be between 8 and 20 characters!');
+        });
+
+        it('should not create a user with invalid username - first character condition not met', async function createUser(): Promise<void> {
+          // append name
+          Object.assign(testuser2, { name: '_TestTest' });
+          const result = await userService.create({ items: [testuser2] });
+          should.exist(result.error);
+          result.error.name.should.equal('InvalidArgument');
+          result.error.details.should.equal('3 INVALID_ARGUMENT: Username _TestTest is invalid! The first letter should be one of the allowed characters: a-z A-Z or äöüÄÖÜß');
+        });
+
+        it('should not create a user with invalid username - allowed characters condition not met', async function createUser(): Promise<void> {
+          // append name
+          Object.assign(testuser2, { name: 'Test?Test' });
+          const result = await userService.create({ items: [testuser2] });
+          should.exist(result.error);
+          result.error.name.should.equal('InvalidArgument');
+          result.error.details.should.equal('3 INVALID_ARGUMENT: Username Test?Test is invalid! Please use only the allowed characters: a-z, A-Z, 0-9, äöüÄÖÜß and @_.- ');
+        });
+
+        it('should not create a user with invalid username - character repetition condition not met', async function createUser(): Promise<void> {
+          // append name
+          Object.assign(testuser2, { name: 'Test--Test' });
+          const result = await userService.create({ items: [testuser2] });
+          should.exist(result.error);
+          result.error.name.should.equal('InvalidArgument');
+          result.error.details.should.equal('3 INVALID_ARGUMENT: Username Test--Test is invalid! Character repetitions like __, .., -- are not allowed.');
+        });
+
         it('should create a user and unregister it', async function createUser(): Promise<void> {
           // append name
-          Object.assign(testuser2, { name: 'test.user2@n-fuse.co' });
+          Object.assign(testuser2, { name: 'test_user@n-fuse.co' });
           const result = await userService.create({ items: [testuser2] });
           should.exist(result);
           should.exist(result.data);
@@ -736,7 +899,7 @@ describe('testing identity-srv', () => {
           const offset = await topic.$offset(-1);
           const result = await userService.update([{
             id: testUserID,
-            name: 'Test123_.-äöüÄÖÜß1', // existing user
+            name: 'test.user1', // existing user
             first_name: 'John',
             meta
           }]);
@@ -750,7 +913,7 @@ describe('testing identity-srv', () => {
 
           let result = await userService.update([{
             id: testUserID,
-            name: 'Test123_.-äöüÄÖÜß1', // existing user
+            name: 'test.user1', // existing user
             email: 'update@restorecommerce.io',
             password: 'notsecure2',
             first_name: 'John',
