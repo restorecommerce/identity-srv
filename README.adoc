@@ -17,6 +17,17 @@ A microservice for identity management.
 * Un-registration as self-service
 * Customizable, optional email notifications to drive processes
 
+[#features_user_name_validation]
+=== User name validation
+This service has a custom validator that checks when a new user is being created if
+the user name is complying with the following set of rules:
+
+. If the user name contains an "@" symbol, then the username must also be a valid email.
+. The user name must respect the minimum and maximum number of characters allowed.
+. The user name must begin with a letter (a-z, A-Z, äöüÄÖÜß).
+. The user name must contain only characters from the allowed characters list (a-z, A-Z, 0-9, äöüÄÖÜß, @_.-).
+. The user name should not contain forbidden character repetitions (__, .., --).
+
 [#configuration]
 == Configuration
 

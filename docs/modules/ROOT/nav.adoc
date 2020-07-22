@@ -3,7 +3,7 @@
 
 // FEATURES
 * xref:index.adoc#features[Features]
-
+** xref:index.adoc#features_user_name_validation[User name validation]
 // CONFIGURATION
 * xref:index.adoc#configuration[Configuration]
 
