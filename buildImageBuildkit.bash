@@ -1,8 +1,10 @@
 #!/bin/bash
 
+SERVICE_NAME="identity-srv"
+
 DOCKER_BUILDKIT=1 docker build \
-  --tag restorecommerce/identity-srv \
+  --tag restorecommerce/$SERVICE_NAME \
   -f ./buildkit.Dockerfile \
-  --cache-from restorecommerce/identity-srv \
-  --build-arg APP_HOME=/home/node/identity-srv \
+  --cache-from restorecommerce/$SERVICE_NAME \
+  --build-arg APP_HOME=/home/node/$SERVICE_NAME \
   .
