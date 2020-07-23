@@ -1306,8 +1306,8 @@ export class UserService extends ServiceBase {
       Object.assign(resources, { id: userIDs });
       await this.createMetadata(resources, AuthZAction.DELETE, subject);
     }
-    if (request.collection) {
-      Object.assign(resources, { collection: request.collection });
+    if (call.request.collection) {
+      resources = [{collection: call.request.collection}];
     }
     let acsResponse: AccessResponse;
     try {
@@ -2055,8 +2055,8 @@ export class RoleService extends ServiceBase {
       Object.assign(resources, { id: roleIDs });
       await this.createMetadata({ id: roleIDs }, AuthZAction.DELETE, subject);
     }
-    if (request.collection) {
-      Object.assign(resources, { collection: request.collection });
+    if (call.request.collection) {
+      resources = [{collection: call.request.collection}];
     }
     let acsResponse: AccessResponse;
     try {
