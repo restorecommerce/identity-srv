@@ -1295,7 +1295,9 @@ export class UserService extends ServiceBase {
     let userIDs = request.ids;
     let resources = [];
     let subject = await getSubjectFromRedis(call, this);
+    let action;
     if (userIDs) {
+      action = AuthZAction.DELETE;
       if (_.isArray(userIDs)) {
         for (let id of userIDs) {
           resources.push({ id });
@@ -1304,14 +1306,15 @@ export class UserService extends ServiceBase {
         resources = [{ id: userIDs }];
       }
       Object.assign(resources, { id: userIDs });
-      await this.createMetadata(resources, AuthZAction.DELETE, subject);
+      await this.createMetadata(resources, action, subject);
     }
     if (call.request.collection) {
+      action = AuthZAction.DROP;
       resources = [{collection: call.request.collection}];
     }
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, resources, AuthZAction.DELETE,
+      acsResponse = await checkAccessRequest(subject, resources, action,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
