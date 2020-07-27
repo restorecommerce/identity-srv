@@ -478,10 +478,10 @@ List of events emitted by this microservice for below topics:
 For `renderRequest` and `renderResponse` the message structures are defined in https://github.com/restorecommerce/rendering-srv[rendering-srv]
 and for `sendEmail` they are defined in https://github.com/restorecommerce/notification-srv[notification-srv],
 
-[#subscribed-events]
-=== Subscribed
+[#consumed-events]
+=== Consumed
 
-This microservice subscribes to the following events by topic:
+This microservice consumes messages for the following events by topic:
 
 [width="100%",cols="31%,33%,36%",options="header",]
 |=====================================================================================
