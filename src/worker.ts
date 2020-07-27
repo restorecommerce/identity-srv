@@ -11,8 +11,8 @@ const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
 
 class UserCommandInterface extends chassis.CommandInterface {
-  constructor(server: chassis.Server, cfg: any, logger: any, events: Events) {
-    super(server, cfg, logger, events);
+  constructor(server: chassis.Server, cfg: any, logger: any, events: Events, redisClient: RedisClient) {
+    super(server, cfg, logger, events, redisClient);
   }
 
   makeResourcesRestoreSetup(db: any, resource: string): any {
@@ -143,7 +143,16 @@ export class Worker {
 
     let authZ = await initAuthZ(this.cfg) as ACSAuthZ;
     this.authZ = authZ;
-    const cis = new UserCommandInterface(server, this.cfg, logger, events);
+
+    // init redis client for subject index
+    const redisConfig = cfg.get('redis');
+    redisConfig.db = this.cfg.get('redis:db-indexes:db-subject');
+    this.redisClient = createClient(redisConfig);
+
+    // init ACS cache
+    initializeCache();
+
+    const cis = new UserCommandInterface(server, this.cfg, logger, events, this.redisClient);
 
     const identityServiceEventListener = async (msg: any,
       context: any, config: any, eventName: string) => {
@@ -179,14 +188,6 @@ export class Worker {
         }
       }
     }
-
-    // init redis client for subject index
-    const redisConfig = cfg.get('redis');
-    redisConfig.db = this.cfg.get('redis:db-indexes:db-subject');
-    this.redisClient = createClient(redisConfig);
-
-    // init ACS cache
-    initializeCache();
 
     // user service
     logger.verbose('Setting up user and role services');
