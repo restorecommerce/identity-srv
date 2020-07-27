@@ -185,8 +185,8 @@ export class Worker {
     redisConfig.db = this.cfg.get('redis:db-indexes:db-subject');
     this.redisClient = createClient(redisConfig);
 
-     // init ACS cache
-     initializeCache();
+    // init ACS cache
+    initializeCache();
 
     // user service
     logger.verbose('Setting up user and role services');
