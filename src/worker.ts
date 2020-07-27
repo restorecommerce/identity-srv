@@ -4,7 +4,7 @@ import { Events } from '@restorecommerce/kafka-client';
 import { Logger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { UserService, RoleService } from './service';
-import { ACSAuthZ, initAuthZ, updateConfig } from '@restorecommerce/acs-client';
+import { ACSAuthZ, initAuthZ, updateConfig, initializeCache } from '@restorecommerce/acs-client';
 import { RedisClient, createClient } from 'redis';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
@@ -180,10 +180,13 @@ export class Worker {
       }
     }
 
-    // init redis client
+    // init redis client for subject index
     const redisConfig = cfg.get('redis');
     redisConfig.db = this.cfg.get('redis:db-indexes:db-subject');
     this.redisClient = createClient(redisConfig);
+
+     // init ACS cache
+     initializeCache();
 
     // user service
     logger.verbose('Setting up user and role services');
