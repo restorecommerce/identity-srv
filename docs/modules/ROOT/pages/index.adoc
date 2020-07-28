@@ -17,6 +17,17 @@ A microservice for identity management.
 * Un-registration as self-service
 * Customizable, optional email notifications to drive processes
 
+[#features_user_name_validation]
+=== User name validation
+This service has a custom validator that checks when a new user is being created if
+the user name is complying with the following set of rules:
+
+. If the user name contains an "@" symbol, then the username must also be a valid email.
+. The user name must respect the minimum and maximum number of characters allowed.
+. The user name must begin with a letter (a-z, A-Z, äöüÄÖÜß).
+. The user name must contain only characters from the allowed characters list (a-z, A-Z, 0-9, äöüÄÖÜß, @_.-).
+. The user name should not contain forbidden character repetitions (__, .., --).
+
 [#configuration]
 == Configuration
 
@@ -169,11 +180,12 @@ The microservice exposes the below CRUD operations for creating or modifying Use
 [#api_user_create]
 ==== `Create`
 
-Used to create a User (usually by previleged user). Requests are performed providing `io.restorecommerce.user.UserList`
+Used to create a User (usually by privileged user). Requests are performed providing `io.restorecommerce.user.UserList`
 protobuf message as input and responses are a `io.restorecommerce.user.UserList` message. The User-to-Role associations
 assignment is optionally secured by https://github.com/restorecommerce/access-control-srv[access-control-srv] with
-link:./cfg/config.json#L71[configuration]. If authorization is enabled this service uses https://github.com/restorecommerce/acs-client/[acs-client]
-to invoke `access-control-srv` to verify the role and its assocations are valid. When authorization is enabled the creating
+link:https://github.com/restorecommerce/identity-srv/blob/master/cfg/config.json#L71[configuration].
+If authorization is enabled this service uses https://github.com/restorecommerce/acs-client/[acs-client]
+to invoke `access-control-srv` to verify the role and its associations are valid. When authorization is enabled the creating
 user should have a valid authentication context `io.restorecommerce.user.Context` in request else the request is denied.
 The User is allowed to create other Users with valid User-to-Role associations `io.restorecommerce.user.RoleAssociation.Attribute`
 with in his `io.restorecommerce.user.HierarchicalScope`. The creating User can assign roles if `io.restorecommerce.role.Role.assignable_by_roles`
@@ -467,10 +479,10 @@ List of events emitted by this microservice for below topics:
 For `renderRequest` and `renderResponse` the message structures are defined in https://github.com/restorecommerce/rendering-srv[rendering-srv]
 and for `sendEmail` they are defined in https://github.com/restorecommerce/notification-srv[notification-srv],
 
-[#subscribed-events]
-=== Subscribed
+[#consumed-events]
+=== Consumed
 
-This microservice subscribes to the following events by topic:
+This microservice consumes messages for the following events by topic:
 
 [width="100%",cols="31%,33%,36%",options="header",]
 |=====================================================================================
