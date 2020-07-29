@@ -821,9 +821,18 @@ export class UserService extends ServiceBase {
     const pw = request.password;
     const newPw = request.new_password;
     let subject = await getSubjectFromRedis(call, this);
+    const filter = toStruct({
+      id: { $eq: userID }
+    });
+    const users = await super.read({ request: { filter } }, context);
+    if (_.size(users) === 0) {
+      logger.debug('user does not exist', userID);
+      throw new errors.NotFound('user does not exist');
+    }
+    const user: User = users.items[0];
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, { id: userID, password: pw, new_password: newPw },
+      acsResponse = await checkAccessRequest(subject, { id: userID, password: pw, new_password: newPw, meta: user.meta },
         AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -835,15 +844,6 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
-      const filter = toStruct({
-        id: { $eq: userID }
-      });
-      const users = await super.read({ request: { filter } }, context);
-      if (_.size(users) === 0) {
-        logger.debug('user does not exist', userID);
-        throw new errors.NotFound('user does not exist');
-      }
-      const user: User = users.items[0];
       const userPWhash = user.password_hash;
       if (!password.verify(userPWhash, pw)) {
         throw new errors.Unauthenticated('password does not match');
