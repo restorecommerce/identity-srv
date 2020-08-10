@@ -2161,7 +2161,8 @@ export class RoleService extends ServiceBase {
    * @param entity entity name
    * @param action resource action
    */
-  async createMetadata(resources: any, action: string, subject?: Subject): Promise<any> {
+  async createMetadata(res: any, action: string, subject?: Subject): Promise<any> {
+    let resources = _.cloneDeep(res);
     let orgOwnerAttributes = [];
     if (!_.isArray(resources)) {
       resources = [resources];
