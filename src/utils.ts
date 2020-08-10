@@ -52,7 +52,7 @@ export interface ReadPolicyResponse extends AccessResponse {
  */
 /* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
 export async function checkAccessRequest(subject: Subject, resources: any, action: AuthZAction,
-  entity: string, service: UserService | RoleService, resourceNameSpace?: string): Promise<AccessResponse | ReadPolicyResponse> {
+  entity: string, service: UserService | RoleService, resourceNameSpace?: string, useCache = true): Promise<AccessResponse | ReadPolicyResponse> {
   let authZ = service.authZ;
   let data = _.cloneDeep(resources);
   if (!_.isArray(resources) && action != AuthZAction.READ) {
@@ -64,7 +64,7 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
 
   let result: Decision | PolicySetRQ;
   try {
-    result = await accessRequest(subject, data, action, authZ, entity, resourceNameSpace);
+    result = await accessRequest(subject, data, action, authZ, entity, resourceNameSpace, useCache);
   } catch (err) {
     return {
       decision: Decision.DENY,

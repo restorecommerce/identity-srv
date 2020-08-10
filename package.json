@@ -17,7 +17,7 @@
     "srv"
   ],
   "dependencies": {
-    "@restorecommerce/acs-client": "^0.2.0",
+    "@restorecommerce/acs-client": "^0.2.1",
     "@restorecommerce/chassis-srv": "^0.1.2",
     "@restorecommerce/cluster-service": "^0.1.4",
     "@restorecommerce/grpc-client": "0.0.6",

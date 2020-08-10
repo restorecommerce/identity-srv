@@ -1113,7 +1113,7 @@ export class UserService extends ServiceBase {
           let acsResponse: AccessResponse;
           try {
             acsResponse = await checkAccessRequest(subject, [user], AuthZAction.MODIFY,
-              'user', this);
+              'user', this, undefined, false);
           } catch (err) {
             this.logger.error('Error occurred requesting access-control-srv:', err);
             throw err;
@@ -2051,7 +2051,7 @@ export class RoleService extends ServiceBase {
           let acsResponse: AccessResponse;
           try {
             acsResponse = await checkAccessRequest(subject, [role], AuthZAction.MODIFY,
-              'user', this);
+              'role', this, undefined, false);
           } catch (err) {
             this.logger.error('Error occurred requesting access-control-srv:', err);
             throw err;
