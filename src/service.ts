@@ -1087,6 +1087,9 @@ export class UserService extends ServiceBase {
         // read the user from DB and update the special fields from DB
         // for user modification
         const user = items[i];
+        if (!user.id) {
+          throw new errors.InvalidArgument('Subject identifier missing for update');
+        }
         const filter = toStruct({
           id: { $eq: user.id }
         });
@@ -1105,6 +1108,21 @@ export class UserService extends ServiceBase {
         } else if (user.meta && !user.meta.owner) {
           user.meta.owner = dbUser.meta.owner;
         }
+        // check for ACS if owner information is changed
+        if (!_.isEqual(user.meta.owner, dbUser.meta.owner)) {
+          let acsResponse: AccessResponse;
+          try {
+            acsResponse = await checkAccessRequest(subject, [user], AuthZAction.MODIFY,
+              'user', this);
+          } catch (err) {
+            this.logger.error('Error occurred requesting access-control-srv:', err);
+            throw err;
+          }
+          if (acsResponse.decision != Decision.PERMIT) {
+            throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+          }
+        }
+
         // Update password if it contains that field by updating hash
         if (user.password) {
           user.password_hash = password.hash(user.password);
@@ -1323,7 +1341,7 @@ export class UserService extends ServiceBase {
     }
     if (call.request.collection) {
       action = AuthZAction.DROP;
-      acsResources = [{collection: call.request.collection}];
+      acsResources = [{ collection: call.request.collection }];
     }
     let acsResponse: AccessResponse;
     try {
@@ -2020,12 +2038,27 @@ export class RoleService extends ServiceBase {
         if (roles.total_count === 0) {
           throw new errors.NotFound('roles not found for updating');
         }
+        const rolesDB = roles.data.items[0];
         // update meta information from existing Object in case if its
         // not provided in request
         if (!role.meta) {
-          role.meta = roles.data.items[0];
+          role.meta = rolesDB.meta;
         } else if (role.meta && !role.meta.owner) {
-          role.meta.owner = roles.data.items[0].meta.owner;
+          role.meta.owner = rolesDB.meta.owner;
+        }
+        // check for ACS if owner information is changed
+        if (!_.isEqual(role.meta.owner, rolesDB.meta.owner)) {
+          let acsResponse: AccessResponse;
+          try {
+            acsResponse = await checkAccessRequest(subject, [role], AuthZAction.MODIFY,
+              'user', this);
+          } catch (err) {
+            this.logger.error('Error occurred requesting access-control-srv:', err);
+            throw err;
+          }
+          if (acsResponse.decision != Decision.PERMIT) {
+            throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+          }
         }
       }
       return super.update(call, context);
@@ -2081,7 +2114,7 @@ export class RoleService extends ServiceBase {
       acsResources = await this.createMetadata({ id: roleIDs }, AuthZAction.DELETE, subject);
     }
     if (call.request.collection) {
-      acsResources = [{collection: call.request.collection}];
+      acsResources = [{ collection: call.request.collection }];
     }
     let acsResponse: AccessResponse;
     try {
