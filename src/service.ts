@@ -270,10 +270,10 @@ export class UserService extends ServiceBase {
     // extract details from auth_context of request and update the context Object
     let subject = await getSubjectFromRedis(call, this);
     // update meta data for owner information
-    await this.createMetadata(usersList, AuthZAction.CREATE, subject);
+    const acsResources = await this.createMetadata(usersList, AuthZAction.CREATE, subject);
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.CREATE,
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.CREATE,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv', err);
@@ -1069,10 +1069,10 @@ export class UserService extends ServiceBase {
     const items = call.request.items;
     let subject = await getSubjectFromRedis(call, this);
     // update meta data for owner information
-    await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
+    const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY,
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -1097,6 +1097,13 @@ export class UserService extends ServiceBase {
         let dbUser = users.items[0];
         if (dbUser.name != user.name) {
           throw new errors.InvalidArgument('User name field cannot be updated');
+        }
+        // update meta information from existing Object in case if its
+        // not provided in request
+        if (!user.meta) {
+          user.meta = dbUser.meta;
+        } else if (user.meta && !user.meta.owner) {
+          user.meta.owner = dbUser.meta.owner;
         }
         // Update password if it contains that field by updating hash
         if (user.password) {
@@ -1124,10 +1131,10 @@ export class UserService extends ServiceBase {
 
     const usersList = call.request.items;
     let subject = await getSubjectFromRedis(call, this);
-    await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
+    const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, usersList, AuthZAction.MODIFY,
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -1252,10 +1259,10 @@ export class UserService extends ServiceBase {
     logger.silly('unregister', userID);
 
     let subject = await getSubjectFromRedis(call, this);
-    await this.createMetadata(call.request.items, AuthZAction.DELETE, subject);
+    const acsResources = await this.createMetadata(call.request.items, AuthZAction.DELETE, subject);
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, { id: userID }, AuthZAction.DELETE,
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.DELETE,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -1299,6 +1306,7 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     let userIDs = request.ids;
     let resources = [];
+    let acsResources = [];
     let subject = await getSubjectFromRedis(call, this);
     let action;
     if (userIDs) {
@@ -1311,15 +1319,15 @@ export class UserService extends ServiceBase {
         resources = [{ id: userIDs }];
       }
       Object.assign(resources, { id: userIDs });
-      await this.createMetadata(resources, action, subject);
+      acsResources = await this.createMetadata(resources, action, subject);
     }
     if (call.request.collection) {
       action = AuthZAction.DROP;
-      resources = [{collection: call.request.collection}];
+      acsResources = [{collection: call.request.collection}];
     }
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, resources, action,
+      acsResponse = await checkAccessRequest(subject, acsResources, action,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -1778,7 +1786,8 @@ export class UserService extends ServiceBase {
    * @param entity entity name
    * @param action resource action
    */
-  async createMetadata(resources: any, action: string, subject?: Subject): Promise<any> {
+  async createMetadata(res: any, action: string, subject?: Subject): Promise<any> {
+    let resources = _.cloneDeep(res);
     let orgOwnerAttributes = [];
     if (resources && !_.isArray(resources)) {
       resources = [resources];
@@ -1912,10 +1921,10 @@ export class RoleService extends ServiceBase {
 
     const items = call.request.items;
     let subject = await getSubjectFromRedis(call, this);
-    await this.createMetadata(call.request.items, AuthZAction.CREATE, subject);
+    const acsResources = await this.createMetadata(call.request.items, AuthZAction.CREATE, subject);
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, items, AuthZAction.CREATE,
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.CREATE,
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -1986,10 +1995,10 @@ export class RoleService extends ServiceBase {
     const items = call.request.items;
     let subject = await getSubjectFromRedis(call, this);
     // update owner information
-    await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
+    const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY,
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -2011,6 +2020,13 @@ export class RoleService extends ServiceBase {
         if (roles.total_count === 0) {
           throw new errors.NotFound('roles not found for updating');
         }
+        // update meta information from existing Object in case if its
+        // not provided in request
+        if (!role.meta) {
+          role.meta = roles.data.items[0];
+        } else if (role.meta && !role.meta.owner) {
+          role.meta.owner = roles.data.items[0].meta.owner;
+        }
       }
       return super.update(call, context);
     }
@@ -2028,10 +2044,10 @@ export class RoleService extends ServiceBase {
     }
 
     let subject = await getSubjectFromRedis(call, this);
-    await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
+    const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.MODIFY,
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -2059,12 +2075,13 @@ export class RoleService extends ServiceBase {
     let roleIDs = request.ids;
     let resources = {};
     let subject = await getSubjectFromRedis(call, this);
+    let acsResources;
     if (roleIDs) {
       Object.assign(resources, { id: roleIDs });
-      await this.createMetadata({ id: roleIDs }, AuthZAction.DELETE, subject);
+      acsResources = await this.createMetadata({ id: roleIDs }, AuthZAction.DELETE, subject);
     }
     if (call.request.collection) {
-      resources = [{collection: call.request.collection}];
+      acsResources = [{collection: call.request.collection}];
     }
     let acsResponse: AccessResponse;
     try {
