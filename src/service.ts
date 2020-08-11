@@ -1105,7 +1105,7 @@ export class UserService extends ServiceBase {
         // not provided in request
         if (!user.meta) {
           user.meta = dbUser.meta;
-        } else if (user.meta && !user.meta.owner) {
+        } else if (user.meta && _.isEmpty(user.meta.owner)) {
           user.meta.owner = dbUser.meta.owner;
         }
         // check for ACS if owner information is changed
@@ -2043,7 +2043,7 @@ export class RoleService extends ServiceBase {
         // not provided in request
         if (!role.meta) {
           role.meta = rolesDB.meta;
-        } else if (role.meta && !role.meta.owner) {
+        } else if (role.meta && _.isEmpty(role.meta.owner)) {
           role.meta.owner = rolesDB.meta.owner;
         }
         // check for ACS if owner information is changed
