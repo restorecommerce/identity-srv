@@ -1,6 +1,6 @@
 {
   "name": "@restorecommerce/identity-srv",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Restore Commerce identity service",
   "main": "lib/start.js",
   "author": "Invend GmbH",
