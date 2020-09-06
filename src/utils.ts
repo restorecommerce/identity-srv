@@ -99,26 +99,7 @@ export const getSubjectFromRedis = async (call: any, service: UserService | Role
     subject = {};
   }
   let api_key = call.request.api_key;
-  if (subject && subject.id && _.isEmpty(subject.hierarchical_scopes)) {
-    let redisKey = `cache:${subject.id}:subject`;
-    // update ctx with HR scope from redis
-    subject = await new Promise((resolve, reject) => {
-      service.redisClient.get(redisKey, async (err, response) => {
-        if (!err && response) {
-          // update user HR scope and role_associations from redis
-          const redisResp = JSON.parse(response);
-          subject.role_associations = redisResp.role_associations;
-          subject.hierarchical_scopes = redisResp.hierarchical_scopes;
-          resolve(subject);
-        }
-        // when not set in redis
-        if (err || (!err && !response)) {
-          resolve(subject);
-          return subject;
-        }
-      });
-    });
-  } else if (api_key) {
+  if (api_key) {
     subject = { api_key };
   }
   return subject;

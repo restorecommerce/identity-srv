@@ -146,6 +146,8 @@ const marshallProtobufAny = (msg: any): any => {
 
 const unmarshallProtobufAny = (msg: any): any => JSON.parse(msg.value.toString());
 
+const TECHNICAL_USER = 'TECHNICAL_USER';
+
 export class UserService extends ServiceBase {
   db: any;
   topics: any;
@@ -1214,7 +1216,8 @@ export class UserService extends ServiceBase {
    */
   async login(call: any, context?: any): Promise<any> {
     if (_.isEmpty(call) || _.isEmpty(call.request) ||
-      (_.isEmpty(call.request.identifier) || (_.isEmpty(call.request.password)))) {
+      (_.isEmpty(call.request.identifier) || (_.isEmpty(call.request.password))
+        || (_.isEmpty(call.request.token)))) {
       throw new errors.InvalidArgument('Missing credentials');
     }
     const identifier = call.request.identifier;
@@ -1252,15 +1255,32 @@ export class UserService extends ServiceBase {
         throw new errors.FailedPrecondition('user is inactive');
       }
     }
-    const match = password.verify(user.password_hash, call.request.password);
-    if (!match) {
+
+    if (user.user_type && user.user_type === TECHNICAL_USER) {
+      const tokens = user.tokens;
+      for (let eachToken of tokens) {
+        if (call.request.token === eachToken.token) {
+          return user;
+        }
+      }
       if (obfuscateAuthNErrorReason) {
         throw new errors.FailedPrecondition('Invalid credentials provided, user inactive or account does not exist');
       } else {
         throw new errors.Unauthenticated('password does not match');
       }
+    } else if (!user.user_type || user.user_type != TECHNICAL_USER) {
+      const match = password.verify(user.password_hash, call.request.password);
+      if (!match) {
+        if (obfuscateAuthNErrorReason) {
+          throw new errors.FailedPrecondition('Invalid credentials provided, user inactive or account does not exist');
+        } else {
+          throw new errors.Unauthenticated('password does not match');
+        }
+      }
+      return user;
+    } else {
+      throw new errors.NotFound('user not found');
     }
-    return user;
   }
 
   /**
