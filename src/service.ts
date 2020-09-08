@@ -1216,8 +1216,8 @@ export class UserService extends ServiceBase {
    */
   async login(call: any, context?: any): Promise<any> {
     if (_.isEmpty(call) || _.isEmpty(call.request) ||
-      (_.isEmpty(call.request.identifier) || (_.isEmpty(call.request.password))
-        || (_.isEmpty(call.request.token)))) {
+      (_.isEmpty(call.request.identifier) || (_.isEmpty(call.request.password) &&
+        _.isEmpty(call.request.token)))) {
       throw new errors.InvalidArgument('Missing credentials');
     }
     const identifier = call.request.identifier;
@@ -1258,7 +1258,9 @@ export class UserService extends ServiceBase {
 
     if (user.user_type && user.user_type === TECHNICAL_USER) {
       const tokens = user.tokens;
+      console.log('Call req token is..', call.request.token);
       for (let eachToken of tokens) {
+        console.log('Each TOken is..', eachToken);
         if (call.request.token === eachToken.token) {
           return user;
         }
