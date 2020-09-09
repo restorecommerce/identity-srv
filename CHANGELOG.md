@@ -1,3 +1,8 @@
+### 0.1.4 (September 9th, 2020)
+
+- updated login method for password / token
+- removed reading of HR scope from subject cache
+
 ### 0.1.3 (Auguest 27th, 2020)
 
 - healthcheck fix, updated dependencies
