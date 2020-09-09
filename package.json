@@ -1,6 +1,6 @@
 {
   "name": "@restorecommerce/identity-srv",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "Restore Commerce identity service",
   "main": "lib/start.js",
   "author": "Invend GmbH",
@@ -17,7 +17,7 @@
     "srv"
   ],
   "dependencies": {
-    "@restorecommerce/acs-client": "^0.2.5",
+    "@restorecommerce/acs-client": "^0.2.6",
     "@restorecommerce/chassis-srv": "^0.1.4",
     "@restorecommerce/cluster-service": "^0.1.4",
     "@restorecommerce/grpc-client": "0.0.7",
