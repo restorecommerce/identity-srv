@@ -16,17 +16,7 @@ A microservice for identity management.
 * Password recovery as self-service
 * Un-registration as self-service
 * Customizable, optional email notifications to drive processes
-
-[#features_user_name_validation]
-=== User name validation
-This service has a custom validator that checks when a new user is being created if
-the user name is complying with the following set of rules:
-
-. If the user name contains an "@" symbol, then the username must also be a valid email.
-. The user name must respect the minimum and maximum number of characters allowed.
-. The user name must begin with a letter (a-z, A-Z, äöüÄÖÜß).
-. The user name must contain only characters from the allowed characters list (a-z, A-Z, 0-9, äöüÄÖÜß, @_.-).
-. The user name should not contain forbidden character repetitions (__, .., --).
+* Configurable in-built https://github.com/restorecommerce/access-control-srv[access-control] mechanism
 
 [#configuration]
 == Configuration
@@ -43,6 +33,8 @@ The following service specific configuration properties are available:
 * `minUsernameLength`: minimum length for the user’s `name`.
 * `maxUsernameLength`: maximum length for the user’s `name`.
 * `obfuscateAuthNErrorReason`: default value is `false`, if set to `true` the login error details are obfuscated and generalized error message is shown.
+* `authorization:enable`: default value is `true`, if set to `true` then access-control check is performed, if value is set to `false` then access-control check is overridden.
+* `authorization:enforce`: default value is `true`, if set to `true` then result of access-control-check is enforced, if value is set to `false` the result of access-control check if logged and ignored.
 
 [#API]
 == API
@@ -82,6 +74,7 @@ A User resource.
 |invited_by_user_name |string |optional |inviting User’s name
 |invited_by_user_first_name |string |optional |inviting User’s first name
 |invited_by_user_last_name |string |optional |inviting User’s last name
+|tokens |https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/user.proto#L309[`io.restorecommerce.user.Tokens`] [] |optional |list of Tokens
 |==============================================================================================================================================
 
 `io.restorecommerce.user.RoleAssociation`
@@ -91,6 +84,7 @@ A User resource.
 |Field |Type |Label |Description
 |role |string |required |Role ID
 |Attribute |`io.restorecommerce.user.RoleAssociation.Attribute`[] |optional |Attributes associated with the User’s role
+|id |string |optional |role association identifier (referred in Tokens list)
 |========================================================================================================================
 
 `io.restorecommerce.user.RoleAssociation.Attribute`
@@ -107,10 +101,22 @@ A User resource.
 [cols=",,,",options="header",]
 |================================================
 |Field |Type |Label |Description
-|INDIVIDUAL_USER |enum |optional |individual User
+|PRIVATE_USER |enum |optional |private User
 |ORG_USER |enum |optional |organizational User
 |GUEST |enum |optional |guest User
+|TECHNICAL_USER |enum |optional |technical User
 |================================================
+
+`io.restorecommerce.user.Tokens`
+
+[cols=",,,",options="header",]
+|==========================================
+|Field |Type |Label |Description
+|name |string |required |token name
+|expires_at |double |optional |token expiry date, if not set default is infinite
+|token |string |required |token value
+|scopes |string [] |required |list of role association mapping
+|==========================================
 
 `io.restorecommerce.image.Image`
 
@@ -160,6 +166,25 @@ A list of User resources.
 |children |`io.restorecommerce.user.HierarchicalScope`[] |optional |hierarchical organizational tree
 |========================================================================================================
 
+`io.restorecommerce.user.HierarchicalScopesRequest`
+
+[cols=",,,",options="header",]
+|==========================================
+|Field |Type |Label |Description
+|subject_id |string |required |subject identifier
+|token_name |string |optional |name of token
+|==========================================
+
+`io.restorecommerce.user.HierarchicalScopesResponse`
+
+[cols=",,,",options="header",]
+|==========================================
+|Field |Type |Label |Description
+|subject_id |string |required |subject identifier
+|token_name |string |optional |name of token
+|hierarchical_scopes |`io.restorecommerce.user.HierarchicalScope`[] |required |A list of hierarchical scopes of the authenticated user
+|==========================================
+
 [#api_user_crud]
 ==== CRUD Operations
 
@@ -190,6 +215,14 @@ user should have a valid authentication context `io.restorecommerce.user.Context
 The User is allowed to create other Users with valid User-to-Role associations `io.restorecommerce.user.RoleAssociation.Attribute`
 with in his `io.restorecommerce.user.HierarchicalScope`. The creating User can assign roles if `io.restorecommerce.role.Role.assignable_by_roles`
 is with in his hierarchical scope context `io.restorecommerce.user.HierarchicalScope.role`.
+
+This API also checks if user name is complying with the following set of rules:
+
+. If the user name contains an "@" symbol, then the username must also be a valid email.
+. The user name must respect the minimum and maximum number of characters allowed.
+. The user name must begin with a letter (a-z, A-Z, äöüÄÖÜß).
+. The user name must contain only characters from the allowed characters list (a-z, A-Z, 0-9, äöüÄÖÜß, @_.-).
+. The user name should not contain forbidden character repetitions (__, .., --).
 
 [#api_user_register]
 ==== `Register`

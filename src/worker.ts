@@ -192,9 +192,9 @@ export class Worker {
     // user service
     logger.verbose('Setting up user and role services');
     const roleService = new RoleService(cfg, db,
-      this.topics['role.resource'], logger, true, this.authZ, this.redisClient);
+      this.topics['role.resource'], logger, true, this.authZ);
     const userService = new UserService(cfg,
-      this.topics, db, logger, true, roleService, this.authZ, this.redisClient);
+      this.topics, db, logger, true, roleService, this.authZ);
     this.userService = userService;
 
     await server.bind(serviceNamesCfg.user, userService);

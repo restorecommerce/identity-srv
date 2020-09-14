@@ -8,7 +8,7 @@ import { ServiceBase, ResourcesAPIBase, toStruct, toObject } from '@restorecomme
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from '@restorecommerce/logger';
 import { ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest, PolicySetRQ, PermissionDenied } from '@restorecommerce/acs-client';
-import { RedisClient } from 'redis';
+import { RedisClient, createClient } from 'redis';
 import { getSubjectFromRedis, checkAccessRequest, ReadPolicyResponse, AccessResponse } from './utils';
 import { errors } from '@restorecommerce/chassis-srv';
 
@@ -167,8 +167,7 @@ export class UserService extends ServiceBase {
   redisClient: RedisClient;
   authZCheck: boolean;
   constructor(cfg: any, topics: any, db: any, logger: Logger,
-    isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ,
-    redisClient: RedisClient) {
+    isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ) {
     super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users'),
       isEventsEnabled);
     this.cfg = cfg;
@@ -177,7 +176,9 @@ export class UserService extends ServiceBase {
     this.logger = logger;
     this.roleService = roleService;
     this.authZ = authZ;
-    this.redisClient = redisClient;
+    const redisConfig = cfg.get('redis');
+    redisConfig.db = cfg.get('redis:db-indexes:db-subject');
+    this.redisClient = createClient(redisConfig);
     this.authZCheck = this.cfg.get('authorization:enabled');
   }
 
@@ -1963,10 +1964,12 @@ export class RoleService extends ServiceBase {
   authZ: ACSAuthZ;
   authZCheck: boolean;
   constructor(cfg: any, db: any, roleTopic: kafkaClient.Topic, logger: any,
-    isEventsEnabled: boolean, authZ: ACSAuthZ, redisClient?: RedisClient) {
+    isEventsEnabled: boolean, authZ: ACSAuthZ) {
     super('role', roleTopic, logger, new ResourcesAPIBase(db, 'roles'), isEventsEnabled);
     this.logger = logger;
-    this.redisClient = redisClient;
+    const redisConfig = cfg.get('redis');
+    redisConfig.db = cfg.get('redis:db-indexes:db-subject');
+    this.redisClient = createClient(redisConfig);
     this.authZ = authZ;
     this.cfg = cfg;
     this.authZCheck = this.cfg.get('authorization:enabled');
