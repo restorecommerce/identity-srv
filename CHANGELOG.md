@@ -1,4 +1,4 @@
-### 0.1.4 (September 14th, 2020)
+### 0.1.5 (September 14th, 2020)
 
 - fix to use separate redisClient objects and updated doc
 
