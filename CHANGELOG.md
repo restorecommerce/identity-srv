@@ -1,3 +1,7 @@
+### 0.1.4 (September 14th, 2020)
+
+- fix to use separate redisClient objects and updated doc
+
 ### 0.1.4 (September 9th, 2020)
 
 - updated login method for password / token
