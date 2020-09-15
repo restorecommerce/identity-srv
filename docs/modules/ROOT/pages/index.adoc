@@ -291,7 +291,7 @@ specified upon the request.
 |name |string |optional |User name
 |email |string |optional |User email
 |authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
-|==========================================================================================================================
+|===========================================================================================================================
 
 [#api_user_confirm-password-change]
 ==== `ConfirmPasswordChange`
