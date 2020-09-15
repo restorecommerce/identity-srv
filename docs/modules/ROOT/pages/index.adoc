@@ -17,17 +17,6 @@ A microservice for identity management.
 * Un-registration as self-service
 * Customizable, optional email notifications to drive processes
 
-[#features_user_name_validation]
-=== User name validation
-This service has a custom validator that checks when a new user is being created if
-the user name is complying with the following set of rules:
-
-. If the user name contains an "@" symbol, then the username must also be a valid email.
-. The user name must respect the minimum and maximum number of characters allowed.
-. The user name must begin with a letter (a-z, A-Z, äöüÄÖÜß).
-. The user name must contain only characters from the allowed characters list (a-z, A-Z, 0-9, äöüÄÖÜß, @_.-).
-. The user name should not contain forbidden character repetitions (__, .., --).
-
 [#configuration]
 == Configuration
 
@@ -43,6 +32,8 @@ The following service specific configuration properties are available:
 * `minUsernameLength`: minimum length for the user’s `name`.
 * `maxUsernameLength`: maximum length for the user’s `name`.
 * `obfuscateAuthNErrorReason`: default value is `false`, if set to `true` the login error details are obfuscated and generalized error message is shown.
+* `authorization:enable`: default value is `true`, if set to `true` then access-control check is performed, if value is set to `false` then access-control check is overridden.
+* `authorization:enforce`: default value is `true`, if set to `true` then result of access-control-check is enforced, if value is set to `false` the result of access-control check if logged and ignored.
 
 [#API]
 == API
@@ -51,6 +42,18 @@ This microservice exposes the following gRPC endpoints:
 
 [#api_user]
 === User
+
+A list of User resources.
+
+`io.restorecommerce.user.UserList`
+
+[width="100%",cols="20%,16%,20%,44%",options="header",]
+|==========================================================================================================================
+|Field |Type |Label |Description
+|items |`io.restorecommerce.user.User`[] |required |List of Users
+|total_count |number |optional |number of Users
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|==========================================================================================================================
 
 A User resource.
 
@@ -73,7 +76,7 @@ A User resource.
 |timezone_id |string |optional |The User’s timezone setting (defaults to `Europe/Berlin')
 |locale_id |string |optional |The User’s locale ID
 |default_scope |string |optional |default scope of user
-|unauthenticated |boolean |optional |Set automatically to `true` upon user registry until its account is activated for the first time
+|unauthenticated |bool |optional |Set automatically to `true` upon user registry until its account is activated for the first time
 |guest |bool |optional |If user is guest
 |role_associations |`io.restorecommerce.user.RoleAssociation`[] |optional |Role associations
 |user_type |`io.restorecommerce.user.UserType` |optional |User Type - individula, organization or guest user
@@ -82,6 +85,7 @@ A User resource.
 |invited_by_user_name |string |optional |inviting User’s name
 |invited_by_user_first_name |string |optional |inviting User’s first name
 |invited_by_user_last_name |string |optional |inviting User’s last name
+|tokens |https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/user.proto#L309[`io.restorecommerce.user.Tokens`] [] |optional |list of Tokens
 |==============================================================================================================================================
 
 `io.restorecommerce.user.RoleAssociation`
@@ -91,6 +95,7 @@ A User resource.
 |Field |Type |Label |Description
 |role |string |required |Role ID
 |Attribute |`io.restorecommerce.user.RoleAssociation.Attribute`[] |optional |Attributes associated with the User’s role
+|id |string |optional |role association identifier (referred in Tokens list)
 |========================================================================================================================
 
 `io.restorecommerce.user.RoleAssociation.Attribute`
@@ -107,10 +112,22 @@ A User resource.
 [cols=",,,",options="header",]
 |================================================
 |Field |Type |Label |Description
-|INDIVIDUAL_USER |enum |optional |individual User
+|PRIVATE_USER |enum |optional |private User
 |ORG_USER |enum |optional |organizational User
 |GUEST |enum |optional |guest User
+|TECHNICAL_USER |enum |optional |technical User
 |================================================
+
+`io.restorecommerce.user.Tokens`
+
+[cols=",,,",options="header",]
+|==========================================
+|Field |Type |Label |Description
+|name |string |required |token name
+|expires_at |double |optional |token expiry date, if not set default is infinite
+|token |string |required |token value
+|scopes |string [] |required |list of role association mapping
+|==========================================
 
 `io.restorecommerce.image.Image`
 
@@ -127,19 +144,7 @@ A User resource.
 |length |string |optional |image length
 |==================================================
 
-A list of User resources.
-
-`io.restorecommerce.user.UserList`
-
-[width="100%",cols="20%,16%,20%,44%",options="header",]
-|=================================================================================
-|Field |Type |Label |Description
-|items |`io.restorecommerce.user.User`[] |required |List of Users
-|total_count |number |optional |number of Users
-|auth_context |`io.restorecommerce.user.Context` |optional |authentication context
-|=================================================================================
-
-`io.restorecommerce.user.Context`
+`io.restorecommerce.user.Subject`
 
 [width="100%",cols="20%,16%,20%,44%",options="header",]
 |======================================================================================================================================
@@ -147,7 +152,9 @@ A list of User resources.
 |id |string |required |user id of the authenticated user
 |scope |string |required |target scope of user
 |role_associations |`io.restorecommerce.user.RoleAssociation`[] |required |A list of roles with their associated attributes
-|hierarchical_scopes |`io.restorecommerce.user.HierarchicalScope`[] |required |A list of hierarchical scopes of the authenticated user
+|hierarchical_scopes |`io.restorecommerce.user.HierarchicalScope`[] |optional |A list of hierarchical scopes of the authenticated user
+|unauthenticated | bool |optional | for unauthenticated users
+|token_name | string |optional | token name
 |======================================================================================================================================
 
 `io.restorecommerce.user.HierarchicalScope`
@@ -186,10 +193,18 @@ assignment is optionally secured by https://github.com/restorecommerce/access-co
 link:https://github.com/restorecommerce/identity-srv/blob/master/cfg/config.json#L71[configuration].
 If authorization is enabled this service uses https://github.com/restorecommerce/acs-client/[acs-client]
 to invoke `access-control-srv` to verify the role and its associations are valid. When authorization is enabled the creating
-user should have a valid authentication context `io.restorecommerce.user.Context` in request else the request is denied.
+user should have a valid authentication subject `io.restorecommerce.user.Subject` in request else the request is denied.
 The User is allowed to create other Users with valid User-to-Role associations `io.restorecommerce.user.RoleAssociation.Attribute`
 with in his `io.restorecommerce.user.HierarchicalScope`. The creating User can assign roles if `io.restorecommerce.role.Role.assignable_by_roles`
 is with in his hierarchical scope context `io.restorecommerce.user.HierarchicalScope.role`.
+
+This API also checks if user name is complying with the following set of rules:
+
+. If the user name contains an "@" symbol, then the username must also be a valid email.
+. The user name must respect the minimum and maximum number of characters allowed.
+. The user name must begin with a letter (a-z, A-Z, äöüÄÖÜß).
+. The user name must contain only characters from the allowed characters list (a-z, A-Z, 0-9, äöüÄÖÜß, @_.-).
+. The user name should not contain forbidden character repetitions (__, .., --).
 
 [#api_user_register]
 ==== `Register`
@@ -220,10 +235,11 @@ configuration value. If disabled, the only endpoint for user creation is `Create
 |last_name |string |required |User’s last name
 |email |string |required |User email ID
 |password |string |required |User password
-|creator |string |optional |User id of the creator
 |timezone |string |optional |The User’s timezone setting (defaults to `Europe/Berlin')
-|locale |string |optional |The User’s locale setting (defaults to `de-DE')
+|locale_id |string |optional |The User’s locale setting identifier (defaults to `de-DE')
 |role_associations |`io.restorecommerce.user.RoleAssociation`[] |required |A list of roles with their associated attributes
+|user_type | `io.restorecommerce.user.UserType`| optional | User Type
+|captcha_code | string | optional | captcha code
 |==========================================================================================================================
 
 [#api_user_activate]
@@ -235,11 +251,12 @@ Requests are performed providing `io.restorecommerce.user.ActiveRequest` protobu
 `io.restorecommerce.user.ActiveRequest`
 
 [cols=",,,",options="header",]
-|===========================================================
+|==========================================================================================================================
 |Field |Type |Label |Description
 |id |string |required |User ID
 |activation_code |string |required |activation code for User
-|===========================================================
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|==========================================================================================================================
 
 [#api_user_change-password]
 ==== `ChangePassword`
@@ -250,12 +267,13 @@ Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest`
 `io.restorecommerce.user.ChangePasswordRequest`
 
 [cols=",,,",options="header",]
-|============================================
+|==========================================================================================================================
 |Field |Type |Label |Description
 |id |string |required |User ID
 |password |string |required |old password
 |new_password |string |required |new password
-|============================================
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|==========================================================================================================================
 
 [#api_user_request-password-change]
 ==== `RequestPasswordChange`
@@ -268,11 +286,12 @@ specified upon the request.
 `io.restorecommerce.user.RequestPasswordChangeRequest`
 
 [cols=",,,",options="header",]
-|===================================
+|===========================================================================================================================
 |Field |Type |Label |Description
 |name |string |optional |User name
 |email |string |optional |User email
-|===================================
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|===========================================================================================================================
 
 [#api_user_confirm-password-change]
 ==== `ConfirmPasswordChange`
@@ -285,12 +304,13 @@ activation code is reset.
 `io.restorecommerce.user.ConfirmPasswordChangeRequest`
 
 [cols=",,,",options="header",]
-|==================================================
+|==========================================================================================================================
 |Field |Type |Label |Description
 |name |string |required |User name
 |activation_code |string |required |Activation code
 |password |string |required |New password
-|==================================================
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|==========================================================================================================================
 
 [#api_user_request-email-change]
 ==== `RequestEmailChange`
@@ -303,11 +323,12 @@ a newly-generated activation code.
 `io.restorecommerce.user.ChangeEmailRequest`
 
 [cols=",,,",options="header",]
-|==================================
+|==========================================================================================================================
 |Field |Type |Label |Description
 |id |string |required |User ID
 |email |string |required |New email
-|==================================
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|==========================================================================================================================
 
 [#api_user_confirm-email-change]
 ==== `ConfirmEmailChange`
@@ -320,11 +341,12 @@ generated activation code, the value assigned to the `new_email` property is the
 `io.restorecommerce.user.ConfirmEmailChangeRequest`
 
 [cols=",,,",options="header",]
-|==================================================
+|==========================================================================================================================
 |Field |Type |Label |Description
 |name |string |required |User name
 |activation_code |string |required |Activation code
-|==================================================
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|==========================================================================================================================
 
 [#api_user_confirm-user-invitation]
 ==== `ConfirmUserInvitation`
@@ -337,12 +359,13 @@ configuration values are setup accordingly.
 `io.restorecommerce.user.ConfirmUserInvitationRequest`
 
 [cols=",,,",options="header",]
-|========================================================================
+|==========================================================================================================================
 |Field |Type |Label |Description
 |name |string |required |User name
 |password |string |required |User password
 |activation_code |string |required |User’s activation_code sent via email
-|========================================================================
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|==========================================================================================================================
 
 [#api_user_login]
 ==== `Login`
@@ -357,7 +380,8 @@ Requests are performed providing `io.restorecommerce.user.LoginRequest` protobuf
 |=====================================================
 |Field |Type |Label |Description
 |identifier |string |required |User name or User email
-|password |string |required |Raw password
+|password |string |optional |Raw password
+|token |string |optional |Token for technical users
 |=====================================================
 
 [#api_user_unregister]
@@ -369,10 +393,11 @@ as input and responses are a `google.protobuf.Empty` message.
 `io.restorecommerce.user.UnregisterRequest`
 
 [cols=",,,",options="header",]
-|===============================
+|==========================================================================================================================
 |Field |Type |Label |Description
 |id |string |required |User ID
-|===============================
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|==========================================================================================================================
 
 [#api_user_find]
 ==== `Find`
@@ -383,12 +408,13 @@ A simplified version of `read`, which only filters users by username, email and/
 `io.restorecommerce.user.FindRequest`
 
 [cols=",,,",options="header",]
-|=====================================
+|==========================================================================================================================
 |Field |Type |Label |Description
 |id |string |required |User ID
 |name |string |required |User name
 |email |string |required |User EmailID
-|=====================================
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|==========================================================================================================================
 
 [#api_user_find-by-role]
 ==== `FindByRole`
@@ -400,29 +426,39 @@ providing `io.restorecommerce.user.FindByRoleRequest` protobuf message as input 
 `io.restorecommerce.user.FindByRoleRequest`
 
 [width="100%",cols="20%,16%,20%,44%",options="header",]
-|============================================================================================
+|==========================================================================================================================
 |Field |Type |Label |Description
 |role |string |required |Role name
 |attributes |`io.restorecommerce.user.RoleAssociation.Attribute`[] |optional |Role attributes
-|============================================================================================
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|==========================================================================================================================
 
 [#api_role]
 === `Role`
 
-A Role resource.
+A list of Role resources.
+
+`io.restorecommerce.role.RoleList`
+
+[width="100%",cols="20%,16%,20%,44%",options="header",]
+|==========================================================================================================================
+|Field |Type |Label |Description
+|items |`io.restorecommerce.role.RoleList`[] |required |List of Roles
+|total_count |number |optional |number of Roles
+|authorization_mode |`io.restorecommerce.user.Subject` or `io.restorecommerce.user.ApiKey` |optional |authorization details
+|==========================================================================================================================
 
 `io.restorecommerce.role.Role`
 
 [width="100%",cols="20%,16%,20%,44%",options="header",]
-|====================================================================================
+|==============================================================================================================================================
 |Field |Type |Label |Description
 |id |string |required |Role identifier
 |name |string |required |specifies the Role of the User
 |description |string |optional |Role description
-|created |double |optional |Role created date
-|modified |double |optional |Role modified date
 |assignable_by_roles |string[] |optional |role identifier’s who can assign this role
-|====================================================================================
+|meta |https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] |required |Meta info
+|==============================================================================================================================================
 
 [#api_role_crud]
 ==== CRUD Operations

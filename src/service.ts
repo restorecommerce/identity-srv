@@ -2,14 +2,15 @@ import * as _ from 'lodash';
 import * as bcrypt from 'bcryptjs';
 import * as util from 'util';
 import * as uuid from 'uuid';
-
-import * as chassis from '@restorecommerce/chassis-srv';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as fetch from 'node-fetch';
-import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
+import { ServiceBase, ResourcesAPIBase, toStruct, toObject } from '@restorecommerce/resource-base-interface';
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from '@restorecommerce/logger';
-import { PolicySetRQ, ACSAuthZ, UnAuthZ, accessRequest, AuthZAction } from '@restorecommerce/acs-client';
+import { ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest, PolicySetRQ, PermissionDenied } from '@restorecommerce/acs-client';
+import { RedisClient, createClient } from 'redis';
+import { getSubjectFromRedis, checkAccessRequest, ReadPolicyResponse, AccessResponse } from './utils';
+import { errors } from '@restorecommerce/chassis-srv';
 
 import {
   validateFirstChar,
@@ -19,8 +20,6 @@ import {
   validateAtSymbol,
   validateEmail
 } from './validation';
-
-const errors = chassis.errors;
 
 const password = {
   hash: (pw): string => {
@@ -77,11 +76,22 @@ export interface FindUser {
   id?: string;
   email?: string;
   name?: string;
+  subject?: Subject;
+  api_key?: string;
 }
 
 export interface ActivateUser {
   name: string;
   activation_code: string;
+  subject?: Subject;
+  api_key?: string;
+}
+
+export interface ConfirmEmailChange {
+  name: string;
+  activation_code: string;
+  subject?: Subject;
+  api_key?: string;
 }
 
 export interface RoleAssociation {
@@ -107,18 +117,24 @@ export interface Role extends BaseDocument {
 export interface ForgotPassword {
   name?: string; // username
   password?: string;
+  subject?: Subject;
+  api_key?: string;
 }
 
 export interface ChangePassword {
   id: string;
   password: string;
   new_password?: string;
+  subject?: Subject;
+  api_key?: string;
 }
 
 export interface ConfirmPasswordChange {
   name: string;
   password: string;
   activation_code: string;
+  subject?: Subject;
+  api_key?: string;
 }
 
 const marshallProtobufAny = (msg: any): any => {
@@ -129,6 +145,8 @@ const marshallProtobufAny = (msg: any): any => {
 };
 
 const unmarshallProtobufAny = (msg: any): any => JSON.parse(msg.value.toString());
+
+const TECHNICAL_USER = 'TECHNICAL_USER';
 
 export class UserService extends ServiceBase {
   db: any;
@@ -145,9 +163,11 @@ export class UserService extends ServiceBase {
   emailEnabled: boolean;
   emailStyle: string;
   roleService: RoleService;
-  authZ: ACSAuthZ | UnAuthZ;
+  authZ: ACSAuthZ;
+  redisClient: RedisClient;
+  authZCheck: boolean;
   constructor(cfg: any, topics: any, db: any, logger: Logger,
-    isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ | UnAuthZ) {
+    isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ) {
     super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users'),
       isEventsEnabled);
     this.cfg = cfg;
@@ -156,6 +176,10 @@ export class UserService extends ServiceBase {
     this.logger = logger;
     this.roleService = roleService;
     this.authZ = authZ;
+    const redisConfig = cfg.get('redis');
+    redisConfig.db = cfg.get('redis:db-indexes:db-subject');
+    this.redisClient = createClient(redisConfig);
+    this.authZCheck = this.cfg.get('authorization:enabled');
   }
 
   /**
@@ -164,25 +188,36 @@ export class UserService extends ServiceBase {
    * @return the list of users found
    */
   async find(call: Call<FindUser>, context?: any): Promise<any> {
-    const request = call.request;
-    const logger = this.logger;
-    let userID = request.id || '';
-    let userName = request.name || '';
-    let mailID = request.email || '';
-    const filter = toStruct({
-      $or: [
-        { id: { $eq: userID } },
-        { name: { $eq: userName } },
-        { email: { $eq: mailID } }
-      ]
-    });
-    const users = await super.read({ request: { filter } }, context);
-    if (users.total_count > 0) {
-      logger.silly('found user(s)', { users });
-      return users;
+    let { id, name, email } = call.request;
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, { id, name, email },
+        AuthZAction.READ, 'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
     }
-    logger.silly('user(s) could not be found for request', request);
-    throw new errors.NotFound('user not found');
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+    if (acsResponse.decision === Decision.PERMIT) {
+      const logger = this.logger;
+      const filter = toStruct({
+        $or: [
+          { id: { $eq: id } },
+          { name: { $eq: name } },
+          { email: { $eq: email } }
+        ]
+      });
+      const users = await super.read({ request: { filter } }, context);
+      if (users.total_count > 0) {
+        logger.silly('found user(s)', { users });
+        return users;
+      }
+      logger.silly('user(s) could not be found for request', call.request);
+      throw new errors.NotFound('user not found');
+    }
   }
 
   /**
@@ -200,6 +235,32 @@ export class UserService extends ServiceBase {
   }
 
   /**
+   * Extends ServiceBase.read()
+   * @param  {any} call request contains read request
+   * @param {context}
+   * @return type is any since it can be guest or user type
+   */
+  async read(call: any, context?: any): Promise<any> {
+    const readRequest = call.request;
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: ReadPolicyResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
+        'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      return await super.read({ request: readRequest });
+    }
+  }
+
+  /**
    * Extends ServiceBase.create()
    * @param  {any} call request containing a list of Users
    * @param {context}
@@ -210,67 +271,83 @@ export class UserService extends ServiceBase {
     const insertedUsers = [];
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
-    let authContext = call.request.auth_context;
-    let id, scope, hierarchical_scopes, role_associations;
-    if (authContext) {
-      scope = authContext.scope;
-      hierarchical_scopes = authContext.hierarchical_scopes;
-      role_associations = authContext.role_associations;
-      id = authContext.id;
-      // update user session context with scope, role assocs and HR scopes
-      context = {
-        session: {
-          data: {
-            id,
-            scope,
-            role_associations,
-            hierarchical_scope: hierarchical_scopes
-          }
-        }
-      };
-      // update context with authZ object
-      context = Object.assign({}, context, { authZ: this.authZ });
+    let subject = await getSubjectFromRedis(call, this);
+    // update meta data for owner information
+    const acsResources = await this.createMetadata(usersList, AuthZAction.CREATE, subject);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.CREATE,
+        'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv', err);
+      throw err;
     }
-    if (this.cfg.get('authorization:enabled')) {
-      try {
-        await this.verifyUserRoleAssociations(usersList, context, hierarchical_scopes);
-      } catch (err) {
-        // for unhandled promise rejection
-        throw err;
-      }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
-    for (let i = 0; i < usersList.length; i++) {
-      let user: User = usersList[i];
-      user.activation_code = '';
-      user.unauthenticated = false;
-      if (user.invite) {
-        user.active = false;
-        user.activation_code = this.idGen();
-        user.unauthenticated = true;
+    if (acsResponse.decision === Decision.PERMIT) {
+      if (this.cfg.get('authorization:enabled')) {
+        try {
+          await this.verifyUserRoleAssociations(usersList, subject);
+        } catch (err) {
+          // for unhandled promise rejection
+          throw err;
+        }
       }
-      insertedUsers.push(await this.createUser(user, context));
-      if (this.emailEnabled && user.invite) {
-        // send render request for user Invitation
-        const renderRequest = this.makeInvitationEmailData(user);
-        await this.topics.rendering.emit('renderRequest', renderRequest);
+      for (let i = 0; i < usersList.length; i++) {
+        let user: User = usersList[i];
+        user.activation_code = '';
+        user.active = true;
+        user.unauthenticated = false;
+        if (user.invite) {
+          user.active = false;
+          user.activation_code = this.idGen();
+          user.unauthenticated = true;
+        }
+        insertedUsers.push(await this.createUser(user, context));
+        if (this.emailEnabled && user.invite) {
+          // send render request for user Invitation
+          const renderRequest = this.makeInvitationEmailData(user);
+          await this.topics.rendering.emit('renderRequest', renderRequest);
+        }
       }
+      return insertedUsers;
     }
-    return insertedUsers;
   }
 
-  private async verifyUserRoleAssociations(usersList: User[], context: any,
-    hierarchical_scopes: HierarchicalScope[]): Promise<void> {
+  private async verifyUserRoleAssociations(usersList: User[], subject: any): Promise<void> {
     let validateRoleScope = false;
+    if (subject && subject.id && _.isEmpty(subject.hierarchical_scopes)) {
+      let redisKey = `cache:${subject.id}:subject`;
+      // update ctx with HR scope from redis
+      subject = await new Promise((resolve, reject) => {
+        this.redisClient.get(redisKey, async (err, response) => {
+          if (!err && response) {
+            // update user HR scope and role_associations from redis
+            const redisResp = JSON.parse(response);
+            subject.role_associations = redisResp.role_associations;
+            subject.hierarchical_scopes = redisResp.hierarchical_scopes;
+            resolve(subject);
+          }
+          // when not set in redis
+          if (err || (!err && !response)) {
+            resolve(subject);
+            return subject;
+          }
+        });
+      });
+    }
+    let hierarchical_scopes = subject.hierarchical_scopes;
     let createAccessRole = [];
     try {
       // Make whatIsAllowedACS request to retreive the set of applicable
       // policies and check for role scoping entity, if it exists then validate
       // the user role associations if not skip validation
-      let policySetRQ: PolicySetRQ = await accessRequest(AuthZAction.CREATE, {
+      let policySetRQ: PolicySetRQ = await accessRequest(subject, {
         entity: 'user',
         args: { filter: [] }
-      }, context) as PolicySetRQ;
+      }, AuthZAction.CREATE, this.authZ) as PolicySetRQ;
       const policiesList = policySetRQ.policies;
       for (let policy of policiesList) {
         for (let rule of policy.rules) {
@@ -312,10 +389,11 @@ export class UserService extends ServiceBase {
       });
       let rolesData = await this.roleService.read({
         request: {
-          filter
+          filter,
+          subject
         }
       });
-      if (rolesData.items.length === 0) {
+      if (rolesData && rolesData.total_count === 0) {
         let message = `One or more of the target role IDs are invalid ${targetUserRoleIds},` +
           ` no such role exist in system`;
         this.logger.verbose(message);
@@ -352,7 +430,7 @@ export class UserService extends ServiceBase {
       }
       for (let user of usersList) {
         if (user.role_associations && user.role_associations.length > 0) {
-          this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, context);
+          this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, subject);
         }
       }
     }
@@ -364,7 +442,7 @@ export class UserService extends ServiceBase {
    * @param user
    */
   private validateUserRoleAssociations(userRoleAssocs: RoleAssociation[],
-    hrScopes: HierarchicalScope[], userName: string, context) {
+    hrScopes: HierarchicalScope[], userName: string, subject: Subject) {
     if (userRoleAssocs && !_.isEmpty(userRoleAssocs)) {
       for (let userRoleAssoc of userRoleAssocs) {
         let validUserRoleAssoc = false;
@@ -392,8 +470,8 @@ export class UserService extends ServiceBase {
           }
           if (!validUserRoleAssoc) {
             // check the context role assoc - scope matches with requested scope
-            if (context && context.session && context.session.data) {
-              const creatorRoleAssocs = context.session.data.role_associations;
+            if (subject.role_associations) {
+              const creatorRoleAssocs = subject.role_associations;
               for (let role of creatorRoleAssocs) {
                 if (role.role === userRole) {
                   // check if the target scope matches
@@ -581,29 +659,55 @@ export class UserService extends ServiceBase {
 
   async confirmUserInvitation(call: any, context: any): Promise<any> {
     const userInviteReq: UserInviationReq = call.request || call;
-    // find the actual user object from DB using the UserInvitationReq username
-    // activate user and update password
-    let user: User = (await this.find({ request: { name: userInviteReq.name } })).items[0];
-
-    if ((!userInviteReq.activation_code) || userInviteReq.activation_code !== user.activation_code) {
-      this.logger.debug('wrong activation code', { user });
-      throw new errors.FailedPrecondition('wrong activation code');
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, {
+        name: userInviteReq.name,
+        password_hash: password.hash(userInviteReq.password),
+        activation_code: userInviteReq.activation_code
+      }, AuthZAction.MODIFY, 'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
-    user.active = true;
-    user.unauthenticated = false;
-    user.activation_code = '';
-
-    const password_hash = password.hash(userInviteReq.password);
-    user.password_hash = password_hash;
-    const serviceCall = {
-      request: {
-        items: [user]
+    if (acsResponse.decision === Decision.PERMIT) {
+      // find the actual user object from DB using the UserInvitationReq username
+      // activate user and update password
+      const filter = toStruct({
+        name: { $eq: userInviteReq.name }
+      });
+      let user;
+      const users = await super.read({ request: { filter } });
+      if (users && users.total_count === 1) {
+        user = users.items[0];
+      } else {
+        throw new errors.NotFound('user not found');
       }
-    };
-    await super.update(serviceCall, context);
-    this.logger.info('password updated for invited user', { name: userInviteReq.name });
-    return {};
+
+      if ((!userInviteReq.activation_code) || userInviteReq.activation_code !== user.activation_code) {
+        this.logger.debug('wrong activation code', { user });
+        throw new errors.FailedPrecondition('wrong activation code');
+      }
+      user.active = true;
+      user.unauthenticated = false;
+      user.activation_code = '';
+
+      const password_hash = password.hash(userInviteReq.password);
+      user.password_hash = password_hash;
+      const serviceCall = {
+        request: {
+          items: [user]
+        }
+      };
+      await super.update(serviceCall, context);
+      this.logger.info('password updated for invited user', { name: userInviteReq.name });
+      return {};
+    }
   }
 
   /**
@@ -670,44 +774,60 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     const userName = request.name;
     const activationCode = request.activation_code;
-    if (!userName) {
-      throw new errors.InvalidArgument('argument id is empty');
-    }
-    if (!activationCode) {
-      throw new errors.InvalidArgument('argument activation_code is empty');
-    }
-    const filter = toStruct({
-      name: { $eq: userName }
-    });
-    const users = await super.read({ request: { filter } }, context);
-    if (!users || users.total_count === 0) {
-      throw new errors.NotFound('user not found');
-    }
-    const user: User = users.items[0];
-    if (user.active) {
-      logger.debug('activation request to an active user' +
-        ' which still has the activation code', user);
-      throw new errors.FailedPrecondition('activation request to an active user' +
-        ' which still has the activation code');
-    }
-    if ((!user.activation_code) || user.activation_code !== activationCode) {
-      logger.debug('wrong activation code', user);
-      throw new errors.FailedPrecondition('wrong activation code');
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, { name: userName, activation_code: activationCode },
+        AuthZAction.MODIFY, 'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
     }
 
-    user.active = true;
-    user.unauthenticated = false;
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
 
-    user.activation_code = '';
-    const serviceCall = {
-      request: {
-        items: [user]
+    if (acsResponse.decision === Decision.PERMIT) {
+      if (!userName) {
+        throw new errors.InvalidArgument('argument id is empty');
       }
-    };
-    await super.update(serviceCall, context);
-    logger.info('user activated', user);
-    await this.topics['user.resource'].emit('activated', { id: user.id });
-    return {};
+      if (!activationCode) {
+        throw new errors.InvalidArgument('argument activation_code is empty');
+      }
+      const filter = toStruct({
+        name: { $eq: userName }
+      });
+      const users = await super.read({ request: { filter } }, context);
+      if (!users || users.total_count === 0) {
+        throw new errors.NotFound('user not found');
+      }
+      const user: User = users.items[0];
+      if (user.active) {
+        logger.debug('activation request to an active user' +
+          ' which still has the activation code', user);
+        throw new errors.FailedPrecondition('activation request to an active user' +
+          ' which still has the activation code');
+      }
+      if ((!user.activation_code) || user.activation_code !== activationCode) {
+        logger.debug('wrong activation code', user);
+        throw new errors.FailedPrecondition('wrong activation code');
+      }
+
+      user.active = true;
+      user.unauthenticated = false;
+
+      user.activation_code = '';
+      const serviceCall = {
+        request: {
+          items: [user]
+        }
+      };
+      await super.update(serviceCall, context);
+      logger.info('user activated', user);
+      await this.topics['user.resource'].emit('activated', { id: user.id });
+      return {};
+    }
   }
 
   /**
@@ -723,7 +843,7 @@ export class UserService extends ServiceBase {
 
     const pw = request.password;
     const newPw = request.new_password;
-
+    let subject = await getSubjectFromRedis(call, this);
     const filter = toStruct({
       id: { $eq: userID }
     });
@@ -733,22 +853,37 @@ export class UserService extends ServiceBase {
       throw new errors.NotFound('user does not exist');
     }
     const user: User = users.items[0];
-    const userPWhash = user.password_hash;
-    if (!password.verify(userPWhash, pw)) {
-      throw new errors.Unauthenticated('password does not match');
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, { id: userID, password: pw, new_password: newPw, meta: user.meta },
+        AuthZAction.MODIFY, 'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
     }
 
-    const password_hash = password.hash(newPw);
-    user.password_hash = password_hash;
-    const serviceCall = {
-      request: {
-        items: [user]
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      const userPWhash = user.password_hash;
+      if (!password.verify(userPWhash, pw)) {
+        throw new errors.Unauthenticated('password does not match');
       }
-    };
-    await super.update(serviceCall, context);
-    logger.info('password changed for user', userID);
-    await this.topics['user.resource'].emit('passwordChanged', user);
-    return {};
+
+      const password_hash = password.hash(newPw);
+      user.password_hash = password_hash;
+      const serviceCall = {
+        request: {
+          items: [user]
+        }
+      };
+      await super.update(serviceCall, context);
+      logger.info('password changed for user', userID);
+      await this.topics['user.resource'].emit('passwordChanged', user);
+      return {};
+    }
   }
 
   /**
@@ -761,10 +896,17 @@ export class UserService extends ServiceBase {
    */
   async requestPasswordChange(call: Call<ForgotPassword>, context?: any): Promise<any> {
     const logger = this.logger;
-
-    const user: User = (await this.find({
-      request: call.request
-    })).items[0]; // NotFound exception is thrown when length is 0
+    const reqName = call.request;
+    const filter = toStruct({
+      name: { $eq: reqName.name }
+    });
+    let user;
+    const users = await super.read({ request: { filter } });
+    if (users.total_count === 1) {
+      user = users.items[0];
+    } else {
+      throw new errors.NotFound('user not found');
+    }
 
     logger.verbose('Received a password change request for user', user.id);
 
@@ -795,28 +937,49 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     const { name, activation_code } = call.request;
     const newPassword = call.request.password;
-
-    const user: User = (await this.find({
-      request: {
-        name
-      }
-    })).items[0];
-
-    if (!user.activation_code || user.activation_code !== activation_code) {
-      logger.debug('wrong activation code upon password change confirmation for user', user.name);
-      throw new errors.FailedPrecondition('wrong activation code');
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, {
+        activation_code,
+        password_hash: password.hash(newPassword)
+      }, AuthZAction.MODIFY, 'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
-    user.activation_code = '';
-    user.password_hash = password.hash(newPassword);
-    await super.update({
-      request: {
-        items: [user]
+    if (acsResponse.decision === Decision.PERMIT) {
+      const filter = toStruct({
+        name: { $eq: name }
+      });
+      let user;
+      const users = await super.read({ request: { filter } });
+      if (users.total_count === 1) {
+        user = users.items[0];
+      } else {
+        throw new errors.NotFound('user not found');
       }
-    });
-    logger.info('password changed for user', user.id);
-    await this.topics['user.resource'].emit('passwordChanged', user);
-    return {};
+
+      if (!user.activation_code || user.activation_code !== activation_code) {
+        logger.debug('wrong activation code upon password change confirmation for user', user.name);
+        throw new errors.FailedPrecondition('wrong activation code');
+      }
+
+      user.activation_code = '';
+      user.password_hash = password.hash(newPassword);
+      await super.update({
+        request: {
+          items: [user]
+        }
+      });
+      logger.info('password changed for user', user.id);
+      await this.topics['user.resource'].emit('passwordChanged', user);
+      return {};
+    }
   }
 
   /**
@@ -851,9 +1014,6 @@ export class UserService extends ServiceBase {
     logger.info('Email change requested for user', userID);
     await this.topics['user.resource'].emit('emailChangeRequested', user);
 
-    // Contextual Data for rendering on Notification-srv before sending mail
-    const usersUpdated = await super.read({ request: { filter } }, context);
-
     if (this.emailEnabled) {
       const renderRequest = this.makeConfirmationData(user, false);
       await this.topics.rendering.emit('renderRequest', renderRequest);
@@ -867,45 +1027,55 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {User} returns user details
    */
-  async confirmEmailChange(call: Call<ActivateUser>, context?: any): Promise<any> {
+  async confirmEmailChange(call: Call<ConfirmEmailChange>, context?: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
     const name = request.name;
     const activationCode = request.activation_code;
 
-
-    const users = await this.find({
-      request: {
-        name
-      }
+    const filter = toStruct({
+      name: { $eq: name }
     });
-    if (users.total_count === 0) {
+    const users = await super.read({ request: { filter } });
+    if (users && users.total_count === 0) {
       logger.debug('user does not exist', name);
       throw new errors.NotFound('user does not exist');
     }
 
     const user: User = users.items[0];
-
-    if (user.activation_code !== activationCode) {
-      logger.debug('wrong activation code upon email confirmation for user', user);
-      throw new errors.FailedPrecondition('wrong activation code');
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, {
+        activation_code: activationCode,
+        email: user.new_email
+      }, AuthZAction.MODIFY, 'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
-    user.email = user.new_email;
-    user.new_email = '';
-    user.activation_code = '';
-
-    const serviceCall = {
-      request: {
-        items: [user]
+    if (acsResponse.decision === Decision.PERMIT) {
+      if (user.activation_code !== activationCode) {
+        logger.debug('wrong activation code upon email confirmation for user', user);
+        throw new errors.FailedPrecondition('wrong activation code');
       }
-    };
-
-    await super.update(serviceCall, context);
-    logger.info('Email address changed for user', user.id);
-
-    await this.topics['user.resource'].emit('emailChangeConfirmed', user);
-    return {};
+      user.email = user.new_email;
+      user.new_email = '';
+      user.activation_code = '';
+      const serviceCall = {
+        request: {
+          items: [user]
+        }
+      };
+      await super.update(serviceCall, context);
+      logger.info('Email address changed for user', user.id);
+      await this.topics['user.resource'].emit('emailChangeConfirmed', user);
+      return {};
+    }
   }
 
   /**
@@ -919,33 +1089,74 @@ export class UserService extends ServiceBase {
       || _.isEmpty(call.request.items)) {
       throw new errors.InvalidArgument('No items were provided for update');
     }
-
     const items = call.request.items;
-    for (let i = 0; i < items.length; i += 1) {
-      // read the user from DB and update the special fields from DB
-      // for user modification
-      const user = items[i];
-      const filter = toStruct({
-        id: { $eq: user.id }
-      });
-      const users = await super.read({ request: { filter } }, context);
-      if (users.total_count === 0) {
-        throw new errors.NotFound('user not found');
-      }
-      let dbUser = users.items[0];
-      if (dbUser.name != user.name) {
-        throw new errors.InvalidArgument('User name field cannot be updated');
-      }
-      // Update password if it contains that field by updating hash
-      if (user.password) {
-        user.password_hash = password.hash(user.password);
-        delete user.password;
-      } else {
-        // set the existing hash password field
-        user.password_hash = dbUser.password_hash;
-      }
+    let subject = await getSubjectFromRedis(call, this);
+    // update meta data for owner information
+    const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
+        'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
     }
-    return super.update(call, context);
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      for (let i = 0; i < items.length; i += 1) {
+        // read the user from DB and update the special fields from DB
+        // for user modification
+        const user = items[i];
+        if (!user.id) {
+          throw new errors.InvalidArgument('Subject identifier missing for update');
+        }
+        const filter = toStruct({
+          id: { $eq: user.id }
+        });
+        const users = await super.read({ request: { filter } }, context);
+        if (users.total_count === 0) {
+          throw new errors.NotFound('user not found');
+        }
+        let dbUser = users.items[0];
+        if (dbUser.name != user.name) {
+          throw new errors.InvalidArgument('User name field cannot be updated');
+        }
+        // update meta information from existing Object in case if its
+        // not provided in request
+        if (!user.meta) {
+          user.meta = dbUser.meta;
+        } else if (user.meta && _.isEmpty(user.meta.owner)) {
+          user.meta.owner = dbUser.meta.owner;
+        }
+        // check for ACS if owner information is changed
+        if (!_.isEqual(user.meta.owner, dbUser.meta.owner)) {
+          let acsResponse: AccessResponse;
+          try {
+            acsResponse = await checkAccessRequest(subject, [user], AuthZAction.MODIFY,
+              'user', this, undefined, false);
+          } catch (err) {
+            this.logger.error('Error occurred requesting access-control-srv:', err);
+            throw err;
+          }
+          if (acsResponse.decision != Decision.PERMIT) {
+            throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+          }
+        }
+
+        // Update password if it contains that field by updating hash
+        if (user.password) {
+          user.password_hash = password.hash(user.password);
+          delete user.password;
+        } else {
+          // set the existing hash password field
+          user.password_hash = dbUser.password_hash;
+        }
+      }
+      return super.update(call, context);
+    }
   }
 
   /**
@@ -960,67 +1171,61 @@ export class UserService extends ServiceBase {
     }
 
     const usersList = call.request.items;
-    // verify the assigned role_associations with the HR scope data before creating
-    let id, scope, hierarchical_scopes, role_associations;
-    let authContext = call.request.auth_context;
-    if (authContext) {
-      scope = authContext.scope;
-      hierarchical_scopes = authContext.hierarchical_scopes;
-      role_associations = authContext.role_associations;
-      id = authContext.id;
-      // update user session context with scope, role assocs and HR scopes
-      context = {
-        session: {
-          data: {
-            id,
-            scope,
-            role_associations,
-            hierarchical_scope: hierarchical_scopes
-          }
-        }
-      };
-      // update context with authZ object
-      context = Object.assign({}, context, { authZ: this.authZ });
-    }
-    if (this.cfg.get('authorization:enabled')) {
-      try {
-        await this.verifyUserRoleAssociations(usersList, context, hierarchical_scopes);
-      } catch (err) {
-        // for unhandled promise rejection
-        throw err;
-      }
+    let subject = await getSubjectFromRedis(call, this);
+    const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
+    let acsResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
+        'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
     }
 
-    let result = [];
-    const items = call.request.items;
-    for (let i = 0; i < items.length; i += 1) {
-      // read the user from DB and update the special fields from DB
-      // for user modification
-      const user = items[i];
-      const filter = toStruct({
-        $or: [
-          {
-            name: {
-              $eq: user.name
-            }
-          },
-          {
-            email: {
-              $eq: user.email
-            }
-          }
-        ]
-      });
-      const users = await super.read({ request: { filter } }, context);
-      if (users.total_count === 0) {
-        // call the create method, checks all conditions before inserting
-        result.push(await this.createUser(user));
-      } else {
-        let updateResponse = await this.update({ request: { items: [user] } });
-        result.push(updateResponse.items[0]);
-      }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
-    return { items: result };
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      if (this.cfg.get('authorization:enabled')) {
+        try {
+          await this.verifyUserRoleAssociations(usersList, subject);
+        } catch (err) {
+          // for unhandled promise rejection
+          throw err;
+        }
+      }
+      let result = [];
+      const items = call.request.items;
+      for (let i = 0; i < items.length; i += 1) {
+        // read the user from DB and update the special fields from DB
+        // for user modification
+        const user = items[i];
+        const filter = toStruct({
+          $or: [
+            {
+              name: {
+                $eq: user.name
+              }
+            },
+            {
+              email: {
+                $eq: user.email
+              }
+            }
+          ]
+        });
+        const users = await super.read({ request: { filter } }, context);
+        if (users.total_count === 0) {
+          // call the create method, checks all conditions before inserting
+          result.push(await this.createUser(user));
+        } else {
+          let updateResponse = await this.update({ request: { items: [user], subject } });
+          result.push(updateResponse.items[0]);
+        }
+      }
+      return { items: result };
+    }
   }
 
   /**
@@ -1032,7 +1237,8 @@ export class UserService extends ServiceBase {
    */
   async login(call: any, context?: any): Promise<any> {
     if (_.isEmpty(call) || _.isEmpty(call.request) ||
-      (_.isEmpty(call.request.identifier) || (_.isEmpty(call.request.password)))) {
+      (_.isEmpty(call.request.identifier) || (_.isEmpty(call.request.password) &&
+        _.isEmpty(call.request.token)))) {
       throw new errors.InvalidArgument('Missing credentials');
     }
     const identifier = call.request.identifier;
@@ -1070,15 +1276,32 @@ export class UserService extends ServiceBase {
         throw new errors.FailedPrecondition('user is inactive');
       }
     }
-    const match = password.verify(user.password_hash, call.request.password);
-    if (!match) {
+
+    if (user.user_type && user.user_type === TECHNICAL_USER) {
+      const tokens = user.tokens;
+      for (let eachToken of tokens) {
+        if (call.request.token === eachToken.token) {
+          return user;
+        }
+      }
       if (obfuscateAuthNErrorReason) {
         throw new errors.FailedPrecondition('Invalid credentials provided, user inactive or account does not exist');
       } else {
         throw new errors.Unauthenticated('password does not match');
       }
+    } else if (!user.user_type || user.user_type != TECHNICAL_USER) {
+      const match = password.verify(user.password_hash, call.request.password);
+      if (!match) {
+        if (obfuscateAuthNErrorReason) {
+          throw new errors.FailedPrecondition('Invalid credentials provided, user inactive or account does not exist');
+        } else {
+          throw new errors.Unauthenticated('password does not match');
+        }
+      }
+      return user;
+    } else {
+      throw new errors.NotFound('user not found');
     }
-    return user;
   }
 
   /**
@@ -1093,26 +1316,42 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     const userID = request.id;
     logger.silly('unregister', userID);
-    const filter = toStruct({
-      id: { $eq: userID }
-    });
-    const users = await super.read({ request: { filter } }, context);
-    if (users.total_count === 0) {
-      logger.debug('user does not exist', userID);
-      throw new errors.NotFound(`user with ${userID} does not exist for unregistering`);
+
+    let subject = await getSubjectFromRedis(call, this);
+    const acsResources = await this.createMetadata(call.request.items, AuthZAction.DELETE, subject);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.DELETE,
+        'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
-    // delete user
-    const serviceCall = {
-      request: {
-        ids: [userID]
+    if (acsResponse.decision === Decision.PERMIT) {
+      const filter = toStruct({
+        id: { $eq: userID }
+      });
+      const users = await super.read({ request: { filter } }, context);
+      if (users && users.total_count === 0) {
+        logger.debug('user does not exist', userID);
+        throw new errors.NotFound(`user with ${userID} does not exist for unregistering`);
       }
-    };
-    await super.delete(serviceCall, context);
 
-    logger.info('user deleted', userID);
-    await this.topics['user.resource'].emit('unregistered', userID);
-    return {};
+      // delete user
+      const serviceCall = {
+        request: {
+          ids: [userID]
+        }
+      };
+      await super.delete(serviceCall, context);
+      logger.info('user deleted', userID);
+      await this.topics['user.resource'].emit('unregistered', userID);
+      return {};
+    }
   }
 
   /**
@@ -1125,48 +1364,97 @@ export class UserService extends ServiceBase {
     const request = call.request;
     const logger = this.logger;
     let userIDs = request.ids;
-    if (request.collection) {
-      // delete collection and return
+    let resources = [];
+    let acsResources = [];
+    let subject = await getSubjectFromRedis(call, this);
+    let action;
+    if (userIDs) {
+      action = AuthZAction.DELETE;
+      if (_.isArray(userIDs)) {
+        for (let id of userIDs) {
+          resources.push({ id });
+        }
+      } else {
+        resources = [{ id: userIDs }];
+      }
+      Object.assign(resources, { id: userIDs });
+      acsResources = await this.createMetadata(resources, action, subject);
+    }
+    if (call.request.collection) {
+      action = AuthZAction.DROP;
+      acsResources = [{ collection: call.request.collection }];
+    }
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, acsResources, action,
+        'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      if (request.collection) {
+        // delete collection and return
+        const serviceCall = {
+          request: {
+            collection: request.collection
+          }
+        };
+        await super.delete(serviceCall, context);
+        logger.info('Users collection deleted:');
+        return {};
+      }
+      if (!_.isArray(userIDs)) {
+        userIDs = [userIDs];
+      }
+      logger.silly('Deleting User IDs:', { userIDs });
+      // Check each user exist if one of the user does not exist throw an error
+      for (let userID of userIDs) {
+        const filter = toStruct({
+          id: { $eq: userID }
+        });
+        const users = await super.read({ request: { filter } }, context);
+        if (users.total_count === 0) {
+          logger.debug('User does not exist for deleting:', { userID });
+          throw new errors.NotFound(`User with ${userID} does not exist for deleting`);
+        }
+      }
+
+      // delete users
       const serviceCall = {
         request: {
-          collection: request.collection
+          ids: userIDs
         }
       };
       await super.delete(serviceCall, context);
-      logger.info('Users collection deleted:');
+      logger.info('Users deleted:', userIDs);
       return {};
     }
-    if (!_.isArray(userIDs)) {
-      userIDs = [userIDs];
-    }
-    logger.silly('Deleting User IDs:', { userIDs });
-    // Check each user exist if one of the user does not exist throw an error
-    for (let userID of userIDs) {
-      const filter = toStruct({
-        id: { $eq: userID }
-      });
-      const users = await super.read({ request: { filter } }, context);
-      if (users.total_count === 0) {
-        logger.debug('User does not exist for deleting:', { userID });
-        throw new errors.NotFound(`User with ${userID} does not exist for deleting`);
-      }
-    }
-
-    // delete users
-    const serviceCall = {
-      request: {
-        ids: userIDs
-      }
-    };
-    await super.delete(serviceCall, context);
-    logger.info('Users deleted:', userIDs);
-    return {};
   }
 
   async deleteUsersByOrg(call: any, context?: any): Promise<any> {
     const orgIDs = call.request.org_ids;
-    const deletedUserIDs = await this.modifyUsers(orgIDs, false, context);
-    return { user_ids: deletedUserIDs.map((user) => { return user.id; }) };
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: ReadPolicyResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, { id: orgIDs }, AuthZAction.DELETE,
+        'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      const deletedUserIDs = await this.modifyUsers(orgIDs, false, context, subject);
+      return { user_ids: deletedUserIDs.map((user) => { return user.id; }) };
+    }
   }
 
   /**
@@ -1181,63 +1469,78 @@ export class UserService extends ServiceBase {
     }
 
     const reqAttributes: any[] = call.attributes || call.request.attributes || [];
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: ReadPolicyResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, { role }, AuthZAction.READ,
+        'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new errors.PermissionDenied(acsResponse.response.status.message);
+    }
 
-    const result = await this.roleService.read({
-      request: {
-        filter: toStruct({
-          name: { $eq: role }
-        }),
-        field: [{
-          name: 'id',
-          include: true
-        }]
+    if (acsResponse.decision === Decision.PERMIT) {
+      const result = await this.roleService.read({
+        request: {
+          filter: toStruct({
+            name: { $eq: role }
+          }),
+          field: [{
+            name: 'id',
+            include: true
+          }],
+          subject
+        }
+      });
+
+      if (_.isEmpty(result) || _.isEmpty(result.items) || result.items.total_count == 0) {
+        throw new errors.NotFound(`Role ${role} does not exist`);
       }
-    });
 
-    if (_.isEmpty(result) || _.isEmpty(result.items) || result.items.total_count == 0) {
-      throw new errors.NotFound(`Role ${role} does not exist`);
-    }
+      const roleObj = result.items[0];
+      const id = roleObj.id;
 
-    const roleObj = result.items[0];
-    const id = roleObj.id;
+      // note: inefficient, a custom AQL query should be the final solution
+      const userResult = await super.read({
+        request: {}
+      }, {});
+      if (_.isEmpty(userResult) || _.isEmpty(userResult.items) || userResult.items.total_count == 0) {
+        throw new errors.NotFound('No users were found in the system');
+      }
 
-    // note: inefficient, a custom AQL query should be the final solution
-    const userResult = await super.read({
-      request: {}
-    }, {});
-    if (_.isEmpty(userResult) || _.isEmpty(userResult.items) || userResult.items.total_count == 0) {
-      throw new errors.NotFound('No users were found in the system');
-    }
+      const users: User[] = userResult.items;
 
-    const users: User[] = userResult.items;
+      let usersWithRole = [];
 
-    let usersWithRole = [];
-
-    for (let user of users) {
-      let found = false;
-      if (user.role_associations) {
-        for (let roleAssoc of user.role_associations) {
-          if (roleAssoc.role == id) {
-            found = true;
-            if (roleAssoc.attributes && reqAttributes) {
-              for (let attribute of reqAttributes) {
-                if (!_.find(roleAssoc.attributes, attribute)) {
-                  found = false;
-                  break;
+      for (let user of users) {
+        let found = false;
+        if (user.role_associations) {
+          for (let roleAssoc of user.role_associations) {
+            if (roleAssoc.role == id) {
+              found = true;
+              if (roleAssoc.attributes && reqAttributes) {
+                for (let attribute of reqAttributes) {
+                  if (!_.find(roleAssoc.attributes, attribute)) {
+                    found = false;
+                    break;
+                  }
                 }
               }
-            }
 
-            if (found) {
-              usersWithRole.push(user);
-              break;
+              if (found) {
+                usersWithRole.push(user);
+                break;
+              }
             }
           }
         }
       }
-    }
 
-    return usersWithRole;
+      return usersWithRole;
+    }
   }
 
   /**
@@ -1393,15 +1696,35 @@ export class UserService extends ServiceBase {
     await this.modifyUsers(orgIDs, true);
   }
 
+  disableAC() {
+    try {
+      this.cfg.set('authorization:enabled', false);
+      updateConfig(this.cfg);
+    } catch (err) {
+      this.logger.error('Error caught disabling authorization:', err);
+      this.cfg.set('authorization:enabled', this.authZCheck);
+    }
+  }
+
+  enableAC() {
+    try {
+      this.cfg.set('authorization:enabled', this.authZCheck);
+      updateConfig(this.cfg);
+    } catch (err) {
+      this.logger.error('Error caught enabling authorization:', err);
+      this.cfg.set('authorization:enabled', this.authZCheck);
+    }
+  }
+
   private async modifyUsers(orgIds: string[], deactivate: boolean,
-    context?: any): Promise<User[]> {
+    context?: any, subject?: any): Promise<User[]> {
     const ROLE_SCOPING_ENTITY = this.cfg.get('urns:roleScopingEntity');
     const ORGANIZATION_URN = this.cfg.get('urns:organization');
     const ROLE_SCOPING_INSTANCE = this.cfg.get('urns:roleScopingInstance');
 
     const eligibleUsers = [];
 
-    const roleID = await this.getNormalUserRoleID(context);
+    const roleID = await this.getNormalUserRoleID(context, subject);
     for (let org of orgIds) {
       const result = await super.read({
         request: {
@@ -1466,13 +1789,13 @@ export class UserService extends ServiceBase {
    * @param {ctx} User context
    * @return {roleID}
    */
-  private async getNormalUserRoleID(context: any): Promise<any> {
+  private async getNormalUserRoleID(context: any, subject: Subject): Promise<any> {
     let roleID;
     const roleName = this.cfg.get('roles:normalUser');
     const filter = toStruct(
       { name: { $eq: roleName } },
     );
-    const role: any = await this.roleService.read({ request: { filter } }, context);
+    const role: any = await this.roleService.read({ request: { filter, subject } }, context);
     if (role) {
       roleID = role.items[0].id;
     }
@@ -1516,6 +1839,82 @@ export class UserService extends ServiceBase {
     return user;
   }
 
+  /**
+   * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
+   * @param reaources list of resources
+   * @param entity entity name
+   * @param action resource action
+   */
+  async createMetadata(res: any, action: string, subject?: Subject): Promise<any> {
+    let resources = _.cloneDeep(res);
+    let orgOwnerAttributes = [];
+    if (resources && !_.isArray(resources)) {
+      resources = [resources];
+    }
+    const urns = this.cfg.get('authorization:urns');
+    if (subject && subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
+      // add user and subject scope as default owner
+      orgOwnerAttributes.push(
+        {
+          id: urns.ownerIndicatoryEntity,
+          value: urns.organization
+        },
+        {
+          id: urns.ownerInstance,
+          value: subject.scope
+        });
+    }
+
+    if (resources) {
+      for (let resource of resources) {
+        if (!resource.meta) {
+          resource.meta = {};
+        }
+        if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
+          let result = await super.read({
+            request: {
+              filter: toStruct({
+                id: {
+                  $eq: resource.id
+                }
+              })
+            }
+          });
+          // update owner info
+          if (result.items.length === 1) {
+            let item = result.items[0];
+            resource.meta.owner = item.meta.owner;
+          } else if (result.items.length === 0 && !resource.meta.owner) {
+            let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+            ownerAttributes.push(
+              {
+                id: urns.ownerIndicatoryEntity,
+                value: urns.user
+              },
+              {
+                id: urns.ownerInstance,
+                value: resource.id
+              });
+            resource.meta.owner = ownerAttributes;
+          }
+        } else if (action === AuthZAction.CREATE && !resource.meta.owner) {
+          let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+          ownerAttributes.push(
+            {
+              id: urns.ownerIndicatoryEntity,
+              value: urns.user
+            },
+            {
+              id: urns.ownerInstance,
+              value: resource.id
+            });
+          resource.meta.owner = ownerAttributes;
+        }
+      }
+    }
+    return resources;
+  }
+
   private async makeUserForInvitationData(data): Promise<any> {
     const { user_id, invited_by_user_id } = data;
     let user, invitedByUser;
@@ -1557,11 +1956,23 @@ export class UserService extends ServiceBase {
 }
 
 
+
 export class RoleService extends ServiceBase {
   logger: Logger;
-  constructor(db: any, roleTopic: kafkaClient.Topic, logger: any, isEventsEnabled: boolean) {
+  redisClient: RedisClient;
+  cfg: any;
+  authZ: ACSAuthZ;
+  authZCheck: boolean;
+  constructor(cfg: any, db: any, roleTopic: kafkaClient.Topic, logger: any,
+    isEventsEnabled: boolean, authZ: ACSAuthZ) {
     super('role', roleTopic, logger, new ResourcesAPIBase(db, 'roles'), isEventsEnabled);
     this.logger = logger;
+    const redisConfig = cfg.get('redis');
+    redisConfig.db = cfg.get('redis:db-indexes:db-subject');
+    this.redisClient = createClient(redisConfig);
+    this.authZ = authZ;
+    this.cfg = cfg;
+    this.authZCheck = this.cfg.get('authorization:enabled');
   }
 
   async create(call: any, context?: any): Promise<any> {
@@ -1569,24 +1980,66 @@ export class RoleService extends ServiceBase {
       throw new errors.InvalidArgument('No role was provided for creation');
     }
 
-    for (let role of call.request.items) {
-      // check unique constraint for role name
-      if (!role.name) {
-        throw new errors.InvalidArgument('argument role name is empty');
-      }
-      const result = await super.read({
-        request: {
-          filter: toStruct({
-            name: { $eq: role.name }
-          })
-        }
-      }, context);
-      if (result && result.items && result.items.length > 0) {
-        throw new errors.AlreadyExists(`Role ${role.name} already exists`);
-      }
+    const items = call.request.items;
+    let subject = await getSubjectFromRedis(call, this);
+    const acsResources = await this.createMetadata(call.request.items, AuthZAction.CREATE, subject);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.CREATE,
+        'role', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
-    return super.create(call, context);
+    if (acsResponse.decision === Decision.PERMIT) {
+      for (let role of items) {
+        // check unique constraint for role name
+        if (!role.name) {
+          throw new errors.InvalidArgument('argument role name is empty');
+        }
+        const result = await super.read({
+          request: {
+            filter: toStruct({
+              name: { $eq: role.name }
+            })
+          }
+        }, context);
+        if (result && result.items && result.items.length > 0) {
+          throw new errors.AlreadyExists(`Role ${role.name} already exists`);
+        }
+      }
+      return super.create(call, context);
+    }
+  }
+
+  /**
+   * Extends ServiceBase.read()
+   * @param  {any} call request contains read request
+   * @param {context}
+   * @return type is any since it can be guest or user type
+   */
+  async read(call: any, context?: any): Promise<any> {
+    const readRequest = call.request;
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResponse: ReadPolicyResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
+        'role', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      return await super.read({ request: readRequest });
+    }
   }
 
   /**
@@ -1601,18 +2054,58 @@ export class RoleService extends ServiceBase {
     }
 
     const items = call.request.items;
-    for (let i = 0; i < items.length; i += 1) {
-      // read the role from DB and check if it exists
-      const role = items[i];
-      const filter = toStruct({
-        id: { $eq: role.id }
-      });
-      const roles = await super.read({ request: { filter } }, context);
-      if (roles.total_count === 0) {
-        throw new errors.NotFound('roles not found for updating');
-      }
+    let subject = await getSubjectFromRedis(call, this);
+    // update owner information
+    const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
+        'role', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
     }
-    return super.update(call, context);
+
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      for (let i = 0; i < items.length; i += 1) {
+        // read the role from DB and check if it exists
+        const role = items[i];
+        const filter = toStruct({
+          id: { $eq: role.id }
+        });
+        const roles = await super.read({ request: { filter } }, context);
+        if (roles.total_count === 0) {
+          throw new errors.NotFound('roles not found for updating');
+        }
+        const rolesDB = roles.data.items[0];
+        // update meta information from existing Object in case if its
+        // not provided in request
+        if (!role.meta) {
+          role.meta = rolesDB.meta;
+        } else if (role.meta && _.isEmpty(role.meta.owner)) {
+          role.meta.owner = rolesDB.meta.owner;
+        }
+        // check for ACS if owner information is changed
+        if (!_.isEqual(role.meta.owner, rolesDB.meta.owner)) {
+          let acsResponse: AccessResponse;
+          try {
+            acsResponse = await checkAccessRequest(subject, [role], AuthZAction.MODIFY,
+              'role', this, undefined, false);
+          } catch (err) {
+            this.logger.error('Error occurred requesting access-control-srv:', err);
+            throw err;
+          }
+          if (acsResponse.decision != Decision.PERMIT) {
+            throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+          }
+        }
+      }
+      return super.update(call, context);
+    }
   }
 
   /**
@@ -1625,7 +2118,25 @@ export class RoleService extends ServiceBase {
       || _.isEmpty(call.request.items)) {
       throw new errors.InvalidArgument('No items were provided for upsert');
     }
-    return super.upsert(call, context);
+
+    let subject = await getSubjectFromRedis(call, this);
+    const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
+        'role', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      return super.upsert(call, context);
+    }
   }
 
   /**
@@ -1638,41 +2149,66 @@ export class RoleService extends ServiceBase {
     const request = call.request;
     const logger = this.logger;
     let roleIDs = request.ids;
-    if (request.collection) {
-      // delete collection and return
+    let resources = {};
+    let subject = await getSubjectFromRedis(call, this);
+    let acsResources;
+    if (roleIDs) {
+      Object.assign(resources, { id: roleIDs });
+      acsResources = await this.createMetadata({ id: roleIDs }, AuthZAction.DELETE, subject);
+    }
+    if (call.request.collection) {
+      acsResources = [{ collection: call.request.collection }];
+    }
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, resources, AuthZAction.DELETE,
+        'role', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      if (request.collection) {
+        // delete collection and return
+        const serviceCall = {
+          request: {
+            collection: request.collection
+          }
+        };
+        await super.delete(serviceCall, context);
+        logger.info('Role collection deleted:');
+        return {};
+      }
+      if (!_.isArray(roleIDs)) {
+        roleIDs = [roleIDs];
+      }
+      logger.silly('deleting Role IDs:', { roleIDs });
+      // Check each user exist if one of the user does not exist throw an error
+      for (let roleID of roleIDs) {
+        const filter = toStruct({
+          id: { $eq: roleID }
+        });
+        const roles = await super.read({ request: { filter } }, context);
+        if (roles.total_count === 0) {
+          logger.debug('Role does not exist for deleting:', { roleID });
+          throw new errors.NotFound(`Role with ${roleID} does not exist for deleting`);
+        }
+      }
+      // delete users
       const serviceCall = {
         request: {
-          collection: request.collection
+          ids: roleIDs
         }
       };
       await super.delete(serviceCall, context);
-      logger.info('Role collection deleted:');
+      logger.info('Roles deleted:', roleIDs);
       return {};
     }
-    if (!_.isArray(roleIDs)) {
-      roleIDs = [roleIDs];
-    }
-    logger.silly('deleting Role IDs:', { roleIDs });
-    // Check each user exist if one of the user does not exist throw an error
-    for (let roleID of roleIDs) {
-      const filter = toStruct({
-        id: { $eq: roleID }
-      });
-      const roles = await super.read({ request: { filter } }, context);
-      if (roles.total_count === 0) {
-        logger.debug('Role does not exist for deleting:', { roleID });
-        throw new errors.NotFound(`Role with ${roleID} does not exist for deleting`);
-      }
-    }
-    // delete users
-    const serviceCall = {
-      request: {
-        ids: roleIDs
-      }
-    };
-    await super.delete(serviceCall, context);
-    logger.info('Roles deleted:', roleIDs);
-    return {};
   }
 
   async verifyRoles(roleAssociations: RoleAssociation[]): Promise<boolean> {
@@ -1693,5 +2229,99 @@ export class RoleService extends ServiceBase {
     }
 
     return true;
+  }
+
+  /**
+   * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
+   * @param reaources list of resources
+   * @param entity entity name
+   * @param action resource action
+   */
+  async createMetadata(res: any, action: string, subject?: Subject): Promise<any> {
+    let resources = _.cloneDeep(res);
+    let orgOwnerAttributes = [];
+    if (!_.isArray(resources)) {
+      resources = [resources];
+    }
+    const urns = this.cfg.get('authorization:urns');
+    if (subject && subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
+      // add user and subject scope as default owner
+      orgOwnerAttributes.push(
+        {
+          id: urns.ownerIndicatoryEntity,
+          value: urns.organization
+        },
+        {
+          id: urns.ownerInstance,
+          value: subject.scope
+        });
+    }
+
+    for (let resource of resources) {
+      if (!resource.meta) {
+        resource.meta = {};
+      }
+      if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
+        let result = await super.read({
+          request: {
+            filter: toStruct({
+              id: {
+                $eq: resource.id
+              }
+            })
+          }
+        });
+        // update owner info
+        if (result.items.length === 1) {
+          let item = result.items[0];
+          resource.meta.owner = item.meta.owner;
+        } else if (result.items.length === 0 && !resource.meta.owner) {
+          let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+          ownerAttributes.push(
+            {
+              id: urns.ownerIndicatoryEntity,
+              value: urns.user
+            },
+            {
+              id: urns.ownerInstance,
+              value: resource.id
+            });
+          resource.meta.owner = ownerAttributes;
+        }
+      } else if (action === AuthZAction.CREATE && !resource.meta.owner) {
+        let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+        ownerAttributes.push(
+          {
+            id: urns.ownerIndicatoryEntity,
+            value: urns.user
+          },
+          {
+            id: urns.ownerInstance,
+            value: resource.id
+          });
+        resource.meta.owner = ownerAttributes;
+      }
+    }
+    return resources;
+  }
+
+  disableAC() {
+    try {
+      this.cfg.set('authorization:enabled', false);
+      updateConfig(this.cfg);
+    } catch (err) {
+      this.logger.error('Error caught disabling authorization:', err);
+      this.cfg.set('authorization:enabled', this.authZCheck);
+    }
+  }
+
+  enableAC() {
+    try {
+      this.cfg.set('authorization:enabled', this.authZCheck);
+      updateConfig(this.cfg);
+    } catch (err) {
+      this.logger.error('Error caught enabling authorization:', err);
+      this.cfg.set('authorization:enabled', this.authZCheck);
+    }
   }
 }

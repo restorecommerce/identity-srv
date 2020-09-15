@@ -63,7 +63,8 @@
     "port": 6379,
     "offsetStoreInterval": 1000,
     "db-indexes": {
-      "db-offsetStore": 0
+      "db-offsetStore": 0,
+      "db-subject": 4
     }
   },
   "obfuscateAuthNErrorReason": false,
@@ -321,6 +322,34 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.notification.Notification"
       },
+      "setApiKeyCommand": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
+      },
+      "setApiKeyResponse": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
+      },
+      "flushCacheCommand": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
+      },
+      "flushCacheResponse": {
+        "protos": [
+          "io/restorecommerce/commandinterface.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
+      },
       "topics": {
         "user.resource": {
           "topic": "io.restorecommerce.users.resource"
@@ -335,7 +364,9 @@
             "restoreCommand",
             "resetCommand",
             "versionCommand",
-            "configUpdateCommand"
+            "configUpdateCommand",
+            "setApiKeyCommand",
+            "flushCacheCommand"
           ]
         },
         "rendering": {

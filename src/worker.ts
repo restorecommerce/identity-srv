@@ -4,14 +4,15 @@ import { Events } from '@restorecommerce/kafka-client';
 import { Logger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { UserService, RoleService } from './service';
-import { ACSAuthZ, UnAuthZ, initAuthZ } from '@restorecommerce/acs-client';
+import { ACSAuthZ, initAuthZ, updateConfig, initializeCache } from '@restorecommerce/acs-client';
+import { RedisClient, createClient } from 'redis';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
 
 class UserCommandInterface extends chassis.CommandInterface {
-  constructor(server: chassis.Server, cfg: any, logger: any, events: Events) {
-    super(server, cfg, logger, events);
+  constructor(server: chassis.Server, cfg: any, logger: any, events: Events, redisClient: RedisClient) {
+    super(server, cfg, logger, events, redisClient);
   }
 
   makeResourcesRestoreSetup(db: any, resource: string): any {
@@ -60,6 +61,18 @@ class UserCommandInterface extends chassis.CommandInterface {
       },
     };
   }
+
+  async setApiKey(payload: any): Promise<any> {
+    const commandResponse = await super.setApiKey(payload);
+    updateConfig(this.config);
+    return commandResponse;
+  }
+
+  async configUpdate(payload: any): Promise<any> {
+    const commandResponse = await super.configUpdate(payload);
+    updateConfig(this.config);
+    return commandResponse;
+  }
 }
 
 export class Worker {
@@ -70,7 +83,8 @@ export class Worker {
   topics: any;
   offsetStore: chassis.OffsetStore;
   userService: UserService;
-  authZ: ACSAuthZ | UnAuthZ;
+  authZ: ACSAuthZ;
+  redisClient: RedisClient;
   constructor(cfg?: any) {
     this.cfg = cfg || sconfig(process.cwd());
     this.logger = new Logger(this.cfg.get('logger'));
@@ -129,7 +143,16 @@ export class Worker {
 
     let authZ = await initAuthZ(this.cfg) as ACSAuthZ;
     this.authZ = authZ;
-    const cis = new UserCommandInterface(server, this.cfg.get(), logger, events);
+
+    // init redis client for subject index
+    const redisConfig = cfg.get('redis');
+    redisConfig.db = this.cfg.get('redis:db-indexes:db-subject');
+    this.redisClient = createClient(redisConfig);
+
+    // init ACS cache
+    initializeCache();
+
+    const cis = new UserCommandInterface(server, this.cfg, logger, events, this.redisClient);
 
     const identityServiceEventListener = async (msg: any,
       context: any, config: any, eventName: string) => {
@@ -168,8 +191,8 @@ export class Worker {
 
     // user service
     logger.verbose('Setting up user and role services');
-    const roleService = new RoleService(db,
-      this.topics['role.resource'], logger, true);
+    const roleService = new RoleService(cfg, db,
+      this.topics['role.resource'], logger, true, this.authZ);
     const userService = new UserService(cfg,
       this.topics, db, logger, true, roleService, this.authZ);
     this.userService = userService;
