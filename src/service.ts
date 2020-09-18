@@ -4,7 +4,7 @@ import * as util from 'util';
 import * as uuid from 'uuid';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as fetch from 'node-fetch';
-import { ServiceBase, ResourcesAPIBase, toStruct, toObject } from '@restorecommerce/resource-base-interface';
+import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from '@restorecommerce/logger';
 import { ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest, PolicySetRQ, PermissionDenied } from '@restorecommerce/acs-client';
@@ -189,7 +189,7 @@ export class UserService extends ServiceBase {
    */
   async find(call: Call<FindUser>, context?: any): Promise<any> {
     let { id, name, email } = call.request;
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id, name, email },
@@ -242,7 +242,7 @@ export class UserService extends ServiceBase {
    */
   async read(call: any, context?: any): Promise<any> {
     const readRequest = call.request;
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     let acsResponse: ReadPolicyResponse;
     try {
       acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
@@ -271,7 +271,7 @@ export class UserService extends ServiceBase {
     const insertedUsers = [];
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     // update meta data for owner information
     const acsResources = await this.createMetadata(usersList, AuthZAction.CREATE, subject);
     let acsResponse: AccessResponse;
@@ -659,7 +659,7 @@ export class UserService extends ServiceBase {
 
   async confirmUserInvitation(call: any, context: any): Promise<any> {
     const userInviteReq: UserInviationReq = call.request || call;
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, {
@@ -774,7 +774,7 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     const userName = request.name;
     const activationCode = request.activation_code;
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { name: userName, activation_code: activationCode },
@@ -843,7 +843,7 @@ export class UserService extends ServiceBase {
 
     const pw = request.password;
     const newPw = request.new_password;
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     const filter = toStruct({
       id: { $eq: userID }
     });
@@ -937,7 +937,7 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     const { name, activation_code } = call.request;
     const newPassword = call.request.password;
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, {
@@ -1043,7 +1043,7 @@ export class UserService extends ServiceBase {
     }
 
     const user: User = users.items[0];
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, {
@@ -1090,7 +1090,7 @@ export class UserService extends ServiceBase {
       throw new errors.InvalidArgument('No items were provided for update');
     }
     const items = call.request.items;
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     // update meta data for owner information
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
@@ -1171,7 +1171,7 @@ export class UserService extends ServiceBase {
     }
 
     const usersList = call.request.items;
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse;
     try {
@@ -1317,7 +1317,7 @@ export class UserService extends ServiceBase {
     const userID = request.id;
     logger.silly('unregister', userID);
 
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.DELETE, subject);
     let acsResponse: AccessResponse;
     try {
@@ -1366,7 +1366,7 @@ export class UserService extends ServiceBase {
     let userIDs = request.ids;
     let resources = [];
     let acsResources = [];
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     let action;
     if (userIDs) {
       action = AuthZAction.DELETE;
@@ -1438,7 +1438,7 @@ export class UserService extends ServiceBase {
 
   async deleteUsersByOrg(call: any, context?: any): Promise<any> {
     const orgIDs = call.request.org_ids;
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     let acsResponse: ReadPolicyResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id: orgIDs }, AuthZAction.DELETE,
@@ -1469,7 +1469,7 @@ export class UserService extends ServiceBase {
     }
 
     const reqAttributes: any[] = call.attributes || call.request.attributes || [];
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     let acsResponse: ReadPolicyResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { role }, AuthZAction.READ,
@@ -1981,7 +1981,7 @@ export class RoleService extends ServiceBase {
     }
 
     const items = call.request.items;
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.CREATE, subject);
     let acsResponse: AccessResponse;
     try {
@@ -2024,7 +2024,7 @@ export class RoleService extends ServiceBase {
    */
   async read(call: any, context?: any): Promise<any> {
     const readRequest = call.request;
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     let acsResponse: ReadPolicyResponse;
     try {
       acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
@@ -2054,7 +2054,7 @@ export class RoleService extends ServiceBase {
     }
 
     const items = call.request.items;
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     // update owner information
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
@@ -2119,7 +2119,7 @@ export class RoleService extends ServiceBase {
       throw new errors.InvalidArgument('No items were provided for upsert');
     }
 
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
     try {
@@ -2150,7 +2150,7 @@ export class RoleService extends ServiceBase {
     const logger = this.logger;
     let roleIDs = request.ids;
     let resources = {};
-    let subject = await getSubjectFromRedis(call, this);
+    let subject = await getSubjectFromRedis(call);
     let acsResources;
     if (roleIDs) {
       Object.assign(resources, { id: roleIDs });
