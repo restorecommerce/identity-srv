@@ -62,7 +62,7 @@
     "tsctests": "tsc -d -p tsconfig.test.json",
     "test-debug": "mocha -R spec ./test/*.js --inspect-brk",
     "coveralls": "nyc report --reporter=text-lcov | coveralls",
-    "createtopics": "node setupTopics.js io.restorecommerce.users.resource io.restorecommerce.roles.resource io.restorecommerce.rendering io.restorecommerce.command",
+    "createtopics": "node setupTopics.js io.restorecommerce.users.resource io.restorecommerce.roles.resource io.restorecommerce.rendering io.restorecommerce.command io.restorecommerce.authentication_log",
     "build:tsc": "tsc -d",
     "build:clean": "rimraf lib",
     "build": "npm-run-all lint build:clean build:tsc",

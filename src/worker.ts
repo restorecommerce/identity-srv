@@ -6,6 +6,7 @@ import * as chassis from '@restorecommerce/chassis-srv';
 import { UserService, RoleService } from './service';
 import { ACSAuthZ, initAuthZ, updateConfig, initializeCache } from '@restorecommerce/acs-client';
 import { RedisClient, createClient } from 'redis';
+import { AuthenticationLogService } from './authlog_service';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
@@ -195,6 +196,8 @@ export class Worker {
       this.topics['role.resource'], logger, true, this.authZ);
     const userService = new UserService(cfg,
       this.topics, db, logger, true, roleService, this.authZ);
+    const authLogService = new AuthenticationLogService(cfg, db,
+      this.topics, logger, true, this.authZ);
     this.userService = userService;
 
     await server.bind(serviceNamesCfg.user, userService);

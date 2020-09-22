@@ -1,26 +1,20 @@
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
 import { Logger, errors } from '@restorecommerce/chassis-srv';
 import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject } from '@restorecommerce/acs-client';
-import { RedisClient, createClient } from 'redis';
 import { Topic } from '@restorecommerce/kafka-client';
 import { AccessResponse, ReadPolicyResponse, getSubjectFromRedis, checkAccessRequest } from './utils';
+import * as _ from 'lodash';
 
 export class AuthenticationLogService extends ServiceBase {
   logger: Logger;
-  redisClient: RedisClient;
   cfg: any;
   authZ: ACSAuthZ;
-  authZCheck: boolean;
-  constructor(cfg: any, db: any, roleTopic: Topic, logger: any,
+  constructor(cfg: any, db: any, authLogTopic: Topic, logger: any,
     isEventsEnabled: boolean, authZ: ACSAuthZ) {
-    super('role', roleTopic, logger, new ResourcesAPIBase(db, 'roles'), isEventsEnabled);
+    super('authentication_log', authLogTopic, logger, new ResourcesAPIBase(db, 'authentication_logs'), isEventsEnabled);
     this.logger = logger;
-    const redisConfig = cfg.get('redis');
-    redisConfig.db = cfg.get('redis:db-indexes:db-subject');
-    this.redisClient = createClient(redisConfig);
     this.authZ = authZ;
     this.cfg = cfg;
-    this.authZCheck = this.cfg.get('authorization:enabled');
   }
 
   async create(call: any, context?: any): Promise<any> {
@@ -28,13 +22,12 @@ export class AuthenticationLogService extends ServiceBase {
       throw new errors.InvalidArgument('No role was provided for creation');
     }
 
-    const items = call.request.items;
     let subject = await getSubjectFromRedis(call);
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.CREATE, subject);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.CREATE,
-        'role', this);
+        'authentication_log', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -44,22 +37,6 @@ export class AuthenticationLogService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
-      for (let role of items) {
-        // check unique constraint for role name
-        if (!role.name) {
-          throw new errors.InvalidArgument('argument role name is empty');
-        }
-        const result = await super.read({
-          request: {
-            filter: toStruct({
-              name: { $eq: role.name }
-            })
-          }
-        }, context);
-        if (result && result.items && result.items.length > 0) {
-          throw new errors.AlreadyExists(`Role ${role.name} already exists`);
-        }
-      }
       return super.create(call, context);
     }
   }
@@ -76,7 +53,7 @@ export class AuthenticationLogService extends ServiceBase {
     let acsResponse: ReadPolicyResponse;
     try {
       acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
-        'role', this);
+        'authentication_log', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -108,7 +85,7 @@ export class AuthenticationLogService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
-        'role', this);
+        'authentication_log', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -121,28 +98,28 @@ export class AuthenticationLogService extends ServiceBase {
     if (acsResponse.decision === Decision.PERMIT) {
       for (let i = 0; i < items.length; i += 1) {
         // read the role from DB and check if it exists
-        const role = items[i];
+        const auth_log = items[i];
         const filter = toStruct({
-          id: { $eq: role.id }
+          id: { $eq: auth_log.id }
         });
-        const roles = await super.read({ request: { filter } }, context);
-        if (roles.total_count === 0) {
+        const auth_logs = await super.read({ request: { filter } }, context);
+        if (auth_logs.total_count === 0) {
           throw new errors.NotFound('roles not found for updating');
         }
-        const rolesDB = roles.data.items[0];
+        const authLogDB = auth_logs.data.items[0];
         // update meta information from existing Object in case if its
         // not provided in request
-        if (!role.meta) {
-          role.meta = rolesDB.meta;
-        } else if (role.meta && _.isEmpty(role.meta.owner)) {
-          role.meta.owner = rolesDB.meta.owner;
+        if (!auth_log.meta) {
+          auth_log.meta = authLogDB.meta;
+        } else if (auth_log.meta && _.isEmpty(auth_log.meta.owner)) {
+          auth_log.meta.owner = authLogDB.meta.owner;
         }
         // check for ACS if owner information is changed
-        if (!_.isEqual(role.meta.owner, rolesDB.meta.owner)) {
+        if (!_.isEqual(auth_log.meta.owner, authLogDB.meta.owner)) {
           let acsResponse: AccessResponse;
           try {
-            acsResponse = await checkAccessRequest(subject, [role], AuthZAction.MODIFY,
-              'role', this, undefined, false);
+            acsResponse = await checkAccessRequest(subject, [auth_log], AuthZAction.MODIFY,
+              'authentication_log', this, undefined, false);
           } catch (err) {
             this.logger.error('Error occurred requesting access-control-srv:', err);
             throw err;
@@ -172,7 +149,7 @@ export class AuthenticationLogService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
-        'role', this);
+        'authentication_log', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -196,13 +173,13 @@ export class AuthenticationLogService extends ServiceBase {
   async delete(call: any, context?: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
-    let roleIDs = request.ids;
+    let authLogIDs = request.ids;
     let resources = {};
     let subject = await getSubjectFromRedis(call);
     let acsResources;
-    if (roleIDs) {
-      Object.assign(resources, { id: roleIDs });
-      acsResources = await this.createMetadata({ id: roleIDs }, AuthZAction.DELETE, subject);
+    if (authLogIDs) {
+      Object.assign(resources, { id: authLogIDs });
+      acsResources = await this.createMetadata({ id: authLogIDs }, AuthZAction.DELETE, subject);
     }
     if (call.request.collection) {
       acsResources = [{ collection: call.request.collection }];
@@ -210,7 +187,7 @@ export class AuthenticationLogService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, resources, AuthZAction.DELETE,
-        'role', this);
+        'authentication_log', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       throw err;
@@ -229,32 +206,32 @@ export class AuthenticationLogService extends ServiceBase {
           }
         };
         await super.delete(serviceCall, context);
-        logger.info('Role collection deleted:');
+        logger.info('AuthenticationLog collection deleted:');
         return {};
       }
-      if (!_.isArray(roleIDs)) {
-        roleIDs = [roleIDs];
+      if (!_.isArray(authLogIDs)) {
+        authLogIDs = [authLogIDs];
       }
-      logger.silly('deleting Role IDs:', { roleIDs });
+      logger.silly('deleting Role IDs:', { authLogIDs });
       // Check each user exist if one of the user does not exist throw an error
-      for (let roleID of roleIDs) {
+      for (let authLogID of authLogIDs) {
         const filter = toStruct({
-          id: { $eq: roleID }
+          id: { $eq: authLogID }
         });
         const roles = await super.read({ request: { filter } }, context);
         if (roles.total_count === 0) {
-          logger.debug('Role does not exist for deleting:', { roleID });
-          throw new errors.NotFound(`Role with ${roleID} does not exist for deleting`);
+          logger.debug('AuthLog does not exist for deleting:', { authLogID });
+          throw new errors.NotFound(`AuthLog with ${authLogID} does not exist for deleting`);
         }
       }
       // delete users
       const serviceCall = {
         request: {
-          ids: roleIDs
+          ids: authLogIDs
         }
       };
       await super.delete(serviceCall, context);
-      logger.info('Roles deleted:', roleIDs);
+      logger.info('AuthenticationLogs deleted:', { authLogIDs });
       return {};
     }
   }
