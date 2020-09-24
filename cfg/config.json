@@ -182,23 +182,23 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.role.Deleted"
       },
-      "authenticationLogCreated": {
+      "authentication_logCreated": {
         "protos": [
-          "io/restorecommerce/user.proto"
+          "io/restorecommerce/authentication_log.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.authentication_log.AuthenticationLog"
       },
-      "authenticationLogModified": {
+      "authentication_logModified": {
         "protos": [
-          "io/restorecommerce/user.proto"
+          "io/restorecommerce/authentication_log.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.authentication_log.AuthenticationLog"
       },
-      "authenticationLogDeleted": {
+      "authentication_logDeleted": {
         "protos": [
-          "io/restorecommerce/user.proto"
+          "io/restorecommerce/authentication_log.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.authentication_log.Deleted"
@@ -377,6 +377,9 @@
         },
         "role.resource": {
           "topic": "io.restorecommerce.roles.resource"
+        },
+        "authlog.resource": {
+          "topic": "io.restorecommerce.authentication_log.resource"
         },
         "command": {
           "topic": "io.restorecommerce.command",
