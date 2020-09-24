@@ -23,10 +23,10 @@ export class AuthenticationLogService extends ServiceBase {
     }
 
     let subject = await getSubjectFromRedis(call);
-    const acsResources = await this.createMetadata(call.request.items, AuthZAction.CREATE, subject);
+    call.request.items = await this.createMetadata(call.request.items, AuthZAction.CREATE, subject);
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.CREATE,
+      acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.CREATE,
         'authentication_log', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -78,13 +78,13 @@ export class AuthenticationLogService extends ServiceBase {
       throw new errors.InvalidArgument('No items were provided for update');
     }
 
-    const items = call.request.items;
+    let items = call.request.items;
     let subject = await getSubjectFromRedis(call);
     // update owner information
-    const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
+    items = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
+      acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY,
         'authentication_log', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -145,10 +145,10 @@ export class AuthenticationLogService extends ServiceBase {
     }
 
     let subject = await getSubjectFromRedis(call);
-    const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
+    call.reqeust.items = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
+      acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.MODIFY,
         'authentication_log', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -289,7 +289,7 @@ export class AuthenticationLogService extends ServiceBase {
             },
             {
               id: urns.ownerInstance,
-              value: resource.id
+              value: subject.id
             });
           resource.meta.owner = ownerAttributes;
         }
@@ -302,7 +302,7 @@ export class AuthenticationLogService extends ServiceBase {
           },
           {
             id: urns.ownerInstance,
-            value: resource.id
+            value: subject.id
           });
         resource.meta.owner = ownerAttributes;
       }

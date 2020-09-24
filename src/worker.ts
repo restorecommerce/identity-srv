@@ -197,7 +197,7 @@ export class Worker {
     const userService = new UserService(cfg,
       this.topics, db, logger, true, roleService, this.authZ);
     const authLogService = new AuthenticationLogService(cfg, db,
-      this.topics, logger, true, this.authZ);
+      this.topics['authlog.resource'], logger, true, this.authZ);
     this.userService = userService;
 
     await server.bind(serviceNamesCfg.user, userService);
