@@ -202,6 +202,7 @@ export class Worker {
 
     await server.bind(serviceNamesCfg.user, userService);
     await server.bind(serviceNamesCfg.role, roleService);
+    await server.bind(serviceNamesCfg.authenticationLog, authLogService);
     await server.bind(serviceNamesCfg.cis, cis);
 
     // Add reflection service
