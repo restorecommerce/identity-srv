@@ -192,6 +192,7 @@ export class TokenService {
     }
 
     let subject = await getSubjectFromRedis(call);
+    const uid = call.request.uid;
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: AccessResponse;
     try {
@@ -207,7 +208,7 @@ export class TokenService {
 
     if (acsResponse.decision === Decision.PERMIT) {
       const id = await new Promise((resolve, reject) => {
-        const key = uidKeyFor(call.request.uid);
+        const key = uidKeyFor(uid);
         this.redisClient.get(key, (err, reply) => {
           if (err) {
             reject(err);
@@ -275,11 +276,12 @@ export class TokenService {
    *
   **/
   async destroy(call: any, context?: any): Promise<any> {
-    if (!call || !call.request || !call.request.uid) {
+    if (!call || !call.request || !call.request.id) {
       throw new errors.InvalidArgument('Key was not provided for delete operation');
     }
 
     let subject = await getSubjectFromRedis(call);
+    const id = call.request.id;
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: AccessResponse;
     try {
@@ -295,7 +297,7 @@ export class TokenService {
 
     if (acsResponse.decision === Decision.PERMIT) {
       const response = await new Promise((resolve, reject) => {
-        const key = this.getKey(call.request.id);
+        const key = this.getKey(id);
         this.redisClient.del(key, (err, reply) => {
           if (err) {
             reject(err);
@@ -303,16 +305,17 @@ export class TokenService {
           }
 
           if (reply) {
-            const response = `Key ${key} deleted successfully`;
+            const response = `Key for subject ${subject.id} deleted successfully`;
             this.logger.debug(response);
             resolve(response);
           } else {
-            const response = `Key could not be ${key} deleted successfully`;
+            const response = `Key could not be ${subject.id} deleted successfully`;
+            this.logger.debug(response);
             resolve(response);
           }
         });
-        return marshallProtobufAny({ response });
       });
+      return marshallProtobufAny({ response });
     }
   }
 
@@ -326,6 +329,7 @@ export class TokenService {
     }
 
     let subject = await getSubjectFromRedis(call);
+    const grant_id = call.request.grant_id;
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: AccessResponse;
     try {
@@ -342,7 +346,7 @@ export class TokenService {
     if (acsResponse.decision === Decision.PERMIT) {
       const multi = this.redisClient.multi();
       const tokens: any = await new Promise((resolve, reject) => {
-        const key = grantKeyFor(call.request.grant_id);
+        const key = grantKeyFor(grant_id);
         this.redisClient.lrange(key, 0, -1, (err, res) => {
           if (err) {
             reject(err);
@@ -361,7 +365,7 @@ export class TokenService {
           }
           if (res) {
             const response = {
-              status: `Revoke by GrantId ${call.request.grant_id} successfull`
+              status: `Revoke by GrantId ${call.request.grant_id} successful`
             };
             resolve(response);
           }
