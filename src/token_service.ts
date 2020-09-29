@@ -119,7 +119,7 @@ export class TokenService {
             const response = {
               status: `AccessToken data ${tokenData.id} persisted successfully`
             };
-            this.logger.info('AccessToken data persisted successfully for subject', {id: subject.id});
+            this.logger.info('AccessToken data persisted successfully for subject', { id: subject.id });
             resolve(response);
           }
         });
@@ -138,6 +138,7 @@ export class TokenService {
     }
 
     let subject = await getSubjectFromRedis(call);
+    const id = call.request.id;
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: AccessResponse;
     try {
@@ -153,7 +154,7 @@ export class TokenService {
 
     if (acsResponse.decision === Decision.PERMIT) {
       const data: any = await new Promise((resolve, reject) => {
-        const key = this.getKey(call.request.id);
+        const key = this.getKey(id);
         this.redisClient.get(key, async (err, reply) => {
           if (err) {
             reject(err);
@@ -166,7 +167,7 @@ export class TokenService {
           } else {
             resolve();
           }
-        }).catch(reject);
+        });
       });
 
       if (!data) {
@@ -174,13 +175,9 @@ export class TokenService {
       }
 
       if (typeof data === 'string') {
-        return JSON.parse(data);
+        return marshallProtobufAny(JSON.parse(data));
       } else if (data && typeof data === 'object') {
-        const { payload, ...rest } = data;
-        return marshallProtobufAny({
-          ...rest,
-          ...JSON.parse(payload),
-        });
+        return marshallProtobufAny(data);
       }
     }
   }
@@ -223,7 +220,7 @@ export class TokenService {
           } else {
             resolve();
           }
-        }).catch(reject);
+        });
       });
       return await this.find({ request: { id, subject } });
     }
@@ -267,7 +264,7 @@ export class TokenService {
           } else {
             resolve();
           }
-        }).catch(reject);
+        });
       });
       return await this.find({ request: { id, subject } });
     }
@@ -313,7 +310,7 @@ export class TokenService {
             const response = `Key could not be ${key} deleted successfully`;
             resolve(response);
           }
-        }).catch(reject);
+        });
         return marshallProtobufAny({ response });
       });
     }
@@ -353,7 +350,7 @@ export class TokenService {
           } else {
             resolve(res);
           }
-        }).catch(reject);
+        });
       });
       tokens.forEach((token: any) => multi.del(token));
       const response = new Promise((resolve, reject) => {
@@ -368,7 +365,7 @@ export class TokenService {
             };
             resolve(response);
           }
-        }).catch(reject);
+        });
       });
       return marshallProtobufAny(response);
     }
