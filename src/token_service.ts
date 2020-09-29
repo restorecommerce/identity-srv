@@ -86,6 +86,7 @@ export class TokenService {
       const payload = unmarshallProtobufAny(tokenData.payload);
       tokenData.payload = JSON.stringify(payload);
 
+      multi.set(key, tokenData.payload);
       if (payload.grantId) {
         const grantKey = grantKeyFor(payload.grantId);
         multi.rpush(grantKey, key);
@@ -108,7 +109,7 @@ export class TokenService {
         multi.set(uidKey, tokenData.id);
         multi.expire(uidKey, tokenData.expires_in);
       }
-      const response = new Promise((resolve, reject) => {
+      const response = await new Promise((resolve, reject) => {
         multi.exec((err, res) => {
           if (err) {
             reject(err);
@@ -118,9 +119,10 @@ export class TokenService {
             const response = {
               status: `AccessToken data ${tokenData.id} persisted successfully`
             };
+            this.logger.info('AccessToken data persisted successfully for subject', {id: subject.id});
             resolve(response);
           }
-        }).catch(reject);
+        });
       });
       return marshallProtobufAny(response);
     }
