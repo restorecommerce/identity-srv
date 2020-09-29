@@ -64,7 +64,8 @@
     "offsetStoreInterval": 1000,
     "db-indexes": {
       "db-offsetStore": 0,
-      "db-subject": 4
+      "db-subject": 4,
+      "db-access-token": 5
     }
   },
   "obfuscateAuthNErrorReason": false,
@@ -562,6 +563,43 @@
           ]
         }
       },
+      "io-restorecommerce-token-srv": {
+        "upsert": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "find": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "findByUid": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "findByUserCode": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "destroy": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "revokeByGrantId": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "consume": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        }
+      },
       "io-restorecommerce-identity-reflection": {
         "serverReflectionInfo": {
           "transport": [
@@ -585,6 +623,7 @@
           "io-restorecommerce-user-srv": "io.restorecommerce.user.Service",
           "io-restorecommerce-role-srv": "io.restorecommerce.role.Service",
           "io-restorecommerce-authentication-log-srv": "io.restorecommerce.authentication_log.Service",
+          "io-restorecommerce-token-srv": "io.restorecommerce.token.Service",
           "io-restorecommerce-identity-reflection": "grpc.reflection.v1alpha.ServerReflection",
           "io-restorecommerce-identity-cis": "io.restorecommerce.commandinterface.Service"
         },
@@ -592,6 +631,7 @@
           "io/restorecommerce/user.proto",
           "io/restorecommerce/role.proto",
           "io/restorecommerce/authentication_log.proto",
+          "io/restorecommerce/token.proto",
           "grpc/reflection/v1alpha/reflection.proto",
           "io/restorecommerce/commandinterface.proto"
         ],
@@ -604,6 +644,7 @@
     "user": "io-restorecommerce-user-srv",
     "role": "io-restorecommerce-role-srv",
     "authenticationLog": "io-restorecommerce-authentication-log-srv",
+    "token": "io-restorecommerce-token-srv",
     "reflection": "io-restorecommerce-identity-reflection",
     "cis": "io-restorecommerce-identity-cis"
   },

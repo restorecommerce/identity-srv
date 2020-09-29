@@ -45,8 +45,7 @@ export class TokenService {
   cfg: any;
   authZ: ACSAuthZ;
   redisClient: RedisClient;
-  constructor(cfg: any, db: any, authLogTopic: Topic, logger: any,
-    authZ: ACSAuthZ, tokenRedisClient: RedisClient) {
+  constructor(cfg: any, logger: any, authZ: ACSAuthZ, tokenRedisClient: RedisClient) {
     this.logger = logger;
     this.authZ = authZ;
     this.cfg = cfg;
@@ -127,6 +126,10 @@ export class TokenService {
     }
   }
 
+  /**
+   * Find access token data from redis by id
+   *
+  **/
   async find(call: any, context?: any): Promise<any> {
     if (!call || !call.request || !call.request.id) {
       throw new errors.InvalidArgument('No id was provided for find');
@@ -180,6 +183,10 @@ export class TokenService {
     }
   }
 
+  /**
+   * Find access token data from redis by uid
+   *
+  **/
   async findByUid(call: any, context: any): Promise<any> {
     if (!call || !call.request || !call.request.uid) {
       throw new errors.InvalidArgument('No uid was provided for find operation');
@@ -220,6 +227,10 @@ export class TokenService {
     }
   }
 
+  /**
+   * Find access token data from redis by userCode
+   *
+  **/
   async findByUserCode(call: any, context?: any): Promise<any> {
     if (!call || !call.request || !call.request.uid) {
       throw new errors.InvalidArgument('UserCode was not provided for find operation');
@@ -260,6 +271,10 @@ export class TokenService {
     }
   }
 
+  /**
+   * Delete access token data from redis by id
+   *
+  **/
   async destroy(call: any, context?: any): Promise<any> {
     if (!call || !call.request || !call.request.uid) {
       throw new errors.InvalidArgument('Key was not provided for delete operation');
@@ -302,6 +317,10 @@ export class TokenService {
     }
   }
 
+  /**
+   * Delete access token data from redis by grant_id
+   *
+  **/
   async revokeByGrantId(call: any, context?: any): Promise<any> {
     if (!call || !call.request || !call.request.grant_id) {
       throw new errors.InvalidArgument('GrantId was not provided for revokeByGrantId operation');
@@ -353,6 +372,10 @@ export class TokenService {
     }
   }
 
+  /**
+   * Consume access token data from redis by id
+   *
+  **/
   async consume(call: any, context?: any): Promise<any> {
     if (!call || !call.request || !call.request.id) {
       throw new errors.InvalidArgument('ID was not provided for consume operation');

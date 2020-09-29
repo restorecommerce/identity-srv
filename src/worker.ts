@@ -7,6 +7,7 @@ import { UserService, RoleService } from './service';
 import { ACSAuthZ, initAuthZ, updateConfig, initializeCache } from '@restorecommerce/acs-client';
 import { RedisClient, createClient } from 'redis';
 import { AuthenticationLogService } from './authlog_service';
+import { TokenService } from './token_service';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
@@ -200,9 +201,16 @@ export class Worker {
       this.topics['authlog.resource'], logger, true, this.authZ);
     this.userService = userService;
 
+    // token service
+    // constructor(cfg: any, logger: any, authZ: ACSAuthZ, tokenRedisClient: RedisClient) {
+    redisConfig.db = this.cfg.get('redis:db-indexes:db-access-token') || 0;
+    const redisTokenClient = createClient(redisConfig);
+    const tokenService = new TokenService(cfg, logger, this.authZ, redisTokenClient);
+
     await server.bind(serviceNamesCfg.user, userService);
     await server.bind(serviceNamesCfg.role, roleService);
     await server.bind(serviceNamesCfg.authenticationLog, authLogService);
+    await server.bind(serviceNamesCfg.token, tokenService);
     await server.bind(serviceNamesCfg.cis, cis);
 
     // Add reflection service
