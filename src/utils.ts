@@ -5,6 +5,7 @@ import * as _ from 'lodash';
 import { UserService, RoleService } from './service';
 import { toStruct } from '@restorecommerce/grpc-client';
 import { AuthenticationLogService } from './authlog_service';
+import { TokenService } from './token_service';
 
 export interface HierarchicalScope {
   id: string;
@@ -53,7 +54,8 @@ export interface ReadPolicyResponse extends AccessResponse {
  */
 /* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
 export async function checkAccessRequest(subject: Subject, resources: any, action: AuthZAction,
-  entity: string, service: UserService | RoleService | AuthenticationLogService, resourceNameSpace?: string, useCache = true): Promise<AccessResponse | ReadPolicyResponse> {
+  entity: string, service: UserService | RoleService | AuthenticationLogService | TokenService,
+  resourceNameSpace?: string, useCache = true): Promise<AccessResponse | ReadPolicyResponse> {
   let authZ = service.authZ;
   let data = _.cloneDeep(resources);
   if (!_.isArray(resources) && action != AuthZAction.READ) {
