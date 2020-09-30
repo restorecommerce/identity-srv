@@ -141,9 +141,15 @@ export class TokenService {
                   break;
                 }
               }
+              let token_name;
+              if (payload.claims && payload.claims.token_name) {
+                token_name = payload.claims.token_name;
+              } else {
+                token_name =  uuid.v4().replace(/-/g, '');
+              }
               if (updateToken) {
                 const token = {
-                  name: uuid.v4().replace(/-/g, ''),
+                  name: token_name,
                   expires_at: payload.exp,
                   token: payload.jti
                 };
