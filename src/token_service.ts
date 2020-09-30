@@ -1,9 +1,10 @@
 import { Logger, errors } from '@restorecommerce/chassis-srv';
 import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject, ApiKey } from '@restorecommerce/acs-client';
-import { Topic } from '@restorecommerce/kafka-client';
 import { AccessResponse, getSubjectFromRedis, checkAccessRequest } from './utils';
 import { RedisClient } from 'redis';
 import * as _ from 'lodash';
+import { UserService } from './service';
+import * as uuid from 'uuid';
 
 interface TokenData {
   id: string;
@@ -45,11 +46,14 @@ export class TokenService {
   cfg: any;
   authZ: ACSAuthZ;
   redisClient: RedisClient;
-  constructor(cfg: any, logger: any, authZ: ACSAuthZ, tokenRedisClient: RedisClient) {
+  userService: UserService;
+  constructor(cfg: any, logger: any, authZ: ACSAuthZ, tokenRedisClient: RedisClient,
+    userService: UserService) {
     this.logger = logger;
     this.authZ = authZ;
     this.cfg = cfg;
     this.redisClient = tokenRedisClient;
+    this.userService = userService;
   }
 
   private getKey(id: string) {
@@ -110,7 +114,7 @@ export class TokenService {
         multi.expire(uidKey, tokenData.expires_in);
       }
       const response = await new Promise((resolve, reject) => {
-        multi.exec((err, res) => {
+        multi.exec(async (err, res) => {
           if (err) {
             reject(err);
             return;
@@ -120,6 +124,36 @@ export class TokenService {
               status: `AccessToken data ${tokenData.id} persisted successfully`
             };
             this.logger.info('AccessToken data persisted successfully for subject', { id: subject.id });
+            // update user token here and also last login
+            const userData = await this.userService.find({ request: { id: payload.accountId, subject: { id: payload.accountId } } });
+            if (userData && userData.items && userData.items.length > 0) {
+              let user = userData.items[0];
+              // check if the token is existing if not update it
+              let updateToken = true;
+              let currentTokenList = [];
+              if (user && user.tokens && user.tokens.length > 0) {
+                currentTokenList = user.tokens;
+              }
+              for (let token of currentTokenList) {
+                if (token.token === payload.jti) {
+                  // token already exists and not expired
+                  updateToken = false;
+                  break;
+                }
+              }
+              if (updateToken) {
+                const token = {
+                  name: uuid.v4().replace(/-/g, ''),
+                  expires_at: payload.exp,
+                  token: payload.jti
+                };
+                currentTokenList.push(token);
+                user.tokens = currentTokenList;
+                user.last_login = new Date().getTime();
+                user.last_access = new Date().getTime();
+                await this.userService.update({ request: { items: [user], subject: { id: payload.accountId } } });
+              }
+            };
             resolve(response);
           }
         });
@@ -296,9 +330,37 @@ export class TokenService {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
-      const response = await new Promise((resolve, reject) => {
+      const response = await new Promise(async (resolve, reject) => {
         const key = this.getKey(id);
-        this.redisClient.del(key, (err, reply) => {
+        let payload = await this.find({ request: { id, subject } });
+        // delete user token here
+        if (payload && payload.value) {
+          payload = unmarshallProtobufAny(payload);
+          const userData = await this.userService.find({ request: { id: payload.accountId, subject: { id: payload.accountId } } });
+          if (userData && userData.items && userData.items.length > 0) {
+            let user = userData.items[0];
+            // check if the token is existing if not update it
+            let updateToken = false;
+            let currentTokenList = [];
+            if (user && user.tokens && user.tokens.length > 0) {
+              currentTokenList = user.tokens;
+            }
+            for (let token of currentTokenList) {
+              if (token.token === id) {
+                // token exists, delete it
+                updateToken = true;
+                break;
+              }
+            }
+            if (updateToken) {
+              const updatedTokenList = currentTokenList.filter(token => token.token !== id);
+              user.tokens = updatedTokenList;
+              user.last_access = new Date().getTime();
+              await this.userService.update({ request: { items: [user], subject: { id: payload.accountId } } });
+            }
+          };
+        }
+        this.redisClient.del(key, async (err, reply) => {
           if (err) {
             reject(err);
             return;
