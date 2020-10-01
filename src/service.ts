@@ -1141,7 +1141,7 @@ export class UserService extends ServiceBase {
         // for user modification
         const user = items[i];
         if (!user.id) {
-          throw new errors.InvalidArgument('Subject identifier missing for update');
+          throw new errors.InvalidArgument('Subject identifier missing for update operation');
         }
         const filter = toStruct({
           id: { $eq: user.id }
