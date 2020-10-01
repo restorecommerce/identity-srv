@@ -1304,6 +1304,37 @@ export class UserService extends ServiceBase {
     }
   }
 
+  async populateRoleAssocCache(call: any, context?: any) {
+    if (!call || !call.request || !call.request.id || call.request.token) {
+      throw new errors.InvalidArgument('Subject ID or Token is missing');
+    }
+    const userID = call.request.id;
+    const filter = toStruct({
+      id: { $eq: userID }
+    });
+    const users = await super.read({ request: filter }, context);
+    const user = users.items[0];
+
+    let populatedHRScope = false;
+    const reqToken = call.request.token;
+    for (let token of user.tokens) {
+      if (token.token === reqToken) {
+        populatedHRScope = true;
+        // populate RoleAssocs and return
+        let redisKey = `cache:${userID}:subject`;
+        await this.redisClient.set(redisKey,
+          JSON.stringify({
+            id: user.id, role_associations: user.role_associations,
+            default_scope: user.default_scope, tokens: user.tokens,
+            token_name: token.name
+          }));
+      }
+    }
+    if (populatedHRScope) {
+      this.logger.info(`RoleAssociations stored successfully to redis for subject ${userID}`);
+    }
+  }
+
   /**
    * Endpoint unregister, delete a user
    * belonging to the user.
