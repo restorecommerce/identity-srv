@@ -318,16 +318,22 @@ export class UserService extends ServiceBase {
 
   private async verifyUserRoleAssociations(usersList: User[], subject: any): Promise<void> {
     let validateRoleScope = false;
-    if (subject && subject.id && _.isEmpty(subject.hierarchical_scopes)) {
-      let redisKey = `cache:${subject.id}:subject`;
+    let subID, token, redisSubKey, redisHRScopesKey;
+    redisSubKey = `cache:${subject.id}:subject`;
+    redisHRScopesKey = `cache:${subject.id}:hrScopes`;
+    let hierarchical_scopes = [];
+    if (subject) {
+      subID = subject.id;
+      token = subject.token;
+    }
+    if (subID) {
       // update ctx with HR scope from redis
       subject = await new Promise((resolve, reject) => {
-        this.redisClient.get(redisKey, async (err, response) => {
+        this.redisClient.get(redisSubKey, async (err, response) => {
           if (!err && response) {
             // update user HR scope and role_associations from redis
             const redisResp = JSON.parse(response);
             subject.role_associations = redisResp.role_associations;
-            subject.hierarchical_scopes = redisResp.hierarchical_scopes;
             resolve(subject);
           }
           // when not set in redis
@@ -338,7 +344,31 @@ export class UserService extends ServiceBase {
         });
       });
     }
-    let hierarchical_scopes = subject.hierarchical_scopes;
+    if (token) {
+      const userTokens = subject.tokens;
+      for (let tokenInfo of userTokens) {
+        if((tokenInfo.token === token) && tokenInfo.scopes && tokenInfo.scopes.length > 0) {
+          redisHRScopesKey = `cache:${subject.id}:${token}:hrScopes`;
+        }
+      }
+    }
+
+    hierarchical_scopes = await new Promise((resolve, reject) => {
+      this.redisClient.get(redisHRScopesKey, async (err, response) => {
+        if (!err && response) {
+          // update user HR scope and role_associations from redis
+          const redisResp = JSON.parse(response);
+          resolve(redisResp);
+        }
+        // when not set in redis
+        if (err || (!err && !response)) {
+          resolve(subject);
+          return subject;
+        }
+      });
+    });
+
+    Object.assign(subject, hierarchical_scopes);
     let createAccessRole = [];
     try {
       // Make whatIsAllowedACS request to retreive the set of applicable
