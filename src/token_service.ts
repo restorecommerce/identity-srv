@@ -489,6 +489,18 @@ export class TokenService {
     }
     try {
       this.tokenRedisClient.set(this.getKey(call.request.id), 'consumed', Math.floor(Date.now() / 1000));
+      const token = call.request.id;
+      const tokenData = await this.find(token);
+      const subject = { id: tokenData.accountId, token };
+      if (tokenData) {
+        // update las access
+        const userData = await this.userService.find({ request: { id: tokenData.accountId, subject } });
+        if (userData && userData.items && userData.items.length > 0) {
+          let user = userData.items[0];
+          user.last_access = new Date().getTime();
+          await this.userService.update({ request: { items: [user], subject } });
+        }
+      };
       return marshallProtobufAny({ response: `AccessToken with ID ${call.request.id} consumed` });
     } catch (err) {
       return marshallProtobufAny({ response: `error consuming access token` });
