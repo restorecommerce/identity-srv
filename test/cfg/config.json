@@ -33,7 +33,9 @@
     "port": 6379,
     "offsetStoreInterval": 1000,
     "db-indexes": {
-      "db-offsetStore": 0
+      "db-offsetStore": 0,
+      "db-subject": 4,
+      "db-access-token": 5
     }
   },
   "obfuscateAuthNErrorReason": false,
@@ -299,6 +301,27 @@
         "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.role.Deleted"
       },
+      "authentication_logCreated": {
+        "protos": [
+          "io/restorecommerce/authentication_log.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.authentication_log.AuthenticationLog"
+      },
+      "authentication_logModified": {
+        "protos": [
+          "io/restorecommerce/authentication_log.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.authentication_log.AuthenticationLog"
+      },
+      "authentication_logDeleted": {
+        "protos": [
+          "io/restorecommerce/authentication_log.proto"
+        ],
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "messageObject": "io.restorecommerce.authentication_log.Deleted"
+      },
       "registered": {
         "protos": [
           "io/restorecommerce/user.proto"
@@ -542,6 +565,11 @@
           "transport": [
             "grpcIdentity"
           ]
+        },
+        "populateRoleAssocCache": {
+          "transport": [
+            "grpcIdentity"
+          ]
         }
       },
       "io-restorecommerce-role-srv": {
@@ -566,6 +594,70 @@
           ]
         },
         "delete": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        }
+      },
+      "io-restorecommerce-authentication-log-srv": {
+        "read": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "create": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "update": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "upsert": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "delete": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        }
+      },
+      "io-restorecommerce-token-srv": {
+        "upsert": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "find": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "findByUid": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "findByUserCode": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "destroy": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "revokeByGrantId": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
+        "consume": {
           "transport": [
             "grpcIdentity"
           ]
@@ -613,12 +705,16 @@
         "services": {
           "io-restorecommerce-user-srv": "io.restorecommerce.user.Service",
           "io-restorecommerce-role-srv": "io.restorecommerce.role.Service",
+          "io-restorecommerce-authentication-log-srv": "io.restorecommerce.authentication_log.Service",
+          "io-restorecommerce-token-srv": "io.restorecommerce.token.Service",
           "io-restorecommerce-identity-reflection": "grpc.reflection.v1alpha.ServerReflection",
           "io-restorecommerce-identity-cis": "io.restorecommerce.commandinterface.Service"
         },
         "protos": [
           "io/restorecommerce/user.proto",
           "io/restorecommerce/role.proto",
+          "io/restorecommerce/authentication_log.proto",
+          "io/restorecommerce/token.proto",
           "grpc/reflection/v1alpha/reflection.proto",
           "io/restorecommerce/commandinterface.proto"
         ],
@@ -630,6 +726,8 @@
   "serviceNames": {
     "user": "io-restorecommerce-user-srv",
     "role": "io-restorecommerce-role-srv",
+    "authenticationLog": "io-restorecommerce-authentication-log-srv",
+    "token": "io-restorecommerce-token-srv",
     "reflection": "io-restorecommerce-identity-reflection",
     "cis": "io-restorecommerce-identity-cis"
   }

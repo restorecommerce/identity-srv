@@ -445,6 +445,7 @@ export class UserService extends ServiceBase {
       // find the HR scopes which gives user the create access
       // it's an array `hrScopes` since an user can be Admin for multiple orgs
       let hrScopes: HierarchicalScope[] = [];
+      hierarchical_scopes = subject.hierarchical_scopes;
       for (let hrScope of hierarchical_scopes) {
         for (let accessRole of createAccessRole) {
           if (hrScope.role === accessRole) {
