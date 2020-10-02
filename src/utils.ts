@@ -96,7 +96,7 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
   };
 }
 
-export const getSubjectFromRedis = async (call: any) => {
+export const getSubject = async (call: any) => {
   let subject = call.request.subject;
   if (!subject) {
     subject = {};

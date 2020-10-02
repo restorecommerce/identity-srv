@@ -2,7 +2,7 @@ import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resour
 import { Logger, errors } from '@restorecommerce/chassis-srv';
 import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject } from '@restorecommerce/acs-client';
 import { Topic } from '@restorecommerce/kafka-client';
-import { AccessResponse, ReadPolicyResponse, getSubjectFromRedis, checkAccessRequest } from './utils';
+import { AccessResponse, ReadPolicyResponse, getSubject, checkAccessRequest } from './utils';
 import * as _ from 'lodash';
 
 export class AuthenticationLogService extends ServiceBase {
@@ -22,7 +22,7 @@ export class AuthenticationLogService extends ServiceBase {
       throw new errors.InvalidArgument('No role was provided for creation');
     }
 
-    let subject = await getSubjectFromRedis(call);
+    let subject = await getSubject(call);
     call.request.items = await this.createMetadata(call.request.items, AuthZAction.CREATE, subject);
     let acsResponse: AccessResponse;
     try {
@@ -49,7 +49,7 @@ export class AuthenticationLogService extends ServiceBase {
    */
   async read(call: any, context?: any): Promise<any> {
     const readRequest = call.request;
-    let subject = await getSubjectFromRedis(call);
+    let subject = await getSubject(call);
     let acsResponse: ReadPolicyResponse;
     try {
       acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
@@ -79,7 +79,7 @@ export class AuthenticationLogService extends ServiceBase {
     }
 
     let items = call.request.items;
-    let subject = await getSubjectFromRedis(call);
+    let subject = await getSubject(call);
     // update owner information
     items = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
@@ -144,7 +144,7 @@ export class AuthenticationLogService extends ServiceBase {
       throw new errors.InvalidArgument('No items were provided for upsert');
     }
 
-    let subject = await getSubjectFromRedis(call);
+    let subject = await getSubject(call);
     call.reqeust.items = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
     try {
@@ -175,7 +175,7 @@ export class AuthenticationLogService extends ServiceBase {
     const logger = this.logger;
     let authLogIDs = request.ids;
     let resources = {};
-    let subject = await getSubjectFromRedis(call);
+    let subject = await getSubject(call);
     let acsResources;
     if (authLogIDs) {
       Object.assign(resources, { id: authLogIDs });
