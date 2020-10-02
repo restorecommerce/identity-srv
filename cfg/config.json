@@ -3,7 +3,7 @@
     "userActivationRequired": true,
     "register": true,
     "enableEmail": true,
-    "hbsTemplates": {
+    "hbs_templates": {
       "registerSubjectURL": "http://localhost:8080/identity-srv/templates/register_subject.hbs",
       "registerBodyURL": "http://localhost:8080/identity-srv/templates/register_body.hbs",
       "changeSubjectURL": "http://localhost:8080/identity-srv/templates/change_subject.hbs",
@@ -666,5 +666,11 @@
       "code": "403",
       "message": "Action not allowed on this resource"
     }
-  }
+  },
+  "techUsers": [
+    {
+      "id": "hbs_user",
+      "token": "5dc3f96905bb46f8aa3ad667692a331d"
+    }
+  ]
 }

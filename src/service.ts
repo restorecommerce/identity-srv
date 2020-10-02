@@ -20,6 +20,7 @@ import {
   validateAtSymbol,
   validateEmail
 } from './validation';
+import { TokenService } from './token_service';
 
 const password = {
   hash: (pw): string => {
@@ -166,6 +167,7 @@ export class UserService extends ServiceBase {
   authZ: ACSAuthZ;
   redisClient: RedisClient;
   authZCheck: boolean;
+  tokenService: TokenService;
   constructor(cfg: any, topics: any, db: any, logger: Logger,
     isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ) {
     super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users'),
@@ -180,6 +182,9 @@ export class UserService extends ServiceBase {
     redisConfig.db = cfg.get('redis:db-indexes:db-subject');
     this.redisClient = createClient(redisConfig);
     this.authZCheck = this.cfg.get('authorization:enabled');
+    redisConfig.db = this.cfg.get('redis:db-indexes:db-access-token') || 0;
+    const redisTokenClient = createClient(redisConfig);
+    this.tokenService = new TokenService(cfg, logger, authZ, redisTokenClient, this);
   }
 
   /**
@@ -347,7 +352,7 @@ export class UserService extends ServiceBase {
     if (token) {
       const userTokens = subject.tokens;
       for (let tokenInfo of userTokens) {
-        if((tokenInfo.token === token) && tokenInfo.scopes && tokenInfo.scopes.length > 0) {
+        if ((tokenInfo.token === token) && tokenInfo.scopes && tokenInfo.scopes.length > 0) {
           redisHRScopesKey = `cache:${subject.id}:${token}:hrScopes`;
         }
       }
@@ -1185,6 +1190,23 @@ export class UserService extends ServiceBase {
           // set the existing hash password field
           user.password_hash = dbUser.password_hash;
         }
+
+        // self kill token
+        const dbUserTokens = user.tokens;
+        if (dbUserTokens && dbUserTokens.length > 0) {
+          for (let dbToken of dbUserTokens) {
+            let tokenExists = _.find(user.tokens, { token: dbToken.token });
+            if (!tokenExists) {
+              this.tokenService.destroy({
+                request: {
+                  id: dbToken.token, subject: {
+                    id: dbToken.id, token: dbToken.token
+                  }
+                }
+              });
+            }
+          }
+        }
       }
       return super.update(call, context);
     }
@@ -1605,6 +1627,13 @@ export class UserService extends ServiceBase {
     }
   }
 
+  private setAuthenticationHeaders(subjectID, token) {
+    return {
+      'account-id': subjectID,
+      Authorization: `Bearer ${token}`
+    };
+  }
+
   /**
    * Initializes useful data for rendering requests
    * before sending emails (user registration / change).
@@ -1615,28 +1644,34 @@ export class UserService extends ServiceBase {
   async setRenderRequestConfigs(tplConfig: any): Promise<any> {
     let response: any;
     try {
-      response = await fetch(tplConfig.registerSubjectURL);
+      const techUsersCfg = this.cfg.get('techUsers');
+      let headers;
+      if (techUsersCfg && techUsersCfg.length > 0) {
+        const hbsUser = _.find(techUsersCfg, { id: 'hbs_user' });
+        headers = this.setAuthenticationHeaders(hbsUser.id, hbsUser.token);
+      }
+      response = await fetch(tplConfig.registerSubjectURL, { headers });
       this.registerSubjectTpl = await response.text();
 
-      response = await fetch(tplConfig.registerBodyURL);
+      response = await fetch(tplConfig.registerBodyURL, { headers });
       this.registerBodyTpl = await response.text();
 
-      response = await fetch(tplConfig.changeSubjectURL);
+      response = await fetch(tplConfig.changeSubjectURL, { headers });
       this.changeSubjectTpl = await response.text();
 
-      response = await fetch(tplConfig.changeBodyURL);
+      response = await fetch(tplConfig.changeBodyURL, { headers });
       this.changeBodyTpl = await response.text();
 
-      response = await fetch(tplConfig.invitationSubjectURL);
+      response = await fetch(tplConfig.invitationSubjectURL, { headers });
       this.invitationSubjectTpl = await response.text();
 
-      response = await fetch(tplConfig.invitationBodyURL);
+      response = await fetch(tplConfig.invitationBodyURL, { headers });
       this.invitationBodyTpl = await response.text();
 
-      response = await fetch(tplConfig.layoutURL);
+      response = await fetch(tplConfig.layoutURL, { headers });
       this.layoutTpl = await response.text();
 
-      response = await fetch(tplConfig.resourcesURL, {});
+      response = await fetch(tplConfig.resourcesURL, { headers });
       if (response.status == 200) {
         const externalRrc = JSON.parse(await response.text());
         this.emailStyle = externalRrc.styleURL;
