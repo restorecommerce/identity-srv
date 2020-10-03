@@ -1,6 +1,6 @@
 {
   "name": "@restorecommerce/identity-srv",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Restore Commerce identity service",
   "main": "lib/start.js",
   "author": "Invend GmbH",
@@ -23,7 +23,7 @@
     "@restorecommerce/grpc-client": "0.0.7",
     "@restorecommerce/kafka-client": "^0.1.12",
     "@restorecommerce/logger": "^0.2.1",
-    "@restorecommerce/protos": "^0.0.10",
+    "@restorecommerce/protos": "^0.0.11",
     "@restorecommerce/resource-base-interface": "0.0.5",
     "@restorecommerce/service-config": "^0.2.0",
     "bcryptjs": "^2.4.3",

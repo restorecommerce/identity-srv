@@ -1,3 +1,8 @@
+### 0.1.6 (October 3rd, 2020)
+
+- added token service and authentication_log service
+- restructured protos
+
 ### 0.1.5 (September 14th, 2020)
 
 - fix to use separate redisClient objects and updated doc
