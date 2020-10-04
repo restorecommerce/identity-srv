@@ -350,7 +350,10 @@ export class UserService extends ServiceBase {
       });
     }
     if (token) {
-      const userTokens = subject.tokens;
+      let userTokens = subject.tokens;
+      if (!userTokens) {
+        userTokens = [];
+      }
       for (let tokenInfo of userTokens) {
         if ((tokenInfo.token === token) && tokenInfo.scopes && tokenInfo.scopes.length > 0) {
           redisHRScopesKey = `cache:${subject.id}:${token}:hrScopes`;
@@ -373,7 +376,7 @@ export class UserService extends ServiceBase {
       });
     });
 
-    Object.assign(subject, hierarchical_scopes);
+    subject.hierarchical_scopes = hierarchical_scopes;
     let createAccessRole = [];
     try {
       // Make whatIsAllowedACS request to retreive the set of applicable
@@ -1358,14 +1361,14 @@ export class UserService extends ServiceBase {
   }
 
   async populateRoleAssocCache(call: any, context?: any) {
-    if (!call || !call.request || !call.request.id || call.request.token) {
+    if (!call || !call.request || !call.request.id || !call.request.token) {
       throw new errors.InvalidArgument('Subject ID or Token is missing');
     }
     const userID = call.request.id;
     const filter = toStruct({
       id: { $eq: userID }
     });
-    const users = await super.read({ request: filter }, context);
+    const users = await super.read({ request: { filter } }, context);
     const user = users.items[0];
 
     let populatedHRScope = false;
@@ -1385,6 +1388,8 @@ export class UserService extends ServiceBase {
     }
     if (populatedHRScope) {
       this.logger.info(`RoleAssociations stored successfully to redis for subject ${userID}`);
+    } else {
+      this.logger.info('RoleAssociations could not be stored for subject ${userID}');
     }
   }
 
