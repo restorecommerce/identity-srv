@@ -1373,17 +1373,19 @@ export class UserService extends ServiceBase {
 
     let populatedHRScope = false;
     const reqToken = call.request.token;
-    for (let token of user.tokens) {
-      if (token.token === reqToken) {
-        populatedHRScope = true;
-        // populate RoleAssocs and return
-        let redisKey = `cache:${userID}:subject`;
-        await this.redisClient.set(redisKey,
-          JSON.stringify({
-            id: user.id, role_associations: user.role_associations,
-            default_scope: user.default_scope, tokens: user.tokens,
-            token_name: token.name
-          }));
+    if (user && user.tokens) {
+      for (let token of user.tokens) {
+        if (token.token === reqToken) {
+          populatedHRScope = true;
+          // populate RoleAssocs and return
+          let redisKey = `cache:${userID}:subject`;
+          await this.redisClient.set(redisKey,
+            JSON.stringify({
+              id: user.id, role_associations: user.role_associations,
+              default_scope: user.default_scope, tokens: user.tokens,
+              token_name: token.name
+            }));
+        }
       }
     }
     if (populatedHRScope) {

@@ -109,99 +109,82 @@ export class TokenService {
       }
     }
 
-    let acsResponse: AccessResponse;
-    try {
-      acsResponse = await checkAccessRequest(subject, call.request, AuthZAction.CREATE,
-        'token', this);
-    } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
-    }
-    if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    const multi = this.tokenRedisClient.multi();
+    tokenData.payload = JSON.stringify(payload);
+    multi.set(key, tokenData.payload);
+    if (payload.grantId) {
+      const grantKey = grantKeyFor(payload.grantId);
+      multi.rpush(grantKey, key);
+      // if you're seeing grant key lists growing out of acceptable proportions consider using LTRIM
+      // here to trim the list to an appropriate length
+      const ttl = await this.tokenRedisClient.ttl(grantKey);
+      if (tokenData.expires_in > ttl) {
+        multi.expire(grantKey, tokenData.expires_in);
+      }
     }
 
-    if (acsResponse.decision === Decision.PERMIT) {
-      const multi = this.tokenRedisClient.multi();
-      tokenData.payload = JSON.stringify(payload);
-      multi.set(key, tokenData.payload);
-      if (payload.grantId) {
-        const grantKey = grantKeyFor(payload.grantId);
-        multi.rpush(grantKey, key);
-        // if you're seeing grant key lists growing out of acceptable proportions consider using LTRIM
-        // here to trim the list to an appropriate length
-        const ttl = await this.tokenRedisClient.ttl(grantKey);
-        if (tokenData.expires_in > ttl) {
-          multi.expire(grantKey, tokenData.expires_in);
+    if (payload.userCode) {
+      const userCodeKey = userCodeKeyFor(payload.userCode);
+      multi.set(userCodeKey, tokenData.id);
+      multi.expire(userCodeKey, tokenData.expires_in);
+    }
+
+    if (payload.uid) {
+      const uidKey = uidKeyFor(payload.uid);
+      multi.set(uidKey, tokenData.id);
+      multi.expire(uidKey, tokenData.expires_in);
+    }
+    const response: any = await new Promise((resolve, reject) => {
+      multi.exec(async (err, res) => {
+        if (err) {
+          reject(err);
+          return;
         }
-      }
-
-      if (payload.userCode) {
-        const userCodeKey = userCodeKeyFor(payload.userCode);
-        multi.set(userCodeKey, tokenData.id);
-        multi.expire(userCodeKey, tokenData.expires_in);
-      }
-
-      if (payload.uid) {
-        const uidKey = uidKeyFor(payload.uid);
-        multi.set(uidKey, tokenData.id);
-        multi.expire(uidKey, tokenData.expires_in);
-      }
-      const response: any = await new Promise((resolve, reject) => {
-        multi.exec(async (err, res) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-          if (res) {
-            const response = {
-              status: `AccessToken data ${tokenData.id} persisted successfully`
-            };
-            this.logger.info('AccessToken data persisted successfully for subject', { id: subject.id });
-            resolve(response);
-          }
-        });
-      });
-      if (response && response.status) {
-        // update user token here and also last login
-        const userData = await this.userService.find({ request: { id: payload.accountId, subject } });
-        if (userData && userData.items && userData.items.length > 0) {
-          let user = userData.items[0];
-          // check if the token is existing if not update it
-          let updateToken = true;
-          let currentTokenList = [];
-          if (user && user.tokens && user.tokens.length > 0) {
-            currentTokenList = user.tokens;
-          }
-          for (let token of currentTokenList) {
-            if (token.token === payload.jti) {
-              // token already exists and not expired
-              updateToken = false;
-              break;
+        if (res) {
+          const response = {
+            status: `AccessToken data ${tokenData.id} persisted successfully`
+          };
+          this.logger.info('AccessToken data persisted successfully for subject', { id: subject.id });
+          const userData = await this.userService.find({ request: { id: payload.accountId, subject } });
+          if (userData && userData.items && userData.items.length > 0) {
+            let user = userData.items[0];
+            // check if the token is existing if not update it
+            let updateToken = true;
+            let currentTokenList = [];
+            if (user && user.tokens && user.tokens.length > 0) {
+              currentTokenList = user.tokens;
             }
-          }
-          let token_name, scope;
-          if (payload.claims && payload.claims.token_name) {
-            token_name = payload.claims.token_name;
-          } else {
-            token_name = uuid.v4().replace(/-/g, '');
-          }
-          if (updateToken) {
-            const token = {
-              name: token_name,
-              expires_at: payload.exp,
-              token: payload.jti
-            };
-            currentTokenList.push(token);
-            user.tokens = currentTokenList;
-            user.last_login = new Date().getTime();
-            user.last_access = new Date().getTime();
-            await this.userService.update({ request: { items: [user], subject } });
-          }
-        };
-      }
-      return marshallProtobufAny(response);
-    }
+            for (let token of currentTokenList) {
+              if (token.token === payload.jti) {
+                // token already exists and not expired
+                updateToken = false;
+                break;
+              }
+            }
+            let token_name, scope;
+            if (payload.claims && payload.claims.token_name) {
+              token_name = payload.claims.token_name;
+            } else {
+              token_name = uuid.v4().replace(/-/g, '');
+            }
+            if (updateToken) {
+              const token = {
+                name: token_name,
+                expires_at: payload.exp,
+                token: payload.jti
+              };
+              currentTokenList.push(token);
+              user.tokens = currentTokenList;
+              user.last_login = new Date().getTime();
+              user.last_access = new Date().getTime();
+              await this.userService.update({ request: { items: [user], subject } });
+            }
+          };
+          resolve(response);
+        }
+      });
+    });
+    return marshallProtobufAny(response);
   }
 
   /**
