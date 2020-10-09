@@ -1,4 +1,4 @@
-### 0.1.7 (October 3rd, 2020)
+### 0.1.7 (October 9th, 2020)
 
 - up acs-client includes fix for validatino of token with subject-id
 - fix for populate role associations
