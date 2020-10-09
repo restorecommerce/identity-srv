@@ -1,3 +1,8 @@
+### 0.1.8 (October 9th, 2020)
+
+- update to chassis-srv v0.1.5
+- add redis and arangodb readiness checks
+
 ### 0.1.7 (October 9th, 2020)
 
 - up acs-client includes fix for validatino of token with subject-id

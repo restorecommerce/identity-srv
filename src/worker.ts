@@ -8,6 +8,8 @@ import { ACSAuthZ, initAuthZ, updateConfig, initializeCache } from '@restorecomm
 import { RedisClient, createClient } from 'redis';
 import { AuthenticationLogService } from './authlog_service';
 import { TokenService } from './token_service';
+import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base';
+import { Database } from 'arangojs';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
@@ -219,6 +221,22 @@ export class Worker {
     const transport = server.transport[transportName];
     const reflectionService = new chassis.grpc.ServerReflection(transport.$builder, server.config);
     await server.bind(reflectionServiceName, reflectionService);
+
+    await server.bind(serviceNamesCfg.health, new chassis.Health(cis, async () => {
+      if (!this.redisClient.ping()) {
+        return false;
+      }
+
+      try {
+        if (!(await ((db as Arango).db as Database).version())) {
+          return false;
+        }
+      } catch (e) {
+        return false;
+      }
+
+      return true;
+    }));
 
     const hbsTemplates = cfg.get('service:hbs_templates');
     if (hbsTemplates && cfg.get('service:enableEmail')) {
