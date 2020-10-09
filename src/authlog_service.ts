@@ -24,21 +24,7 @@ export class AuthenticationLogService extends ServiceBase {
 
     let subject = await getSubject(call);
     call.request.items = await this.createMetadata(call.request.items, AuthZAction.CREATE, subject);
-    let acsResponse: AccessResponse;
-    try {
-      acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.CREATE,
-        'authentication_log', this);
-    } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
-    }
-    if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
-    }
-
-    if (acsResponse.decision === Decision.PERMIT) {
-      return super.create(call, context);
-    }
+    return super.create(call, context);
   }
 
   /**
