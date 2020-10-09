@@ -1,6 +1,6 @@
 {
   "name": "@restorecommerce/identity-srv",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Restore Commerce identity service",
   "main": "lib/start.js",
   "author": "Invend GmbH",
@@ -66,8 +66,7 @@
     "createtopics": "node setupTopics.js io.restorecommerce.users.resource io.restorecommerce.roles.resource io.restorecommerce.rendering io.restorecommerce.command io.restorecommerce.authentication_log.resource",
     "build:tsc": "tsc -d",
     "build:clean": "rimraf lib",
-    "build": "npm-run-all lint build:clean build:tsc",
-    "healthcheck": "node lib/healthcheck.js"
+    "build": "npm-run-all lint build:clean build:tsc"
   },
   "engines": {
     "node": ">= 12.0.0"

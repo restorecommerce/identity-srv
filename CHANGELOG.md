@@ -1,3 +1,7 @@
+### 0.1.9 (October 10th, 2020)
+
+- switch docker healthcheck to grpc
+
 ### 0.1.8 (October 9th, 2020)
 
 - update to chassis-srv v0.1.5
