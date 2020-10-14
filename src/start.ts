@@ -1,6 +1,7 @@
 import * as Cluster from '@restorecommerce/cluster-service';
+import { createServiceConfig } from '@restorecommerce/service-config';
 
-const cfg = require('@restorecommerce/service-config')(process.cwd());
+const cfg = createServiceConfig(process.cwd());
 const server = new Cluster(cfg);
 server.run('./lib/worker');
 process.on('SIGINT', () => {

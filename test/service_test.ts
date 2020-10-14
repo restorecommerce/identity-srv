@@ -3,9 +3,8 @@ import * as should from 'should';
 import * as _ from 'lodash';
 import * as grpcClient from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
-import * as Logger from '@restorecommerce/logger';
 import { Worker } from '../lib/worker';
-import * as sconfig from '@restorecommerce/service-config';
+import { createServiceConfig } from '@restorecommerce/service-config';
 import { User } from '../lib/service';
 import { Topic } from '@restorecommerce/kafka-client/lib/events/provider/kafka';
 import { createMockServer } from 'grpc-mock';
@@ -29,7 +28,7 @@ let roleService: any;
 let mockServer: any;
 
 async function start(): Promise<void> {
-  cfg = sconfig(process.cwd() + '/test');
+  cfg = createServiceConfig(process.cwd() + '/test');
   worker = new Worker(cfg);
   await worker.start();
 }

@@ -1,9 +1,9 @@
 const { Events } = require('@restorecommerce/kafka-client');
-const RestoreLogger = require('@restorecommerce/logger');
-const sconfig = require('@restorecommerce/service-config');
+const { createLogger } = require('@restorecommerce/logger');
+const { createServiceConfig } = require('@restorecommerce/service-config');
 
-const cfg = sconfig(process.cwd());
-const logger = new RestoreLogger.Logger(cfg.get('logger'));
+const cfg = createServiceConfig(process.cwd());
+const logger = createLogger(cfg.get('logger'));
 
 /*
 * This script is used to create kafka topics before running the tests.

@@ -1,7 +1,7 @@
-import * as sconfig from '@restorecommerce/service-config';
+import { createServiceConfig } from '@restorecommerce/service-config';
 import * as _ from 'lodash';
 import { Events } from '@restorecommerce/kafka-client';
-import { Logger } from '@restorecommerce/logger';
+import { createLogger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { UserService, RoleService } from './service';
 import { ACSAuthZ, initAuthZ, updateConfig, initializeCache } from '@restorecommerce/acs-client';
@@ -90,8 +90,8 @@ export class Worker {
   authZ: ACSAuthZ;
   redisClient: RedisClient;
   constructor(cfg?: any) {
-    this.cfg = cfg || sconfig(process.cwd());
-    this.logger = new Logger(this.cfg.get('logger'));
+    this.cfg = cfg || createServiceConfig(process.cwd());
+    this.logger = createLogger(this.cfg.get('logger'));
     this.topics = {};
   }
 

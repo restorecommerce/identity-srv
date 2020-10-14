@@ -370,8 +370,8 @@ export class UserService extends ServiceBase {
         }
         // when not set in redis
         if (err || (!err && !response)) {
-          resolve(subject);
-          return subject;
+          resolve(subject.hierarchical_scopes);
+          return subject.hierarchical_scopes;
         }
       });
     });
