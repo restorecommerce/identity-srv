@@ -1,3 +1,8 @@
+### 0.1.10 (October 14th, 2020)
+
+- updated acs-client for evaluation_cacheable and protos
+- updated dependencies
+
 ### 0.1.9 (October 10th, 2020)
 
 - switch docker healthcheck to grpc
