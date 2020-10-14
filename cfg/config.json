@@ -655,7 +655,7 @@
           "grpc/health/v1/health.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
-        "addr": "localhost:50051"
+        "addr": "0.0.0.0:50051"
       }
     ]
   },
