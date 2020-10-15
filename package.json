@@ -3,7 +3,7 @@
   "version": "0.1.10",
   "description": "Restore Commerce identity service",
   "main": "lib/start.js",
-  "author": "Invend GmbH",
+  "author": "n-fuse GmbH",
   "repository": {
     "type": "git",
     "url": "https://github.com/restorecommerce/identity-srv.git"

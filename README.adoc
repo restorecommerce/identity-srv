@@ -4,9 +4,11 @@ https://travis-ci.org/restorecommerce/identity-srv?branch=master[image:http://im
 https://david-dm.org/restorecommerce/identity-srv[image:https://img.shields.io/david/restorecommerce/identity-srv.svg?style=flat-square[Dependencies]]
 https://coveralls.io/github/restorecommerce/identity-srv?branch=master[image:http://img.shields.io/coveralls/restorecommerce/identity-srv/master.svg?style=flat-square[Coverage Status]]
 
-A microservice for identity management part of the link:https://github.com/restorecommerce[Restorecommerce].
+A microservice for identity management.
 
 Please consult the documentation for using it:
 
 - *link:https://docs.restorecommerce.io/identity-srv/index.html[Usage]*
 - *link:https://docs.restorecommerce.io/architecture/index.html[General Architecture]*
+
+Part of link:https://github.com/restorecommerce[Restorecommerce].
