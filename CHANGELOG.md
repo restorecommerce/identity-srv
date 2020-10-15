@@ -1,3 +1,8 @@
+### 0.1.11 (October 15th, 2020)
+
+- updated chassis-srv
+- add acs-srv readiness check
+
 ### 0.1.10 (October 14th, 2020)
 
 - updated acs-client for evaluation_cacheable and protos

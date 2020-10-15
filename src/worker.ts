@@ -222,20 +222,11 @@ export class Worker {
     const reflectionService = new chassis.grpc.ServerReflection(transport.$builder, server.config);
     await server.bind(reflectionServiceName, reflectionService);
 
-    await server.bind(serviceNamesCfg.health, new chassis.Health(cis, async () => {
-      if (!this.redisClient.ping()) {
-        return false;
-      }
-
-      try {
-        if (!(await ((db as Arango).db as Database).version())) {
-          return false;
-        }
-      } catch (e) {
-        return false;
-      }
-
-      return true;
+    await server.bind(serviceNamesCfg.health, new chassis.Health(cis, {
+      logger,
+      cfg,
+      dependencies: ['acs-srv'],
+      readiness: async () => !!await ((db as Arango).db as Database).version()
     }));
 
     const hbsTemplates = cfg.get('service:hbs_templates');
