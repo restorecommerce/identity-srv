@@ -1,3 +1,7 @@
+### 0.1.12 (October 19th, 2020)
+
+- update services in production config
+
 ### 0.1.11 (October 19th, 2020)
 
 - updated chassis-srv
