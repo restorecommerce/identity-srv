@@ -1,7 +1,8 @@
-### 0.1.11 (October 15th, 2020)
+### 0.1.11 (October 19th, 2020)
 
 - updated chassis-srv
 - add acs-srv readiness check
+- updated acs-client
 
 ### 0.1.10 (October 14th, 2020)
 
