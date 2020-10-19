@@ -382,23 +382,29 @@ export class UserService extends ServiceBase {
       // Make whatIsAllowedACS request to retreive the set of applicable
       // policies and check for role scoping entity, if it exists then validate
       // the user role associations if not skip validation
-      let policySetRQ: PolicySetRQ = await accessRequest(subject, {
+      let acsResponse: Decision | PolicySetRQ = await accessRequest(subject, {
         entity: 'user',
         args: { filter: [] }
-      }, AuthZAction.CREATE, this.authZ) as PolicySetRQ;
-      const policiesList = policySetRQ.policies;
-      for (let policy of policiesList) {
-        for (let rule of policy.rules) {
-          if (rule.effect === 'PERMIT' && rule.target && rule.target.subject) {
-            // check if the rule subject has any scoping Entity
-            const ruleSubjectAttrs = rule.target.subject;
-            for (let ruleAttr of ruleSubjectAttrs) {
-              if (ruleAttr.id === this.cfg.get('authorization:urns:role')) {
-                // rule's role which give's user the acess to create User
-                createAccessRole.push(ruleAttr.value);
-              }
-              if (ruleAttr.id === this.cfg.get('authorization:urns:roleScopingEntity')) {
-                validateRoleScope = true;
+      }, AuthZAction.CREATE, this.authZ);
+      // decision is for apiKey
+      if ((acsResponse as Decision) === Decision.PERMIT) {
+        return;
+      }
+      const policiesList = (acsResponse as PolicySetRQ).policies;
+      if (policiesList && policiesList.length > 0) {
+        for (let policy of policiesList) {
+          for (let rule of policy.rules) {
+            if (rule.effect === 'PERMIT' && rule.target && rule.target.subject) {
+              // check if the rule subject has any scoping Entity
+              const ruleSubjectAttrs = rule.target.subject;
+              for (let ruleAttr of ruleSubjectAttrs) {
+                if (ruleAttr.id === this.cfg.get('authorization:urns:role')) {
+                  // rule's role which give's user the acess to create User
+                  createAccessRole.push(ruleAttr.value);
+                }
+                if (ruleAttr.id === this.cfg.get('authorization:urns:roleScopingEntity')) {
+                  validateRoleScope = true;
+                }
               }
             }
           }
