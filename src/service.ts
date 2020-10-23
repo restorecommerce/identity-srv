@@ -311,6 +311,13 @@ export class UserService extends ServiceBase {
           user.unauthenticated = true;
         }
         insertedUsers.push(await this.createUser(user, context));
+
+        const hbsTemplates = this.cfg.get('service:hbs_templates');
+        const enableEmail = this.cfg.get('service:enableEmail');
+
+        // if (hbsTemplates && cfg.get('service:enableEmail')) {
+
+        await this.fetchHbsTemplates();
         if (this.emailEnabled && user.invite) {
           // send render request for user Invitation
           const renderRequest = this.makeInvitationEmailData(user);
@@ -693,6 +700,7 @@ export class UserService extends ServiceBase {
     this.logger.info('user registered', user);
     await this.topics['user.resource'].emit('registered', user);
 
+    await this.fetchHbsTemplates();
     // For guest user email should not be sent out
     if (this.emailEnabled && !user.guest) {
       const renderRequest = this.makeActivationEmailData(user);
@@ -964,6 +972,7 @@ export class UserService extends ServiceBase {
     });
     await this.topics['user.resource'].emit('passwordChangeRequested', user);
 
+    await this.fetchHbsTemplates();
     // sending activation code via email
     if (this.emailEnabled) {
       const renderRequest = this.makeConfirmationData(user, true);
@@ -1059,6 +1068,7 @@ export class UserService extends ServiceBase {
     logger.info('Email change requested for user', userID);
     await this.topics['user.resource'].emit('emailChangeRequested', user);
 
+    await this.fetchHbsTemplates();
     if (this.emailEnabled) {
       const renderRequest = this.makeConfirmationData(user, false);
       await this.topics.rendering.emit('renderRequest', renderRequest);
@@ -1647,59 +1657,61 @@ export class UserService extends ServiceBase {
     };
   }
 
-  /**
-   * Initializes useful data for rendering requests
-   * before sending emails (user registration / change).
-   * @param {kafkaClient.Topic} renderingTopic Kafka topic with
-   * rendering-srv events.
-   * @param {any } tplConfig Templates prefix and URLs.
-   */
-  async setRenderRequestConfigs(tplConfig: any): Promise<any> {
-    let response: any;
-    try {
-      const techUsersCfg = this.cfg.get('techUsers');
-      let headers;
-      if (techUsersCfg && techUsersCfg.length > 0) {
-        const hbsUser = _.find(techUsersCfg, { id: 'hbs_user' });
-        headers = this.setAuthenticationHeaders(hbsUser.id, hbsUser.token);
+  // Initializes useful data for rendering requests
+  // before sending emails (user registration / change).
+  async fetchHbsTemplates(): Promise<any> {
+    const hbsTemplates = this.cfg.get('service:hbs_templates');
+    const enableEmail = this.cfg.get('service:enableEmail');
+
+    if (!_.isEmpty(hbsTemplates) && enableEmail) {
+      let response: any;
+      try {
+        const techUsersCfg = this.cfg.get('techUsers');
+        let headers;
+        if (techUsersCfg && techUsersCfg.length > 0) {
+          const hbsUser = _.find(techUsersCfg, { id: 'hbs_user' });
+          headers = this.setAuthenticationHeaders(hbsUser.id, hbsUser.token);
+        }
+
+        response = await fetch(hbsTemplates.registerSubjectURL, { headers });
+        this.registerSubjectTpl = await response.text();
+
+        response = await fetch(hbsTemplates.registerBodyURL, { headers });
+        this.registerBodyTpl = await response.text();
+
+        response = await fetch(hbsTemplates.changeSubjectURL, { headers });
+        this.changeSubjectTpl = await response.text();
+
+        response = await fetch(hbsTemplates.changeBodyURL, { headers });
+        this.changeBodyTpl = await response.text();
+
+        response = await fetch(hbsTemplates.invitationSubjectURL, { headers });
+        this.invitationSubjectTpl = await response.text();
+
+        response = await fetch(hbsTemplates.invitationBodyURL, { headers });
+        this.invitationBodyTpl = await response.text();
+
+        response = await fetch(hbsTemplates.layoutURL, { headers });
+        this.layoutTpl = await response.text();
+
+        response = await fetch(hbsTemplates.resourcesURL, { headers });
+        if (response.status == 200) {
+          const externalRrc = JSON.parse(await response.text());
+          this.emailStyle = externalRrc.styleURL;
+        }
+
+        this.emailEnabled = true;
+      } catch (err) {
+        this.emailEnabled = false;
+        if (err.code == 'ECONNREFUSED' || err.message == 'ECONNREFUSED') {
+          this.logger.error('An error occurred while attempting to load email templates from'
+            + ' remote server. Email operations will be disabled.');
+        } else {
+          this.logger.error('Unexpected error occurred while loading email templates', err.message);
+        }
       }
-      response = await fetch(tplConfig.registerSubjectURL, { headers });
-      this.registerSubjectTpl = await response.text();
-
-      response = await fetch(tplConfig.registerBodyURL, { headers });
-      this.registerBodyTpl = await response.text();
-
-      response = await fetch(tplConfig.changeSubjectURL, { headers });
-      this.changeSubjectTpl = await response.text();
-
-      response = await fetch(tplConfig.changeBodyURL, { headers });
-      this.changeBodyTpl = await response.text();
-
-      response = await fetch(tplConfig.invitationSubjectURL, { headers });
-      this.invitationSubjectTpl = await response.text();
-
-      response = await fetch(tplConfig.invitationBodyURL, { headers });
-      this.invitationBodyTpl = await response.text();
-
-      response = await fetch(tplConfig.layoutURL, { headers });
-      this.layoutTpl = await response.text();
-
-      response = await fetch(tplConfig.resourcesURL, { headers });
-      if (response.status == 200) {
-        const externalRrc = JSON.parse(await response.text());
-        this.emailStyle = externalRrc.styleURL;
-      }
-
-      this.emailEnabled = true;
-    } catch (err) {
-      this.emailEnabled = false;
-      this.sendEmail = null;
-      if (err.code == 'ECONNREFUSED' || err.message == 'ECONNREFUSED') {
-        this.logger.warn('An error occurred while attempting to load email templates from'
-          + ' remote server. Email operations will be disabled.');
-      } else {
-        this.logger.error('Unexpected error occurred while loading email templates', err.message);
-      }
+    } else {
+      this.logger.info('Email sending is disabled');
     }
   }
 
@@ -2059,13 +2071,16 @@ export class UserService extends ServiceBase {
     const user = call.request;
 
     const userForInvitation = await this.makeUserForInvitationData(user);
-    const renderRequest = this.makeInvitationEmailData(userForInvitation);
-    await this.topics.rendering.emit('renderRequest', renderRequest);
+
+    await this.fetchHbsTemplates();
+    if (this.emailEnabled && user.invite) {
+      const renderRequest = this.makeInvitationEmailData(userForInvitation);
+      await this.topics.rendering.emit('renderRequest', renderRequest);
+    }
+
     return {};
   }
 }
-
-
 
 export class RoleService extends ServiceBase {
   logger: Logger;

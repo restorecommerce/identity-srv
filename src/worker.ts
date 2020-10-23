@@ -229,12 +229,6 @@ export class Worker {
       readiness: async () => !!await ((db as Arango).db as Database).version()
     }));
 
-    const hbsTemplates = cfg.get('service:hbs_templates');
-    if (hbsTemplates && cfg.get('service:enableEmail')) {
-      await userService.setRenderRequestConfigs(hbsTemplates);
-    } else {
-      logger.info('Email sending is disabled');
-    }
     // Start server
     await server.start();
 
