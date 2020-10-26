@@ -4,14 +4,14 @@
     "register": true,
     "enableEmail": true,
     "hbsTemplates": {
-      "registerSubjectURL": "http://localhost:8080/identity-srv/templates/register_subject.hbs",
-      "registerBodyURL": "http://localhost:8080/identity-srv/templates/register_body.hbs",
-      "changeSubjectURL": "http://localhost:8080/identity-srv/templates/change_subject.hbs",
-      "changeBodyURL": "http://localhost:8080/identity-srv/templates/change_body.hbs",
-      "invitationSubjectURL": "http://localhost:8080/identity-srv/templates/invitation_subject.hbs",
-      "invitationBodyURL": "http://localhost:8080/identity-srv/templates/invitation_body.hbs",
-      "layoutURL": "http://localhost:8080/identity-srv/templates/layout.hbs",
-      "resourcesURL": "http://localhost:8080/identity-srv/templates/resources.json"
+      "registrationSubjectTpl": "http://localhost:8080/identity-srv/templates/registration_subject.hbs",
+      "registrationBodyTpl": "http://localhost:8080/identity-srv/templates/registration_body.hbs",
+      "changePWEmailSubjectTpl": "http://localhost:8080/identity-srv/templates/change_password_email_subject.hbs",
+      "changePWEmailBodyTpl": "http://localhost:8080/identity-srv/templates/change_password_email_body.hbs",
+      "invitationSubjectTpl": "http://localhost:8080/identity-srv/templates/invitation_subject.hbs",
+      "invitationBodyTpl": "http://localhost:8080/identity-srv/templates/invitation_body.hbs",
+      "layoutTpl": "http://localhost:8080/identity-srv/templates/layout.hbs",
+      "resourcesTpl": "http://localhost:8080/identity-srv/templates/resources.json"
     },
     "activationURL": "http://restorecommerce.io/activate_user/",
     "emailConfirmationURL": "http://restorecommerce.io/confirm_email_change/",

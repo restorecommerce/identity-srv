@@ -154,11 +154,11 @@ export class UserService extends ServiceBase {
   topics: any;
   logger: Logger;
   cfg: any;
-  registerSubjectTpl: string;
-  changeSubjectTpl: string;
+  registrationSubjectTpl: string;
+  changePWEmailSubjectTpl: string;
   layoutTpl: string;
-  registerBodyTpl: string;
-  changeBodyTpl: string;
+  registrationBodyTpl: string;
+  changePWEmailBodyTpl: string;
   invitationSubjectTpl: string;
   invitationBodyTpl: string;
   emailEnabled: boolean;
@@ -1673,28 +1673,28 @@ export class UserService extends ServiceBase {
           headers = this.setAuthenticationHeaders(hbsUser.id, hbsUser.token);
         }
 
-        response = await fetch(hbsTemplates.registerSubjectURL, { headers });
-        this.registerSubjectTpl = await response.text();
+        response = await fetch(hbsTemplates.registrationSubjectTpl, { headers });
+        this.registrationSubjectTpl = await response.text();
 
-        response = await fetch(hbsTemplates.registerBodyURL, { headers });
-        this.registerBodyTpl = await response.text();
+        response = await fetch(hbsTemplates.registrationBodyTpl, { headers });
+        this.registrationBodyTpl = await response.text();
 
-        response = await fetch(hbsTemplates.changeSubjectURL, { headers });
-        this.changeSubjectTpl = await response.text();
+        response = await fetch(hbsTemplates.changePWEmailSubjectTpl, { headers });
+        this.changePWEmailSubjectTpl = await response.text();
 
-        response = await fetch(hbsTemplates.changeBodyURL, { headers });
-        this.changeBodyTpl = await response.text();
+        response = await fetch(hbsTemplates.changePWEmailBodyTpl, { headers });
+        this.changePWEmailBodyTpl = await response.text();
 
-        response = await fetch(hbsTemplates.invitationSubjectURL, { headers });
+        response = await fetch(hbsTemplates.invitationSubjectTpl, { headers });
         this.invitationSubjectTpl = await response.text();
 
-        response = await fetch(hbsTemplates.invitationBodyURL, { headers });
+        response = await fetch(hbsTemplates.invitationBodyTpl, { headers });
         this.invitationBodyTpl = await response.text();
 
-        response = await fetch(hbsTemplates.layoutURL, { headers });
+        response = await fetch(hbsTemplates.layoutTpl, { headers });
         this.layoutTpl = await response.text();
 
-        response = await fetch(hbsTemplates.resourcesURL, { headers });
+        response = await fetch(hbsTemplates.resourcesTpl, { headers });
         if (response.status == 200) {
           const externalRrc = JSON.parse(await response.text());
           this.emailStyle = externalRrc.styleURL;
@@ -1731,8 +1731,8 @@ export class UserService extends ServiceBase {
     // since there are no place holders in subject
     const dataSubject = { userName: user.name };
 
-    const emailBody = this.registerBodyTpl;
-    const emailSubject = this.registerSubjectTpl;
+    const emailBody = this.registrationBodyTpl;
+    const emailSubject = this.registrationSubjectTpl;
     return this.makeRenderRequestMsg(user, emailSubject, emailBody,
       dataBody, dataSubject);
   }
@@ -1767,8 +1767,8 @@ export class UserService extends ServiceBase {
   }
 
   private makeConfirmationData(user: User, passwordChange: boolean): any {
-    const emailBody = this.changeBodyTpl;
-    const emailSubject = this.changeSubjectTpl;
+    const emailBody = this.changePWEmailBodyTpl;
+    const emailSubject = this.changePWEmailSubjectTpl;
 
     let URL: string = passwordChange ? this.cfg.get('service:passwordChangeConfirmationURL')
       : this.cfg.get('service:emailConfirmationURL'); // prefix

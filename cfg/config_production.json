@@ -23,14 +23,14 @@
   },
   "service": {
     "hbsTemplates": {
-      "registerSubjectURL": "http://restorecommerce-console:8080/identity-srv/templates/register_subject.hbs",
-      "registerBodyURL": "http://restorecommerce-console:8080/identity-srv/templates/register_body.hbs",
-      "changeSubjectURL": "http://restorecommerce-console:8080/identity-srv/templates/change_subject.hbs",
-      "changeBodyURL": "http://restorecommerce-console:8080/identity-srv/templates/change_body.hbs",
-      "invitationSubjectURL": "http://restorecommerce-console:8080/identity-srv/templates/invitation_subject.hbs",
-      "invitationBodyURL": "http://restorecommerce-console:8080/identity-srv/templates/invitation_body.hbs",
-      "layoutURL": "http://restorecommerce-console:8080/identity-srv/templates/layout.hbs",
-      "resourcesURL": "http://restorecommerce-console:8080/identity-srv/templates/resources.json"
+      "registrationSubjectTpl": "http://restorecommerce-console:8080/identity-srv/templates/registration_subject.hbs",
+      "registrationBodyTpl": "http://restorecommerce-console:8080/identity-srv/templates/registration_body.hbs",
+      "changePWEmailSubjectTpl": "http://restorecommerce-console:8080/identity-srv/templates/change_password_email_subject.hbs",
+      "changePWEmailBodyTpl": "http://restorecommerce-console:8080/identity-srv/templates/change_password_email_body.hbs",
+      "invitationSubjectTpl": "http://restorecommerce-console:8080/identity-srv/templates/invitation_subject.hbs",
+      "invitationBodyTpl": "http://restorecommerce-console:8080/identity-srv/templates/invitation_body.hbs",
+      "layoutTpl": "http://restorecommerce-console:8080/identity-srv/templates/layout.hbs",
+      "resourcesTpl": "http://restorecommerce-console:8080/identity-srv/templates/resources.json"
     }
   },
   "database": {
