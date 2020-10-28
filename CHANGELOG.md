@@ -1,3 +1,8 @@
+### 0.1.13 (October 28th, 2020)
+
+- changed HBS templates naming in configuration
+- added query params to activation urls 
+
 ### 0.1.12 (October 19th, 2020)
 
 - update services in production config
