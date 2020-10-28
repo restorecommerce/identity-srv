@@ -1717,11 +1717,7 @@ export class UserService extends ServiceBase {
 
   private makeActivationEmailData(user: User): any {
     let activationURL: string = this.cfg.get('service:activationURL');
-    if (!activationURL.endsWith('/')) {
-      activationURL += '/';
-    }
-
-    activationURL = `${activationURL}${user.name}/${user.activation_code}`;
+    activationURL = `${activationURL}?user_name=${user.name}&activation_code=${user.activation_code}`;
 
     const dataBody = {
       firstName: user.first_name,
@@ -1739,11 +1735,7 @@ export class UserService extends ServiceBase {
 
   private makeInvitationEmailData(user: User): any {
     let invitationURL: string = this.cfg.get('service:invitationURL');
-    if (!invitationURL.endsWith('/')) {
-      invitationURL += '/';
-    }
-
-    invitationURL = `${invitationURL}${user.name}/${user.activation_code}`;
+    invitationURL = `${invitationURL}?user_name=${user.name}&activation_code=${user.activation_code}`;
 
     const dataBody = {
       firstName: user.first_name,
@@ -1772,12 +1764,7 @@ export class UserService extends ServiceBase {
 
     let URL: string = passwordChange ? this.cfg.get('service:passwordChangeConfirmationURL')
       : this.cfg.get('service:emailConfirmationURL'); // prefix
-
-    if (!URL.endsWith('/')) {
-      URL += '/';
-    }
-
-    URL = `${URL}${user.name}/${user.activation_code}`; // actual email
+    URL = `${URL}?user_name=${user.name}&activation_code=${user.activation_code}`; // actual email
 
     const dataBody = {
       firstName: user.first_name,

@@ -13,10 +13,10 @@
       "layoutTpl": "http://localhost:8080/identity-srv/templates/layout.hbs",
       "resourcesTpl": "http://localhost:8080/identity-srv/templates/resources.json"
     },
-    "activationURL": "http://restorecommerce.io/activate_user/",
-    "emailConfirmationURL": "http://restorecommerce.io/confirm_email_change/",
-    "passwordChangeConfirmationURL": "http://restorecommerce.io/confirm_password_change/",
-    "invitationURL": "http://restorecommerce.io/#/invite_user/",
+    "activationURL": "http://restorecommerce.io/activate_user",
+    "emailConfirmationURL": "http://restorecommerce.io/confirm_email_change",
+    "passwordChangeConfirmationURL": "http://restorecommerce.io/confirm_password_change",
+    "invitationURL": "http://restorecommerce.io/#/invite_user",
     "minUsernameLength": 8,
     "maxUsernameLength": 40
   },
