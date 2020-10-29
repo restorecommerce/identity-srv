@@ -716,9 +716,10 @@ export class UserService extends ServiceBase {
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, {
-        name: userInviteReq.name,
+        active: true,
+        activation_code: userInviteReq.activation_code,
         password_hash: password.hash(userInviteReq.password),
-        activation_code: userInviteReq.activation_code
+        unauthenticated: true
       }, AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -830,7 +831,7 @@ export class UserService extends ServiceBase {
     let subject = await getSubject(call);
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, { name: userName, activation_code: activationCode },
+      acsResponse = await checkAccessRequest(subject, { active: true, activation_code: activationCode },
         AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);

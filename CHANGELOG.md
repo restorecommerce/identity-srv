@@ -1,7 +1,8 @@
 ### 0.1.13 (October 28th, 2020)
 
 - changed HBS templates naming in configuration
-- added query params to activation urls 
+- added query params to activation urls
+- updated acs-client for unauthenticated fix and fixed activation to remove user name
 
 ### 0.1.12 (October 19th, 2020)
 
