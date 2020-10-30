@@ -621,7 +621,7 @@ export class UserService extends ServiceBase {
     }
     if (user.user_type && user.user_type === TECHNICAL_USER && user.password) {
       throw new errors.InvalidArgument('argument password should be empty for technical user');
-    } 
+    }
 
     const serviceCfg = this.cfg.get('service');
 
