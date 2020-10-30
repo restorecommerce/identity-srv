@@ -81,6 +81,10 @@ export interface FindUser {
   api_key?: string;
 }
 
+export interface FindUserByToken {
+  token?: string;
+}
+
 export interface ActivateUser {
   name: string;
   activation_code: string;
@@ -223,6 +227,32 @@ export class UserService extends ServiceBase {
       logger.silly('user(s) could not be found for request', call.request);
       throw new errors.NotFound('user not found');
     }
+  }
+
+  /**
+   * Endpoint to search for user by token.
+   * @param {call} call request containing token
+   * @return user found
+   */
+  async findByToken(call: Call<FindUserByToken>, context?: any): Promise<any> {
+    let { token } = call.request;
+    const logger = this.logger;
+    // regex filter search field for token array
+    const filter = toStruct({
+      'tokens[*].token': {
+        $in: token
+      }
+    });
+    const users = await super.read({ request: { filter } }, context);
+    if (users.total_count === 0) {
+      logger.debug('No user found for provided token value');
+    }
+    if (users.total_count === 1) {
+      logger.silly('found user from token', { users });
+      return users;
+    }
+    logger.silly('multiple user found for request', call.request);
+    throw new errors.OutOfRange('multiple users found for token');
   }
 
   /**
@@ -580,7 +610,7 @@ export class UserService extends ServiceBase {
     logger.silly('request to register a user');
 
     this.setUserDefaults(user);
-    if ((!user.password && !user.invite)) {
+    if ((!user.password && !user.invite && (user.user_type != TECHNICAL_USER))) {
       throw new errors.InvalidArgument('argument password is empty');
     }
     if (!user.email) {
@@ -589,6 +619,9 @@ export class UserService extends ServiceBase {
     if (!user.name) {
       throw new errors.InvalidArgument('argument name is empty');
     }
+    if (user.user_type && user.user_type === TECHNICAL_USER && user.password) {
+      throw new errors.InvalidArgument('argument password should be empty for technical user');
+    } 
 
     const serviceCfg = this.cfg.get('service');
 
@@ -650,8 +683,10 @@ export class UserService extends ServiceBase {
     logger.silly('user does not exist');
 
     // Hash password
-    user.password_hash = password.hash(user.password);
-    delete user.password;
+    if (user.password) {
+      user.password_hash = password.hash(user.password);
+      delete user.password;
+    }
 
     if (!this.roleService.verifyRoles(user.role_associations)) {
       throw new errors.InvalidArgument(`Invalid role ID in role associations`);
