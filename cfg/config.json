@@ -512,6 +512,11 @@
           "transport": [
             "grpcIdentity"
           ]
+        },
+        "findByToken": {
+          "transport": [
+            "grpcIdentity"
+          ]
         }
       },
       "io-restorecommerce-role-srv": {
