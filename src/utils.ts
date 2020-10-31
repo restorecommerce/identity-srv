@@ -95,15 +95,3 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
     custom_query_args: { custom_queries, custom_arguments }
   };
 }
-
-export const getSubject = async (call: any) => {
-  let subject = call.request.subject;
-  if (!subject) {
-    subject = {};
-  }
-  let api_key = call.request.api_key;
-  if (api_key) {
-    subject = { api_key };
-  }
-  return subject;
-};
