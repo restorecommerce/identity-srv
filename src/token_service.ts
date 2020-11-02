@@ -1,6 +1,6 @@
 import { Logger, errors } from '@restorecommerce/chassis-srv';
-import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject, ApiKey } from '@restorecommerce/acs-client';
-import { AccessResponse, getSubject, checkAccessRequest } from './utils';
+import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject } from '@restorecommerce/acs-client';
+import { AccessResponse, checkAccessRequest } from './utils';
 import { RedisClient, createClient } from 'redis';
 import * as _ from 'lodash';
 import { UserService } from './service';
@@ -11,7 +11,6 @@ interface TokenData {
   payload: any;
   expires_in: number;
   subject?: Subject;
-  api_key?: ApiKey;
 }
 
 interface ReqTokenData {
@@ -76,7 +75,7 @@ export class TokenService {
     const tokenData = call.request;
     const payload = unmarshallProtobufAny(tokenData.payload);
     tokenData.payload = payload;
-    let subject = await getSubject(call);
+    let subject = call.request.subject;
     call.request = await this.createMetadata(tokenData, subject);
 
     // persist subject to reids - containing role_assocs
@@ -196,7 +195,7 @@ export class TokenService {
       throw new errors.InvalidArgument('No id was provided for find');
     }
 
-    let subject = await getSubject(call);
+    let subject = call.request.subject;
     const id = call.request.id;
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: AccessResponse;
@@ -250,7 +249,7 @@ export class TokenService {
       throw new errors.InvalidArgument('No uid was provided for find operation');
     }
 
-    let subject = await getSubject(call);
+    let subject = call.request.subject;
     const uid = call.request.uid;
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: AccessResponse;
@@ -295,7 +294,7 @@ export class TokenService {
       throw new errors.InvalidArgument('UserCode was not provided for find operation');
     }
 
-    let subject = await getSubject(call);
+    let subject = call.request.subject;
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: AccessResponse;
     try {
@@ -339,7 +338,7 @@ export class TokenService {
       throw new errors.InvalidArgument('Key was not provided for delete operation');
     }
 
-    let subject = await getSubject(call);
+    let subject = call.request.subject;
     const id = call.request.id;
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: AccessResponse;
@@ -415,7 +414,7 @@ export class TokenService {
       throw new errors.InvalidArgument('GrantId was not provided for revokeByGrantId operation');
     }
 
-    let subject = await getSubject(call);
+    let subject = call.request.subject;
     const grant_id = call.request.grant_id;
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: AccessResponse;
