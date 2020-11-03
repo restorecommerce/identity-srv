@@ -172,6 +172,7 @@ export class UserService extends ServiceBase {
   redisClient: RedisClient;
   authZCheck: boolean;
   tokenService: TokenService;
+  tokenRedisClient: RedisClient;
   constructor(cfg: any, topics: any, db: any, logger: Logger,
     isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ) {
     super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users'),
@@ -187,8 +188,8 @@ export class UserService extends ServiceBase {
     this.redisClient = createClient(redisConfig);
     this.authZCheck = this.cfg.get('authorization:enabled');
     redisConfig.db = this.cfg.get('redis:db-indexes:db-access-token') || 0;
-    const redisTokenClient = createClient(redisConfig);
-    this.tokenService = new TokenService(cfg, logger, authZ, redisTokenClient, this);
+    this.tokenRedisClient = createClient(redisConfig);
+    this.tokenService = new TokenService(cfg, logger, authZ, this.tokenRedisClient, this);
   }
 
   /**
@@ -242,9 +243,30 @@ export class UserService extends ServiceBase {
         $in: token
       }
     });
-    const users = await super.read({ request: { filter } }, context);
+    let users = await super.read({ request: { filter } }, context);
     if (users.total_count === 0) {
       logger.debug('No user found for provided token value');
+      // to handle use case (find operation in token upsert before updating user token)
+      const redisKey = `AccessToken:${token}`;
+      const redisSubject: any = await new Promise((resolve, reject) => {
+        this.tokenRedisClient.get(redisKey, async (err, reply) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+
+          if (reply) {
+            this.logger.debug('Found AccessToken in redis', redisKey);
+            resolve(JSON.parse(reply));
+          } else {
+            resolve();
+          }
+        });
+      });
+      if (redisSubject && redisSubject.claims && redisSubject.claims.data) {
+        users = redisSubject.claims.data;
+      }
+      return users;
     }
     if (users.total_count === 1) {
       logger.silly('found user from token', { users });

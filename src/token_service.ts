@@ -143,7 +143,7 @@ export class TokenService {
           const response = {
             status: `AccessToken data ${tokenData.id} persisted successfully`
           };
-          this.logger.info('AccessToken data persisted successfully for subject', { id: subject.id });
+          this.logger.debug('AccessToken data persisted successfully for subject', { id: payload.accountId });
           const userData = await this.userService.find({ request: { id: payload.accountId, subject } });
           if (userData && userData.items && userData.items.length > 0) {
             let user = userData.items[0];
@@ -160,7 +160,7 @@ export class TokenService {
                 break;
               }
             }
-            let token_name, scope;
+            let token_name;
             if (payload.claims && payload.claims.token_name) {
               token_name = payload.claims.token_name;
             } else {
