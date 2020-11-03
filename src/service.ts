@@ -341,13 +341,8 @@ export class UserService extends ServiceBase {
         }
         insertedUsers.push(await this.createUser(user, context));
 
-        const hbsTemplates = this.cfg.get('service:hbs_templates');
-        const enableEmail = this.cfg.get('service:enableEmail');
-
-        // if (hbsTemplates && cfg.get('service:enableEmail')) {
-
-        await this.fetchHbsTemplates();
         if (this.emailEnabled && user.invite) {
+          await this.fetchHbsTemplates();
           // send render request for user Invitation
           const renderRequest = this.makeInvitationEmailData(user);
           await this.topics.rendering.emit('renderRequest', renderRequest);
@@ -734,9 +729,9 @@ export class UserService extends ServiceBase {
     this.logger.info('user registered', user);
     await this.topics['user.resource'].emit('registered', user);
 
-    await this.fetchHbsTemplates();
     // For guest user email should not be sent out
     if (this.emailEnabled && !user.guest) {
+      await this.fetchHbsTemplates();
       const renderRequest = this.makeActivationEmailData(user);
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
@@ -1007,9 +1002,9 @@ export class UserService extends ServiceBase {
     });
     await this.topics['user.resource'].emit('passwordChangeRequested', user);
 
-    await this.fetchHbsTemplates();
     // sending activation code via email
     if (this.emailEnabled) {
+      await this.fetchHbsTemplates();
       const renderRequest = this.makeConfirmationData(user, true);
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
@@ -1103,8 +1098,8 @@ export class UserService extends ServiceBase {
     logger.info('Email change requested for user', userID);
     await this.topics['user.resource'].emit('emailChangeRequested', user);
 
-    await this.fetchHbsTemplates();
     if (this.emailEnabled) {
+      await this.fetchHbsTemplates();
       const renderRequest = this.makeConfirmationData(user, false);
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
@@ -2094,8 +2089,8 @@ export class UserService extends ServiceBase {
 
     const userForInvitation = await this.makeUserForInvitationData(user);
 
-    await this.fetchHbsTemplates();
     if (this.emailEnabled && user.invite) {
+      await this.fetchHbsTemplates();
       const renderRequest = this.makeInvitationEmailData(userForInvitation);
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
