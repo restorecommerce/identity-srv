@@ -270,7 +270,9 @@ export class UserService extends ServiceBase {
     }
     if (users.total_count === 1) {
       logger.silly('found user from token', { users });
-      return users;
+      if (users.items && users.items[0]) {
+        return users.items[0];
+      }
     }
     logger.silly('multiple user found for request', call.request);
     throw new errors.OutOfRange('multiple users found for token');
@@ -1197,7 +1199,7 @@ export class UserService extends ServiceBase {
       throw new errors.InvalidArgument('No items were provided for update');
     }
     const items = call.request.items;
-    let subject = call.reuest.subject;
+    let subject = call.request.subject;
     // update meta data for owner information
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: AccessResponse;
