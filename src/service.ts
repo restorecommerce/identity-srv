@@ -189,7 +189,7 @@ export class UserService extends ServiceBase {
     this.authZCheck = this.cfg.get('authorization:enabled');
     redisConfig.db = this.cfg.get('redis:db-indexes:db-access-token') || 0;
     this.tokenRedisClient = createClient(redisConfig);
-    this.tokenService = new TokenService(cfg, logger, authZ, this.tokenRedisClient, this);
+    this.tokenService = new TokenService(cfg, logger, authZ, this);
   }
 
   /**
@@ -378,40 +378,24 @@ export class UserService extends ServiceBase {
 
   private async verifyUserRoleAssociations(usersList: User[], subject: any): Promise<void> {
     let validateRoleScope = false;
-    let subID, token, redisSubKey, redisHRScopesKey;
-    redisSubKey = `cache:${subject.id}:subject`;
-    redisHRScopesKey = `cache:${subject.id}:hrScopes`;
+    let token, redisHRScopesKey, user;
     let hierarchical_scopes = [];
     if (subject) {
-      subID = subject.id;
       token = subject.token;
     }
-    if (subID) {
+    if (token) {
       // update ctx with HR scope from redis
-      subject = await new Promise((resolve, reject) => {
-        this.redisClient.get(redisSubKey, async (err, response) => {
-          if (!err && response) {
-            // update user HR scope and role_associations from redis
-            const redisResp = JSON.parse(response);
-            subject.role_associations = redisResp.role_associations;
-            resolve(subject);
-          }
-          // when not set in redis
-          if (err || (!err && !response)) {
-            resolve(subject);
-            return subject;
-          }
-        });
-      });
+      user = await this.findByToken({ token });
+      redisHRScopesKey = `cache:${user.id}:hrScopes`;
     }
     if (token) {
-      let userTokens = subject.tokens;
+      let userTokens = user.tokens;
       if (!userTokens) {
         userTokens = [];
       }
       for (let tokenInfo of userTokens) {
-        if ((tokenInfo.token === token) && tokenInfo.scopes && tokenInfo.scopes.length > 0) {
-          redisHRScopesKey = `cache:${subject.id}:${token}:hrScopes`;
+        if ((tokenInfo.token === token) && tokenInfo.scopes && tokenInfo.scopes.length > 0 && !tokenInfo.token_type) {
+          redisHRScopesKey = `cache:${user.id}:${token}:hrScopes`;
         }
       }
     }
@@ -1427,41 +1411,6 @@ export class UserService extends ServiceBase {
       return user;
     } else {
       throw new errors.NotFound('user not found');
-    }
-  }
-
-  async populateRoleAssocCache(call: any, context?: any) {
-    if (!call || !call.request || !call.request.id || !call.request.token) {
-      throw new errors.InvalidArgument('Subject ID or Token is missing');
-    }
-    const userID = call.request.id;
-    const filter = toStruct({
-      id: { $eq: userID }
-    });
-    const users = await super.read({ request: { filter } }, context);
-    const user = users.items[0];
-
-    let populatedHRScope = false;
-    const reqToken = call.request.token;
-    if (user && user.tokens) {
-      for (let token of user.tokens) {
-        if (token.token === reqToken) {
-          populatedHRScope = true;
-          // populate RoleAssocs and return
-          let redisKey = `cache:${userID}:subject`;
-          await this.redisClient.set(redisKey,
-            JSON.stringify({
-              id: user.id, role_associations: user.role_associations,
-              default_scope: user.default_scope, tokens: user.tokens,
-              token_name: token.name
-            }));
-        }
-      }
-    }
-    if (populatedHRScope) {
-      this.logger.info(`RoleAssociations stored successfully to redis for subject ${userID}`);
-    } else {
-      this.logger.info('RoleAssociations could not be stored for subject ${userID}');
     }
   }
 

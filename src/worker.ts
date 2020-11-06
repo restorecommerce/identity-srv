@@ -204,10 +204,7 @@ export class Worker {
     this.userService = userService;
 
     // token service
-    // constructor(cfg: any, logger: any, authZ: ACSAuthZ, tokenRedisClient: RedisClient) {
-    redisConfig.db = this.cfg.get('redis:db-indexes:db-access-token') || 0;
-    const redisTokenClient = createClient(redisConfig);
-    const tokenService = new TokenService(cfg, logger, this.authZ, redisTokenClient, userService);
+    const tokenService = new TokenService(cfg, logger, this.authZ, userService);
 
     await server.bind(serviceNamesCfg.user, userService);
     await server.bind(serviceNamesCfg.role, roleService);
