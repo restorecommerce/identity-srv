@@ -247,6 +247,55 @@ export class TokenService {
   }
 
   /**
+  * Consume access token
+  *
+  **/
+  async consume(call: any, context?: any): Promise<any> {
+    if (!call || !call.request || !call.request.id) {
+      throw new errors.InvalidArgument('ID was not provided for consume operation');
+    }
+
+    let acsResponse: AccessResponse;
+    const token = call.request.id;
+    const subject = { token };
+    try {
+      acsResponse = await checkAccessRequest(subject, { entity: 'token' }, AuthZAction.READ,
+        'token', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    try {
+      const tokenData = await this.find({ request: { token, subject: { token } } });
+      if (tokenData) {
+        // update last access
+        const userData = await this.userService.find({ request: { id: tokenData.accountId, subject } });
+        if (userData && userData.items && userData.items.length > 0) {
+          let user = userData.items[0];
+          user.last_access = new Date().getTime();
+          await this.userService.update({ request: { items: [user], subject } });
+        }
+      };
+      return marshallProtobufAny({ response: `AccessToken with ID ${call.request.id} consumed` });
+    } catch (err) {
+      return marshallProtobufAny({ response: `error consuming access token` });
+    }
+  }
+
+  /**
+  * Delete access token data from redis by grant_id
+  *
+  **/
+  async revokeByGrantId(call: any, context?: any): Promise<any> {
+    throw new errors.Unimplemented('RevokeByGrantId operation not implemented');
+  }
+
+
+  /**
    * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
    * @param reaources list of resources
    * @param entity entity name

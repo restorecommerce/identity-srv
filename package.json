@@ -17,13 +17,13 @@
     "srv"
   ],
   "dependencies": {
-    "@restorecommerce/acs-client": "0.2.18-alpha.2",
+    "@restorecommerce/acs-client": "0.2.18-alpha.4",
     "@restorecommerce/chassis-srv": "^0.1.6",
     "@restorecommerce/cluster-service": "^0.1.4",
     "@restorecommerce/grpc-client": "0.0.7",
     "@restorecommerce/kafka-client": "^0.1.12",
     "@restorecommerce/logger": "^0.3.5",
-    "@restorecommerce/protos": "^0.0.13",
+    "@restorecommerce/protos": "^0.0.15-alpha.1",
     "@restorecommerce/resource-base-interface": "0.0.5",
     "@restorecommerce/service-config": "^0.3.1",
     "bcryptjs": "^2.4.3",
