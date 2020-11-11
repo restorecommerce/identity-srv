@@ -384,18 +384,14 @@ export class UserService extends ServiceBase {
       token = subject.token;
     }
     if (token) {
-      // update ctx with HR scope from redis
       user = await this.findByToken({ token });
-      redisHRScopesKey = `cache:${user.id}:hrScopes`;
-    }
-    if (token) {
-      let userTokens = user.tokens;
-      if (!userTokens) {
-        userTokens = [];
-      }
-      for (let tokenInfo of userTokens) {
-        if ((tokenInfo.token === token) && tokenInfo.scopes && tokenInfo.scopes.length > 0 && !tokenInfo.token_type) {
-          redisHRScopesKey = `cache:${user.id}:${token}:hrScopes`;
+      if (user && user.data) {
+        const tokenFound = _.find(user.data.tokens, { token });
+        let redisHRScopesKey;
+        if (tokenFound && tokenFound.interactive) {
+          redisHRScopesKey = `cache:${user.data.id}:hrScopes`;
+        } else if (tokenFound && !tokenFound.interactive) {
+          redisHRScopesKey = `cache:${user.data.id}:${token}:hrScopes`;
         }
       }
     }
@@ -1653,9 +1649,8 @@ export class UserService extends ServiceBase {
     }
   }
 
-  private setAuthenticationHeaders(subjectID, token) {
+  private setAuthenticationHeaders(token) {
     return {
-      'account-id': subjectID,
       Authorization: `Bearer ${token}`
     };
   }
@@ -1673,7 +1668,7 @@ export class UserService extends ServiceBase {
         let headers;
         if (techUsersCfg && techUsersCfg.length > 0) {
           const hbsUser = _.find(techUsersCfg, { id: 'hbs_user' });
-          headers = this.setAuthenticationHeaders(hbsUser.id, hbsUser.token);
+          headers = this.setAuthenticationHeaders(hbsUser.token);
         }
 
         response = await fetch(hbsTemplates.registrationSubjectTpl, { headers });

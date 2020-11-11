@@ -719,6 +719,10 @@
     {
       "id": "hbs_user",
       "token": "change.this.token.number"
+    },
+    {
+      "id": "upsert_user_tokens",
+      "token": "change.this.token.number"
     }
   ]
 }

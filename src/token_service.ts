@@ -40,10 +40,6 @@ export class TokenService {
     this.userService = userService;
   }
 
-  private getKey(id: string) {
-    return `AccessToken:${id}`;
-  }
-
   /**
    * Store / Upsert accessToken Data to User entity
    *
@@ -53,13 +49,29 @@ export class TokenService {
       throw new errors.InvalidArgument('No id was provided for creat / upsert');
     }
 
-    const tokenData = call.request;
+    // using techUser to update user Tokens
+    let tokenTechUser;
+    const techUsersCfg = this.cfg.get('techUsers');
+    if (techUsersCfg && techUsersCfg.length > 0) {
+      tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
+    }
+    let acsResponse: AccessResponse;
+    let tokenData = call.request;
+    let subject = call.request.subject;
+    try {
+      call.request = await this.createMetadata(tokenData, tokenTechUser);
+      acsResponse = await checkAccessRequest(tokenTechUser, call.request, AuthZAction.MODIFY,
+        'token', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
     const payload = unmarshallProtobufAny(tokenData.payload);
     tokenData.payload = payload;
-    let subject = call.request.subject;
-    call.request = await this.createMetadata(tokenData, subject);
-
-    // persist subject to reids - containing role_assocs (required when constructing HR scopes)
     const tokent_type = tokenData.token_type;
     tokenData.payload = JSON.stringify(payload);
 
@@ -69,18 +81,9 @@ export class TokenService {
       const userData = await this.userService.find({ request: { id: payload.accountId, subject } });
       if (userData && userData.items && userData.items.length > 0) {
         let user = userData.items[0];
-        // check if the token is existing if not update it
-        let updateToken = true;
         let currentTokenList = [];
         if (user && user.tokens && user.tokens.length > 0) {
           currentTokenList = user.tokens;
-        }
-        for (let token of currentTokenList) {
-          if (token.token === payload.jti && token.expires_at === payload.exp) {
-            // token already exists and not expired
-            updateToken = false;
-            break;
-          }
         }
         let token_name;
         if (payload.claims && payload.claims.token_name) {
@@ -88,19 +91,18 @@ export class TokenService {
         } else {
           token_name = uuid.v4().replace(/-/g, '');
         }
-        if (updateToken) {
-          const token = {
-            name: token_name,
-            expires_at: payload.exp,
-            token: payload.jti,
-            tokent_type
-          };
-          currentTokenList.push(token);
-          user.tokens = currentTokenList;
-          user.last_login = new Date().getTime();
-          user.last_access = new Date().getTime();
-          await this.userService.update({ request: { items: [user], subject } });
-        }
+        const token = {
+          name: token_name,
+          expires_at: payload.exp,
+          token: payload.jti,
+          tokent_type,
+          interactive: true
+        };
+        currentTokenList.push(token);
+        user.tokens = currentTokenList;
+        user.last_login = new Date().getTime();
+        user.last_access = new Date().getTime();
+        await this.userService.update({ request: { items: [user], tokenTechUser } });
         response = {
           status: `Token updated successfully for Subject ${user.name}`
         };
@@ -148,7 +150,7 @@ export class TokenService {
       let data;
       let tokenData;
       const user = await this.userService.findByToken({ token: id });
-      if (user && user.tokens && user.tokens.length > 0) {
+      if (user && user.data && user.data.tokens && user.tokens.length > 0) {
         for (let token of user.tokens) {
           if (token.token === id && token.token_type === token_type) {
             tokenData = token;
@@ -261,16 +263,19 @@ export class TokenService {
       if (!resource.meta) {
         resource.meta = {};
       }
-      if (subject.id) {
-        orgOwnerAttributes.push(
-          {
-            id: urns.ownerIndicatoryEntity,
-            value: urns.user
-          },
-          {
-            id: urns.ownerInstance,
-            value: subject.id
-          });
+      if (subject && subject.token) {
+        const user = await this.userService.findByToken({ token: subject.token });
+        if (user.data && user.data.id) {
+          orgOwnerAttributes.push(
+            {
+              id: urns.ownerIndicatoryEntity,
+              value: urns.user
+            },
+            {
+              id: urns.ownerInstance,
+              value: user.data.id
+            });
+        }
       }
       resource.meta.owner = orgOwnerAttributes;
     }
