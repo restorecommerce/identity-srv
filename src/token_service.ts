@@ -10,7 +10,7 @@ interface TokenData {
   payload: any;
   expires_in: number;
   subject?: Subject;
-  token_type?: string;
+  type?: string;
 }
 
 interface ReqTokenData {
@@ -72,7 +72,7 @@ export class TokenService {
 
     const payload = unmarshallProtobufAny(tokenData.payload);
     tokenData.payload = payload;
-    const tokent_type = tokenData.token_type;
+    const type = tokenData.type;
     tokenData.payload = JSON.stringify(payload);
 
     let response;
@@ -93,9 +93,9 @@ export class TokenService {
         }
         const token = {
           name: token_name,
-          expires_at: payload.exp,
+          expires_in: payload.exp,
           token: payload.jti,
-          tokent_type,
+          type,
           interactive: true
         };
         currentTokenList.push(token);
@@ -132,7 +132,7 @@ export class TokenService {
 
     let subject = call.request.subject;
     const id = call.request.id;
-    const token_type = call.request.token_type;
+    const type = call.request.type;
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: AccessResponse;
     try {
@@ -152,7 +152,7 @@ export class TokenService {
       const user = await this.userService.findByToken({ token: id });
       if (user && user.data && user.data.tokens && user.tokens.length > 0) {
         for (let token of user.tokens) {
-          if (token.token === id && token.token_type === token_type) {
+          if (token.token === id && token.type === type) {
             tokenData = token;
             break;
           }
@@ -163,7 +163,7 @@ export class TokenService {
           accountId: user.id,
           exp: tokenData.expires_at,
           claims: user,
-          kind: tokenData.token_type,
+          kind: tokenData.type,
           jti: tokenData.token
         };
       }
@@ -191,7 +191,7 @@ export class TokenService {
 
     let subject = call.request.subject;
     const id = call.request.id;
-    const token_type = call.request.token_type;
+    const type = call.request.type;
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: AccessResponse;
     try {
@@ -223,7 +223,7 @@ export class TokenService {
               currentTokenList = user.tokens;
             }
             for (let token of currentTokenList) {
-              if (token.token === id && token.token_type === token_type) {
+              if (token.token === id && token.type === type) {
                 // token exists, delete it
                 updateToken = true;
                 break;
