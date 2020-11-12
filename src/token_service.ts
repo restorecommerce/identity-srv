@@ -149,7 +149,7 @@ export class TokenService {
     if (acsResponse.decision === Decision.PERMIT) {
       let data;
       let tokenData;
-      const user = await this.userService.findByToken({ token: id });
+      const user = await this.userService.findByToken({ request: { token: id } });
       if (user && user.data && user.data.tokens && user.tokens.length > 0) {
         for (let token of user.tokens) {
           if (token.token === id && token.type === type) {
@@ -313,7 +313,7 @@ export class TokenService {
         resource.meta = {};
       }
       if (subject && subject.token) {
-        const user = await this.userService.findByToken({ token: subject.token });
+        const user = await this.userService.findByToken({ request: { token: subject.token } });
         if (user.data && user.data.id) {
           orgOwnerAttributes.push(
             {

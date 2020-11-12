@@ -384,7 +384,7 @@ export class UserService extends ServiceBase {
       token = subject.token;
     }
     if (token) {
-      user = await this.findByToken({ token });
+      user = await this.findByToken({ request: { token } });
       if (user && user.data) {
         const tokenFound = _.find(user.data.tokens, { token });
         let redisHRScopesKey;
