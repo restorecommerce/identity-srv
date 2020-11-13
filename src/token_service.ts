@@ -50,14 +50,17 @@ export class TokenService {
     }
 
     // using techUser to update user Tokens
-    let tokenTechUser;
+    let tokenTechUser: any = {};
     const techUsersCfg = this.cfg.get('techUsers');
     if (techUsersCfg && techUsersCfg.length > 0) {
       tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
     }
     let acsResponse: AccessResponse;
     let tokenData = call.request;
-    let subject = call.request.subject;
+    // unmarshall payload
+    const payload = unmarshallProtobufAny(tokenData.payload);
+    tokenData.payload = payload;
+    tokenTechUser.scope = payload?.claims?.data?.default_scope;
     try {
       call.request = await this.createMetadata(tokenData, tokenTechUser);
       acsResponse = await checkAccessRequest(tokenTechUser, call.request, AuthZAction.MODIFY,
@@ -70,15 +73,13 @@ export class TokenService {
       throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
     }
 
-    const payload = unmarshallProtobufAny(tokenData.payload);
-    tokenData.payload = payload;
     const type = tokenData.type;
     tokenData.payload = JSON.stringify(payload);
 
     let response;
     try {
       // pass tech user for subject find operation
-      const userData = await this.userService.find({ request: { id: payload.accountId, subject } });
+      const userData = await this.userService.find({ request: { id: payload.accountId, subject: tokenTechUser } });
       if (userData && userData.items && userData.items.length > 0) {
         let user = userData.items[0];
         let currentTokenList = [];
@@ -102,7 +103,7 @@ export class TokenService {
         user.tokens = currentTokenList;
         user.last_login = new Date().getTime();
         user.last_access = new Date().getTime();
-        await this.userService.update({ request: { items: [user], tokenTechUser } });
+        await this.userService.update({ request: { items: [user], subject: tokenTechUser } });
         response = {
           status: `Token updated successfully for Subject ${user.name}`
         };
@@ -312,7 +313,18 @@ export class TokenService {
       if (!resource.meta) {
         resource.meta = {};
       }
-      if (subject && subject.token) {
+      if (subject && subject.id) {
+        orgOwnerAttributes.push(
+          {
+            id: urns.ownerIndicatoryEntity,
+            value: urns.user
+          },
+          {
+            id: urns.ownerInstance,
+            value: subject.id
+          });
+      } else if (subject && subject.token) {
+        // when no subjectID is provided find the subjectID using findByToken
         const user = await this.userService.findByToken({ request: { token: subject.token } });
         if (user.data && user.data.id) {
           orgOwnerAttributes.push(
