@@ -365,13 +365,12 @@ export class UserService extends ServiceBase {
     }
     if (token) {
       user = await this.findByToken({ request: { token } });
-      if (user && user.data) {
-        const tokenFound = _.find(user.data.tokens, { token });
-        let redisHRScopesKey;
+      if (user) {
+        const tokenFound = _.find(user.tokens, { token });
         if (tokenFound && tokenFound.interactive) {
-          redisHRScopesKey = `cache:${user.data.id}:hrScopes`;
+          redisHRScopesKey = `cache:${user.id}:hrScopes`;
         } else if (tokenFound && !tokenFound.interactive) {
-          redisHRScopesKey = `cache:${user.data.id}:${token}:hrScopes`;
+          redisHRScopesKey = `cache:${user.id}:${token}:hrScopes`;
         }
       }
     }
@@ -475,10 +474,12 @@ export class UserService extends ServiceBase {
       // it's an array `hrScopes` since an user can be Admin for multiple orgs
       let hrScopes: HierarchicalScope[] = [];
       hierarchical_scopes = subject.hierarchical_scopes;
-      for (let hrScope of hierarchical_scopes) {
-        for (let accessRole of createAccessRole) {
-          if (hrScope.role === accessRole) {
-            hrScopes.push(hrScope);
+      if (!_.isEmpty(hierarchical_scopes)) {
+        for (let hrScope of hierarchical_scopes) {
+          for (let accessRole of createAccessRole) {
+            if (hrScope.role === accessRole) {
+              hrScopes.push(hrScope);
+            }
           }
         }
       }
