@@ -372,6 +372,7 @@ export class UserService extends ServiceBase {
         } else if (tokenFound && !tokenFound.interactive) {
           redisHRScopesKey = `cache:${user.id}:${token}:hrScopes`;
         }
+        subject.role_associations = user.role_associations;
       }
     }
 
