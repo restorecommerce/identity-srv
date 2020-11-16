@@ -187,7 +187,7 @@ export class UserService extends ServiceBase {
     redisConfig.db = cfg.get('redis:db-indexes:db-subject');
     this.redisClient = createClient(redisConfig);
     this.authZCheck = this.cfg.get('authorization:enabled');
-    redisConfig.db = this.cfg.get('redis:db-indexes:db-access-token') || 0;
+    redisConfig.db = this.cfg.get('redis:db-indexes:db-findByToken') || 0;
     this.tokenRedisClient = createClient(redisConfig);
     this.tokenService = new TokenService(cfg, logger, authZ, this);
   }
@@ -235,27 +235,44 @@ export class UserService extends ServiceBase {
    * @return user found
    */
   async findByToken(call: Call<FindUserByToken>, context?: any): Promise<any> {
-    let { token } = call.request;
+    const { token } = call.request;
+    let userData;
     const logger = this.logger;
-    // regex filter search field for token array
-    const filter = toStruct({
-      'tokens[*].token': {
-        $in: token
-      }
-    });
-    let users = await super.read({ request: { filter } }, context);
-    if (users.total_count === 0) {
-      logger.debug('No user found for provided token value');
-      return;
+    if (token) {
+      userData = await new Promise((resolve, reject) => {
+        this.tokenRedisClient.get(token, async (err, response) => {
+          if (!err && response) {
+            // user data
+            logger.debug('Found user data in redis cache');
+            const redisResp = JSON.parse(response);
+            return resolve(redisResp);
+          }
+          // when not set in redis
+          // regex filter search field for token array
+          const filter = toStruct({
+            'tokens[*].token': {
+              $in: token
+            }
+          });
+          let users = await super.read({ request: { filter } }, context);
+          if (users.total_count === 0) {
+            logger.debug('No user found for provided token value');
+            return resolve();;
+          }
+          if (users.total_count === 1) {
+            logger.debug('found user from token', { users });
+            if (users.items && users.items[0]) {
+              this.tokenRedisClient.set(token, JSON.stringify(users.items[0]));
+              logger.debug('Stored user data to redis cache successfully');
+              return resolve(users.items[0]);
+            }
+          }
+          logger.silly('multiple user found for request', call.request);
+          reject(new errors.OutOfRange('multiple users found for token'));
+        });
+      });
     }
-    if (users.total_count === 1) {
-      logger.debug('found user from token', { users });
-      if (users.items && users.items[0]) {
-        return users.items[0];
-      }
-    }
-    logger.silly('multiple user found for request', call.request);
-    throw new errors.OutOfRange('multiple users found for token');
+    return userData;
   }
 
   /**
@@ -1215,6 +1232,50 @@ export class UserService extends ServiceBase {
           if (acsResponse.decision != Decision.PERMIT) {
             throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
           }
+        }
+
+        // Flush findByToken redis data
+        if (subject && subject.token) {
+          await new Promise((resolve, reject) => {
+            this.tokenRedisClient.get(subject.token, async (err, response) => {
+              if (!err && response) {
+                const redisResp = JSON.parse(response);
+                const redisRoleAssocs = redisResp.role_associations;
+                const redisTokens = redisResp.tokens;
+                let roleAssocEqual;
+                let tokensEqual;
+                let updatedRoleAssocs = user.role_associations;
+                let updatedTokens = user.tokens;
+                for (let obj of updatedRoleAssocs) {
+                  roleAssocEqual = _.find(redisRoleAssocs, obj);
+                  if (!roleAssocEqual) {
+                    this.logger.debug('Subject Role assocation has been updated', obj);
+                    break;
+                  }
+                }
+                for (let token of updatedTokens) {
+                  tokensEqual = _.find(redisTokens, token);
+                  if (!tokensEqual) {
+                    this.logger.debug('Subject Token scope has been updated', token);
+                    break;
+                  }
+                }
+                if (!roleAssocEqual || !tokensEqual || (updatedRoleAssocs.length != redisRoleAssocs.length)) {
+                  // flush token subject cache
+                  this.tokenRedisClient.del(subject.token, async (err, numberOfDeletedKeys) => {
+                    if (err) {
+                      this.logger.error('Error deleting user data from redis', err);
+                      reject(err);
+                    } else {
+                      this.logger.info('Subject data deleted from Reids', { noOfKeys: numberOfDeletedKeys });
+                    }
+                  });
+                }
+                return resolve(redisResp);
+              }
+              resolve();
+            });
+          });
         }
 
         // Update password if it contains that field by updating hash
