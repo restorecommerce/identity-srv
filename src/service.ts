@@ -6,7 +6,7 @@ import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
 import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
-import { Logger } from '@restorecommerce/logger';
+import { Logger } from 'winston';
 import { ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest, PolicySetRQ, PermissionDenied, SubjectResolved } from '@restorecommerce/acs-client';
 import { RedisClient, createClient } from 'redis';
 import { checkAccessRequest, ReadPolicyResponse, AccessResponse } from './utils';

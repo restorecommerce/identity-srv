@@ -1,5 +1,5 @@
-import {errors} from '@restorecommerce/chassis-srv';
-import {Logger} from '@restorecommerce/logger';
+import { errors } from '@restorecommerce/chassis-srv';
+import { Logger } from 'winston';
 
 // validateFirstChar validates the first allowed character in a string
 export const validateFirstChar = (string: string, logger: Logger): boolean => {
