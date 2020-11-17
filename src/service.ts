@@ -510,6 +510,20 @@ export class UserService extends ServiceBase {
       for (let user of usersList) {
         if (user.role_associations && user.role_associations.length > 0) {
           this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, subject);
+          if (!_.isEmpty(user.tokens)) {
+            for (let token of user.tokens) {
+              if (!token.interactive && !_.isEmpty(token.scopes)) {
+                for (let scope of token.scopes) {
+                  // if scope is not found in role assoc invalid scope assignemnt in token
+                  if (!_.find(user.role_associations, { id: scope })) {
+                    let message = `Invalid token scope ${scope} found for Subject ${user.id}`;
+                    this.logger.verbose(message);
+                    throw new errors.InvalidArgument(message);
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -1194,6 +1208,14 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
+      if (this.cfg.get('authorization:enabled')) {
+        try {
+          await this.verifyUserRoleAssociations(items, subject);
+        } catch (err) {
+          // for unhandled promise rejection
+          throw err;
+        }
+      }
       for (let i = 0; i < items.length; i += 1) {
         // read the user from DB and update the special fields from DB
         // for user modification
