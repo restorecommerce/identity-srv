@@ -1254,10 +1254,14 @@ export class UserService extends ServiceBase {
                   }
                 }
                 for (let token of updatedTokens) {
-                  tokensEqual = _.find(redisTokens, token);
-                  if (!tokensEqual) {
-                    this.logger.debug('Subject Token scope has been updated', token);
-                    break;
+                  if (!token.interactive) {
+                    tokensEqual = _.find(redisTokens, token);
+                    if (!tokensEqual) {
+                      this.logger.debug('Subject Token scope has been updated', token);
+                      break;
+                    } else {
+                      tokensEqual = true;
+                    }
                   }
                 }
                 if (!roleAssocEqual || !tokensEqual || (updatedRoleAssocs.length != redisRoleAssocs.length)) {
