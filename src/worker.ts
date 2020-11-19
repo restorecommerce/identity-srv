@@ -3,6 +3,7 @@ import * as _ from 'lodash';
 import { Events } from '@restorecommerce/kafka-client';
 import { createLogger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
+import { Logger } from 'winston';
 import { UserService, RoleService } from './service';
 import { ACSAuthZ, initAuthZ, updateConfig, initializeCache } from '@restorecommerce/acs-client';
 import { RedisClient, createClient } from 'redis';
@@ -82,7 +83,7 @@ class UserCommandInterface extends chassis.CommandInterface {
 export class Worker {
   events: Events;
   server: any;
-  logger: chassis.Logger;
+  logger: Logger;
   cfg: any;
   topics: any;
   offsetStore: chassis.OffsetStore;

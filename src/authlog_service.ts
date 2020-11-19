@@ -1,5 +1,6 @@
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
-import { Logger, errors } from '@restorecommerce/chassis-srv';
+import { Logger } from 'winston';
+import { errors } from '@restorecommerce/chassis-srv';
 import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject } from '@restorecommerce/acs-client';
 import { Topic } from '@restorecommerce/kafka-client';
 import { AccessResponse, ReadPolicyResponse, checkAccessRequest } from './utils';

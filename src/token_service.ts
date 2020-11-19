@@ -1,4 +1,5 @@
-import { Logger, errors } from '@restorecommerce/chassis-srv';
+import { errors } from '@restorecommerce/chassis-srv';
+import { Logger } from 'winston';
 import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject } from '@restorecommerce/acs-client';
 import { AccessResponse, checkAccessRequest } from './utils';
 import * as _ from 'lodash';
