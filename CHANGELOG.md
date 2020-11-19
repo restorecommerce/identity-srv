@@ -1,3 +1,11 @@
+### 0.1.14 (November 19th, 2020)
+
+- added findByToken and empty password check for technical user
+- removed subject cache, storing of token to redis and unused methods from token service.
+- added interactive flag to tokens
+- up token service to match oidc token fields
+- modified update api of user service to verify role associations
+
 ### 0.1.13 (October 28th, 2020)
 
 - changed HBS templates naming in configuration
