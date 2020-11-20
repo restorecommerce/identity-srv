@@ -341,7 +341,7 @@ export class TokenService {
       } else if (subject && subject.token) {
         // when no subjectID is provided find the subjectID using findByToken
         const user = await this.userService.findByToken({ request: { token: subject.token } });
-        if (user.data && user.data.id) {
+        if (user && user.data && user.data.id) {
           orgOwnerAttributes.push(
             {
               id: urns.ownerIndicatoryEntity,
