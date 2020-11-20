@@ -152,9 +152,9 @@ export class TokenService {
       let data;
       let tokenData;
       const user = await this.userService.findByToken({ request: { token: id } });
-      if (user && user.data && user.data.tokens && user.tokens.length > 0) {
+      if (user && user.tokens && user.tokens.length > 0) {
         for (let token of user.tokens) {
-          if (token.token === id && token.type === type) {
+          if (token.token === id) {
             tokenData = token;
             break;
           }
@@ -163,13 +163,12 @@ export class TokenService {
       if (user && tokenData) {
         data = {
           accountId: user.id,
-          exp: tokenData.expires_at,
+          exp: tokenData.expires_in,
           claims: user,
           kind: tokenData.type,
           jti: tokenData.token
         };
       }
-
       if (!data) {
         return undefined;
       }
@@ -249,7 +248,14 @@ export class TokenService {
               const updatedTokenList = currentTokenList.filter(token => token.token !== id);
               user.tokens = updatedTokenList;
               user.last_access = new Date().getTime();
-              await this.userService.update({ request: { items: [user], subject } });
+
+              let tokenTechUser: any = {};
+              const techUsersCfg = this.cfg.get('techUsers');
+              if (techUsersCfg && techUsersCfg.length > 0) {
+                tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
+              }
+              tokenTechUser.scope = user.default_scope;
+              await this.userService.update({ request: { items: [user], subject: tokenTechUser } });
             }
           };
           response = `Key for subject ${user.id} deleted successfully`;
@@ -341,7 +347,7 @@ export class TokenService {
       } else if (subject && subject.token) {
         // when no subjectID is provided find the subjectID using findByToken
         const user = await this.userService.findByToken({ request: { token: subject.token } });
-        if (user && user.data && user.data.id) {
+        if (user && user.id) {
           orgOwnerAttributes.push(
             {
               id: urns.ownerIndicatoryEntity,
@@ -349,7 +355,7 @@ export class TokenService {
             },
             {
               id: urns.ownerInstance,
-              value: user.data.id
+              value: user.id
             });
         }
       }
