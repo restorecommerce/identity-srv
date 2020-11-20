@@ -245,7 +245,24 @@ export class UserService extends ServiceBase {
             // user data
             logger.debug('Found user data in redis cache');
             const redisResp = JSON.parse(response);
-            return resolve(redisResp);
+            // validate token expiry date and delete it if expired
+            if (redisResp && redisResp.tokens) {
+              const dbToken = _.find(redisResp.tokens, { token });
+              if ((dbToken && dbToken.expires_in === 0) || (dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000))) {
+                return resolve(redisResp);
+              } else {
+                // delete token from redis and update user entity
+                this.tokenRedisClient.del(token, async (err, numberOfDeletedKeys) => {
+                  if (err) {
+                    this.logger.error('Error deleting cached findByTOken data from redis', { err });
+                    reject(err);
+                  } else {
+                    this.logger.info('Redis cached data for findByToken deleted successfully', { noOfKeys: numberOfDeletedKeys });
+                  }
+                  resolve(numberOfDeletedKeys);
+                });
+              }
+            }
           }
           // when not set in redis
           // regex filter search field for token array
@@ -262,9 +279,26 @@ export class UserService extends ServiceBase {
           if (users.total_count === 1) {
             logger.debug('found user from token', { users });
             if (users.items && users.items[0]) {
-              this.tokenRedisClient.set(token, JSON.stringify(users.items[0]));
-              logger.debug('Stored user data to redis cache successfully');
-              return resolve(users.items[0]);
+              // validate token expiry and delete if expired
+              const dbToken = _.find(users.items[0].tokens, { token });
+
+              if (dbToken && dbToken.expires_in === 0 || dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000)) {
+                this.tokenRedisClient.set(token, JSON.stringify(users.items[0]));
+                logger.debug('Stored user data to redis cache successfully');
+                return resolve(users.items[0]);
+              } else if (dbToken && dbToken.expires_in < Math.round(new Date().getTime() / 1000)) {
+                logger.debug('Token expired, updating subject to remove token');
+                // delete token
+                let tokenTechUser: any = {};
+                const techUsersCfg = this.cfg.get('techUsers');
+                if (techUsersCfg && techUsersCfg.length > 0) {
+                  tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
+                }
+                tokenTechUser.scope = users.items[0].default_scope;
+                const updatedUser = _.remove(users.items[0].tokens, { token });
+                await this.update({ request: { items: [updatedUser], subject: tokenTechUser } });
+                return;
+              }
             }
           }
           logger.silly('multiple user found for request', call.request);
@@ -1290,11 +1324,12 @@ export class UserService extends ServiceBase {
                   // flush token subject cache
                   this.tokenRedisClient.del(subject.token, async (err, numberOfDeletedKeys) => {
                     if (err) {
-                      this.logger.error('Error deleting user data from redis', err);
+                      this.logger.error('Error deleting cached findByTOken data from redis', { err });
                       reject(err);
                     } else {
-                      this.logger.info('Subject data deleted from Reids', { noOfKeys: numberOfDeletedKeys });
+                      this.logger.info('Redis cached data for findByToken deleted successfully', { noOfKeys: numberOfDeletedKeys });
                     }
+                    resolve(numberOfDeletedKeys);
                   });
                 }
                 return resolve(redisResp);
