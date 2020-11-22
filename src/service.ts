@@ -282,7 +282,7 @@ export class UserService extends ServiceBase {
               // validate token expiry and delete if expired
               const dbToken = _.find(users.items[0].tokens, { token });
 
-              if (dbToken && dbToken.expires_in === 0 || dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000)) {
+              if ((dbToken && dbToken.expires_in === 0) || (dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000))) {
                 this.tokenRedisClient.set(token, JSON.stringify(users.items[0]));
                 logger.debug('Stored user data to redis cache successfully');
                 return resolve(users.items[0]);
@@ -1294,6 +1294,7 @@ export class UserService extends ServiceBase {
         if (subject && subject.token) {
           await new Promise((resolve, reject) => {
             this.tokenRedisClient.get(subject.token, async (err, response) => {
+              console.log('UPDATE>>>>>>>>>>>>', err, response);
               if (!err && response) {
                 const redisResp = JSON.parse(response);
                 const redisRoleAssocs = redisResp.role_associations;
