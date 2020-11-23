@@ -1294,7 +1294,6 @@ export class UserService extends ServiceBase {
         if (subject && subject.token) {
           await new Promise((resolve, reject) => {
             this.tokenRedisClient.get(subject.token, async (err, response) => {
-              console.log('UPDATE>>>>>>>>>>>>', err, response);
               if (!err && response) {
                 const redisResp = JSON.parse(response);
                 const redisRoleAssocs = redisResp.role_associations;
