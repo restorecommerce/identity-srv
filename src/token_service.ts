@@ -192,20 +192,6 @@ export class TokenService {
 
     let subject = call.request.subject;
     const id = call.request.id;
-    if (id) {
-      // flush token subject cache
-      await new Promise((resolve, reject) => {
-        this.userService.tokenRedisClient.del(id, async (err, numberOfDeletedKeys) => {
-          if (err) {
-            this.logger.error('Error deleting user data from redis', err);
-            resolve(err);
-          } else {
-            this.logger.info('Subject data deleted from Reids', { noOfKeys: numberOfDeletedKeys });
-            resolve();
-          }
-        });
-      });
-    }
     const type = call.request.type;
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: AccessResponse;
@@ -258,6 +244,20 @@ export class TokenService {
               await this.userService.update({ request: { items: [user], subject: tokenTechUser } });
             }
           };
+          if (id) {
+            // flush token subject cache
+            await new Promise((resolve, reject) => {
+              this.userService.tokenRedisClient.del(id, async (err, numberOfDeletedKeys) => {
+                if (err) {
+                  this.logger.error('Error deleting user data from redis', err);
+                  resolve(err);
+                } else {
+                  this.logger.info('Subject data deleted from Reids', { noOfKeys: numberOfDeletedKeys });
+                  resolve();
+                }
+              });
+            });
+          }
           response = `Key for subject ${user.id} deleted successfully`;
         }
       } catch (err) {
