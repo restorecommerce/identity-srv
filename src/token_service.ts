@@ -5,6 +5,7 @@ import { AccessResponse, checkAccessRequest } from './utils';
 import * as _ from 'lodash';
 import { UserService } from './service';
 import * as uuid from 'uuid';
+import { resolve } from 'dns';
 
 interface TokenData {
   id: string;
@@ -243,7 +244,7 @@ export class TokenService {
               tokenTechUser.scope = user.default_scope;
               await this.userService.update({ request: { items: [user], subject: tokenTechUser } });
             }
-          };
+          }
           if (id) {
             // flush token subject cache
             await new Promise((resolve, reject) => {
@@ -309,11 +310,57 @@ export class TokenService {
   }
 
   /**
-  * Delete access token data from redis by grant_id
+  * Delete access token data using grant_id
   *
   **/
   async revokeByGrantId(call: any, context?: any): Promise<any> {
-    throw new errors.Unimplemented('RevokeByGrantId operation not implemented');
+    if (!call || !call.request || !call.request.id) {
+      throw new errors.InvalidArgument('GrantId was not provided for revoke operation');
+    }
+
+    let subject = call.request.subject;
+    const grant_id = call.request.grant_id;
+    let tokens = await new Promise((resolve, reject) => {
+      this.userService.tokenRedisClient.get(grant_id, async (err, response) => {
+        if (!err && response) {
+          this.logger.debug('Found grant_id in redis cache');
+          const redisResp = JSON.parse(response);
+          resolve(redisResp);
+        } else if (err) {
+          this.logger.error('Error retrieving grant_id', { err });
+          return resolve(marshallProtobufAny({ response: `Error retrieving grant_id ${grant_id}` }));
+        }
+      });
+    });
+    Object.assign(subject, { tokens });
+    call.request = await this.createMetadata(call.request, subject);
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, call.request, AuthZAction.DELETE,
+        'token', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      if (typeof tokens === 'string') {
+        tokens = [tokens];
+      }
+
+      if (tokens && _.isArray(tokens)) {
+        for (let token of tokens) {
+          const userData = await this.find({ request: { id: token, subject } });
+          if (!_.isEmpty(userData)) {
+            let tokenData = unmarshallProtobufAny(userData);
+            await this.destroy({ request: { id: tokens, type: tokenData.kind, subject } });
+          }
+        }
+      }
+    }
   }
 
 
