@@ -59,7 +59,7 @@
     "pretest": "npm run build && npm run tsctests && npm run createtopics",
     "test": "npm run lint && nyc npm run mocha",
     "lint": "eslint src --ext .ts",
-    "mocha": "cross-env NODE_ENV=test mocha -R spec ./test/*.js --full-trace --exit",
+    "mocha": "cross-env NODE_ENV=test mocha -R spec ./test/*.js --full-trace --exit --timeout 5000",
     "tsctests": "tsc -d -p tsconfig.test.json",
     "test-debug": "mocha -R spec ./test/*.js --inspect-brk",
     "coveralls": "nyc report --reporter=text-lcov | coveralls",
