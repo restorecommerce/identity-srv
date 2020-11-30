@@ -54,4 +54,4 @@ jobs:
           install: true
 
       - name: Build image
-        run: docker build . --file buildkit.Dockerfile --tag ${{ github.repository }}
+        run: bash buildImageBuildkit.bash
