@@ -58,7 +58,7 @@ jobs:
           context: .
           file: ./buildkit.Dockerfile
           platforms: linux/amd64
-          push: true
+          push: false
           tags: |
             ${{ github.repository }}:latest
             ${{ github.repository }}:${GITHUB_REF#refs/*/}
