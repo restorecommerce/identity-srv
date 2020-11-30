@@ -53,7 +53,7 @@ jobs:
           context: .
           file: ./buildkit.Dockerfile
           platforms: linux/amd64
-          push: false
+          push: true
           build-args: |
             APP_HOME=/home/node/${{ steps.vars.outputs.repo_name }}
           cache-from: |
@@ -61,10 +61,3 @@ jobs:
           repository: ${{ github.repository }}
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
-
-      - name: Update repo description
-        uses: peter-evans/dockerhub-description@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ github.repository }}
