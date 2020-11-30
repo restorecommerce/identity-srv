@@ -64,11 +64,6 @@ jobs:
           file: ./buildkit.Dockerfile
           platforms: linux/amd64
           push: false
-          tags: |
-            ${{ github.repository }}:latest
-            ${{ github.repository }}:${{ steps.vars.outputs.version_tag }}
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ steps.vars.outputs.version_tag }}
           build-args: |
             APP_HOME=/home/node/${{ steps.vars.outputs.repo_name }}
           cache-from: |

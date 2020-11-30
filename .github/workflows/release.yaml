@@ -35,19 +35,36 @@ jobs:
           echo ::set-output name=version_tag::$(echo ${GITHUB_REF#refs/*/})
           echo ::set-output name=repo_name::$(echo ${GITHUB_REPOSITORY#*/*})
 
+      - name: Docker meta
+        id: docker_meta
+        uses: crazy-max/ghaction-docker-meta@v1
+        with:
+          images: |
+            ${{ github.repository }}
+            ghcr.io/${{ github.repository }}
+          tag-sha: true
+          tag-semver: |
+            {{version}}
+            {{major}}.{{minor}}
+
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
           context: .
           file: ./buildkit.Dockerfile
           platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ github.repository }}:latest
-            ${{ github.repository }}:${{ steps.vars.outputs.version_tag }}
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ steps.vars.outputs.version_tag }}
+          push: false
           build-args: |
             APP_HOME=/home/node/${{ steps.vars.outputs.repo_name }}
           cache-from: |
             ${{ github.repository }}:latest
+          repository: ${{ github.repository }}
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          labels: ${{ steps.docker_meta.outputs.labels }}
+
+      - name: Update repo description
+        uses: peter-evans/dockerhub-description@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ github.repository }}
