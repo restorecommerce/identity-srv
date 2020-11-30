@@ -41,6 +41,9 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: Coverage
+        run: npm run coveralls && cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js
+
   image:
     runs-on: ubuntu-20.04
     needs: build
