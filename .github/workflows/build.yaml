@@ -57,7 +57,7 @@ jobs:
           echo ::set-output name=version_tag::$(echo ${GITHUB_REF#refs/*/})
           echo ::set-output name=repo_name::$(echo ${GITHUB_REPOSITORY#*/*})
 
-      - name: Build and push
+      - name: Build
         uses: docker/build-push-action@v2
         with:
           context: .
