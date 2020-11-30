@@ -58,6 +58,5 @@ jobs:
             APP_HOME=/home/node/${{ steps.vars.outputs.repo_name }}
           cache-from: |
             ${{ github.repository }}:latest
-          repository: ${{ github.repository }}
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
