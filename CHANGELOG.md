@@ -1,3 +1,7 @@
+## 0.1.15 (December 2nd, 2020)
+
+- fix docker image permissions
+
 ### 0.1.14 (November 19th, 2020)
 
 - added findByToken and empty password check for technical user

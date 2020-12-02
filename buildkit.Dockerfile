@@ -29,12 +29,8 @@ FROM base as deployment
 
 RUN npm ci --only=production
 
-COPY setupTopics.js $APP_HOME/setupTopics.js
-COPY filter_ownership.aql $APP_HOME/filter_ownership.aql
-COPY filter_role_association.aql $APP_HOME/filter_role_association.aql
-COPY cfg $APP_HOME/cfg
-COPY email_templates $APP_HOME/email_templates
-COPY --from=build $APP_HOME/lib $APP_HOME/lib
+COPY --chown=node:node . $APP_HOME
+COPY --chown=node:node --from=build $APP_HOME/lib $APP_HOME/lib
 
 EXPOSE 50051
 
