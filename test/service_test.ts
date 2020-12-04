@@ -1003,14 +1003,10 @@ describe('testing identity-srv', () => {
             message.id.should.equal(`identity#${sampleUser.email}`);
           };
 
-          const offset = await topic.$offset(0);
           await topic.on('renderRequest', listener);
           const result = await (userService.sendInvitationEmail({ user_id: sampleUser.id, invited_by_user_id: invitingUser.id }));
-          await topic.$wait(offset);
-
           should.exist(result);
           should.not.exist(result.error);
-
           await topic.removeListener('renderRequest', listener);
         });
       });

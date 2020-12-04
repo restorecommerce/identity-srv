@@ -99,11 +99,11 @@ export class TokenService {
           expires_in: payload.exp,
           token: payload.jti,
           type,
-          interactive: true
+          interactive: true,
+          last_login: new Date().getTime()
         };
         currentTokenList.push(token);
         user.tokens = currentTokenList;
-        user.last_login = new Date().getTime();
         user.last_access = new Date().getTime();
         await this.userService.update({ request: { items: [user], subject: tokenTechUser } });
         response = {

@@ -281,19 +281,29 @@ export class UserService extends ServiceBase {
             if (users.items && users.items[0]) {
               // validate token expiry and delete if expired
               const dbToken = _.find(users.items[0].tokens, { token });
+              let tokenTechUser: any = {};
+              const techUsersCfg = this.cfg.get('techUsers');
+              if (techUsersCfg && techUsersCfg.length > 0) {
+                tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
+              }
 
               if ((dbToken && dbToken.expires_in === 0) || (dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000))) {
                 this.tokenRedisClient.set(token, JSON.stringify(users.items[0]));
                 logger.debug('Stored user data to redis cache successfully');
+                // update token last_login
+                let user = users.items[0];
+                if (user && user.tokens && user.tokens.length > 0) {
+                  for (let token of user.tokens) {
+                    if (token.token === token) {
+                      token.last_login = new Date().getTime();
+                    }
+                  }
+                }
+                await this.update({ request: { items: users, subject: tokenTechUser } });
                 return resolve(users.items[0]);
               } else if (dbToken && dbToken.expires_in < Math.round(new Date().getTime() / 1000)) {
                 logger.debug('Token expired, updating subject to remove token');
                 // delete token
-                let tokenTechUser: any = {};
-                const techUsersCfg = this.cfg.get('techUsers');
-                if (techUsersCfg && techUsersCfg.length > 0) {
-                  tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
-                }
                 tokenTechUser.scope = users.items[0].default_scope;
                 const updatedUser = _.remove(users.items[0].tokens, { token });
                 await this.update({ request: { items: [updatedUser], subject: tokenTechUser } });
@@ -427,20 +437,24 @@ export class UserService extends ServiceBase {
       }
     }
 
-    hierarchical_scopes = await new Promise((resolve, reject) => {
-      this.redisClient.get(redisHRScopesKey, async (err, response) => {
-        if (!err && response) {
-          // update user HR scope and role_associations from redis
-          const redisResp = JSON.parse(response);
-          resolve(redisResp);
-        }
-        // when not set in redis
-        if (err || (!err && !response)) {
-          resolve(subject.hierarchical_scopes);
-          return subject.hierarchical_scopes;
-        }
+    if (redisHRScopesKey) {
+      hierarchical_scopes = await new Promise((resolve, reject) => {
+        this.redisClient.get(redisHRScopesKey, async (err, response) => {
+          if (!err && response) {
+            // update user HR scope and role_associations from redis
+            const redisResp = JSON.parse(response);
+            resolve(redisResp);
+          }
+          // when not set in redis
+          if (err || (!err && !response)) {
+            resolve(subject.hierarchical_scopes);
+            return subject.hierarchical_scopes;
+          }
+        });
       });
-    });
+    } else if (subject && subject.hierarchical_scopes) {
+      hierarchical_scopes = subject.hierarchical_scopes;
+    }
 
     subject.hierarchical_scopes = hierarchical_scopes;
     let createAccessRole = [];
