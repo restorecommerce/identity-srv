@@ -293,9 +293,9 @@ export class UserService extends ServiceBase {
                 // update token last_login
                 let user = users.items[0];
                 if (user && user.tokens && user.tokens.length > 0) {
-                  for (let token of user.tokens) {
-                    if (token.token === token) {
-                      token.last_login = new Date().getTime();
+                  for (let user_token of user.tokens) {
+                    if (user_token.token === token) {
+                      user_token.last_login = new Date().getTime();
                     }
                   }
                 }
