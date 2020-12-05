@@ -299,8 +299,8 @@ export class UserService extends ServiceBase {
                     }
                   }
                 }
-                await this.update({ request: { items: users, subject: tokenTechUser } });
-                return resolve(users.items[0]);
+                await this.update({ request: { items: [user], subject: tokenTechUser } });
+                return resolve(user);
               } else if (dbToken && dbToken.expires_in < Math.round(new Date().getTime() / 1000)) {
                 logger.debug('Token expired, updating subject to remove token');
                 // delete token
