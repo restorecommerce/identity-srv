@@ -1323,15 +1323,19 @@ export class UserService extends ServiceBase {
                     break;
                   }
                 }
+                // to ignore interactive tokens use case
+                if (_.isEmpty(updatedTokens)) {
+                  tokensEqual = true;
+                }
                 for (let token of updatedTokens) {
                   if (!token.interactive) {
                     tokensEqual = _.find(redisTokens, token);
                     if (!tokensEqual) {
                       this.logger.debug('Subject Token scope has been updated', token);
                       break;
-                    } else {
-                      tokensEqual = true;
                     }
+                  } else {
+                    tokensEqual = true;
                   }
                 }
                 if (!roleAssocEqual || !tokensEqual || (updatedRoleAssocs.length != redisRoleAssocs.length)) {
