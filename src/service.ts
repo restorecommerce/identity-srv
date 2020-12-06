@@ -1312,6 +1312,7 @@ export class UserService extends ServiceBase {
                 const redisResp = JSON.parse(response);
                 const redisRoleAssocs = redisResp.role_associations;
                 const redisTokens = redisResp.tokens;
+                const redisID = redisResp.id;
                 let roleAssocEqual;
                 let tokensEqual;
                 let updatedRoleAssocs = user.role_associations;
@@ -1339,15 +1340,17 @@ export class UserService extends ServiceBase {
                   }
                 }
                 // restore interactive tokens on update (when not provided)
-                if (redisTokens && redisTokens.length > 0) {
-                  let userTokens = user.tokens;
-                  let interactiveTokens = [];
-                  for (let token of redisTokens) {
-                    if (token.interactive) {
-                      interactiveTokens.push(token);
+                if (redisID === user.id) {
+                  if (redisTokens && redisTokens.length > 0) {
+                    let userTokens = user.tokens;
+                    let interactiveTokens = [];
+                    for (let token of redisTokens) {
+                      if (token.interactive) {
+                        interactiveTokens.push(token);
+                      }
                     }
+                    user.tokens = _.unionBy(userTokens, interactiveTokens);
                   }
-                  user.tokens = _.unionBy(userTokens, interactiveTokens);
                 }
                 if (!roleAssocEqual || !tokensEqual || (updatedRoleAssocs.length != redisRoleAssocs.length)) {
                   // flush token subject cache
