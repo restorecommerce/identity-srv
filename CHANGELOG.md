@@ -1,6 +1,10 @@
+## 0.1.17 (December 10th, 2020)
+
+- fix for invalidating findByToken cache
+
 ## 0.1.16 (December 4th, 2020)
 
-- up acs-client (unauthenticated fix), protos (last_login updated on token) 
+- up acs-client (unauthenticated fix), protos (last_login updated on token)
 
 ## 0.1.15 (December 2nd, 2020)
 

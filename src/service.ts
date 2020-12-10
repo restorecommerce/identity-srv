@@ -1317,30 +1317,38 @@ export class UserService extends ServiceBase {
                 let tokensEqual;
                 let updatedRoleAssocs = user.role_associations;
                 let updatedTokens = user.tokens;
-                for (let obj of updatedRoleAssocs) {
-                  roleAssocEqual = _.find(redisRoleAssocs, obj);
-                  if (!roleAssocEqual) {
-                    this.logger.debug('Subject Role assocation has been updated', obj);
-                    break;
+                if (redisID === user.id) {
+                  for (let obj of updatedRoleAssocs) {
+                    roleAssocEqual = _.find(redisRoleAssocs, obj);
+                    if (!roleAssocEqual) {
+                      this.logger.debug('Subject Role assocation has been updated', obj);
+                      break;
+                    }
                   }
+                } else {
+                  roleAssocEqual = true;
                 }
                 // to ignore interactive tokens use case
                 if (_.isEmpty(updatedTokens)) {
                   tokensEqual = true;
                 }
-                for (let token of updatedTokens) {
-                  if (!token.interactive) {
-                    tokensEqual = _.find(redisTokens, token);
-                    if (!tokensEqual) {
-                      this.logger.debug('Subject Token scope has been updated', token);
-                      break;
+                if (redisID === user.id) {
+                  for (let token of updatedTokens) {
+                    if (!token.interactive) {
+                      tokensEqual = _.find(redisTokens, token);
+                      if (!tokensEqual) {
+                        this.logger.debug('Subject Token scope has been updated', token);
+                        break;
+                      }
+                    } else {
+                      tokensEqual = true;
                     }
-                  } else {
-                    tokensEqual = true;
                   }
+                } else {
+                  tokensEqual = true;
                 }
                 // restore interactive tokens on update (when not provided)
-                if (redisID === user.id) {
+                if (redisID && (redisID === user.id)) {
                   if (redisTokens && redisTokens.length > 0) {
                     let userTokens = user.tokens;
                     let interactiveTokens = [];
