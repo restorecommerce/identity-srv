@@ -106,9 +106,11 @@ export class TokenService {
         user.tokens = currentTokenList;
         user.last_access = new Date().getTime();
         try {
-          await this.userService.update({ request: { items: [user], subject: tokenTechUser } });
+          // temporary fix to append tokens on user entity
+          await this.userService.updateUserTokens(user.id, token);
+          this.logger.info('Token updated successfully on user entity', { token, id: user.id });
         } catch (err) {
-          this.logger.error('Error Updating Token', { err });
+          this.logger.error('Error Updating Token', err);
         }
         response = {
           status: `Token updated successfully for Subject ${user.name}`

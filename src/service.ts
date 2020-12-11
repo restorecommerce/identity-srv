@@ -11,6 +11,7 @@ import { ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest, 
 import { RedisClient, createClient } from 'redis';
 import { checkAccessRequest, ReadPolicyResponse, AccessResponse } from './utils';
 import { errors } from '@restorecommerce/chassis-srv';
+import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common';
 
 import {
   validateFirstChar,
@@ -21,6 +22,7 @@ import {
   validateEmail
 } from './validation';
 import { TokenService } from './token_service';
+import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base';
 
 const password = {
   hash: (pw): string => {
@@ -154,7 +156,7 @@ const unmarshallProtobufAny = (msg: any): any => JSON.parse(msg.value.toString()
 const TECHNICAL_USER = 'TECHNICAL_USER';
 
 export class UserService extends ServiceBase {
-  db: any;
+  db: Arango;
   topics: any;
   logger: Logger;
   cfg: any;
@@ -229,6 +231,32 @@ export class UserService extends ServiceBase {
     }
   }
 
+  async updateUserTokens(id, token) {
+    // temporary hack to update tokens on user(to fix issue when same user login multiple times simultaneously)
+    // tokens get overwritten with update operation on simultaneours req
+    if (token && token.interactive) {
+      // insert token to tokens array
+      const aql_token = `FOR doc in users FILTER doc.id == @docID UPDATE doc WITH
+      { tokens: APPEND(doc.tokens, @token)} IN users return doc`;
+      const bindVars = Object.assign({
+        docID: id,
+        token
+      });
+      const res = await query(this.db.db, 'users', aql_token, bindVars);
+      await res.all();
+      // update last_access
+      const aql_last_accesss = `FOR doc in users FILTER doc.id == @docID UPDATE doc WITH
+      { last_access: @last_access} IN users return doc`;
+      const bindVars_last_access = Object.assign({
+        docID: id,
+        last_access: new Date().getTime()
+      });
+      const res_last_access = await query(this.db.db, 'users', aql_last_accesss, bindVars_last_access);
+      await res_last_access.all();
+      this.logger.debug('Tokens updated successuflly for subject', { id });
+    }
+  }
+
   /**
    * Endpoint to search for user by token.
    * @param {call} call request containing token
@@ -243,7 +271,7 @@ export class UserService extends ServiceBase {
         this.tokenRedisClient.get(token, async (err, response) => {
           if (!err && response) {
             // user data
-            logger.debug('Found user data in redis cache');
+            logger.debug('Found user data in redis cache', { token });
             const redisResp = JSON.parse(response);
             // validate token expiry date and delete it if expired
             if (redisResp && redisResp.tokens) {
@@ -273,7 +301,7 @@ export class UserService extends ServiceBase {
           });
           let users = await super.read({ request: { filter } }, context);
           if (users.total_count === 0) {
-            logger.debug('No user found for provided token value');
+            logger.debug('No user found for provided token value', { token });
             return resolve();;
           }
           if (users.total_count === 1) {
@@ -1335,7 +1363,12 @@ export class UserService extends ServiceBase {
                 if (redisID === user.id) {
                   for (let token of updatedTokens) {
                     if (!token.interactive) {
-                      tokensEqual = _.find(redisTokens, token);
+                      // compare only token scopes (since it now contains last_login as well)
+                      for (let redisToken of redisTokens) {
+                        if (redisToken.token === token.token) {
+                          tokensEqual = _.isEqual(redisToken.scopes.sort(), token.scopes.sort());
+                        }
+                      }
                       if (!tokensEqual) {
                         this.logger.debug('Subject Token scope has been updated', token);
                         break;
@@ -1367,7 +1400,7 @@ export class UserService extends ServiceBase {
                       this.logger.error('Error deleting cached findByTOken data from redis', { err });
                       reject(err);
                     } else {
-                      this.logger.info('Redis cached data for findByToken deleted successfully', { noOfKeys: numberOfDeletedKeys });
+                      this.logger.info('Redis cached data for findByToken deleted successfully', { token: subject.token });
                     }
                     resolve(numberOfDeletedKeys);
                   });
@@ -1394,7 +1427,7 @@ export class UserService extends ServiceBase {
           for (let dbToken of dbUserTokens) {
             let tokenExists = _.find(user.tokens, { token: dbToken.token });
             if (!tokenExists) {
-              this.tokenService.destroy({
+              await this.tokenService.destroy({
                 request: {
                   id: dbToken.token, subject: {
                     id: dbToken.id, token: dbToken.token
@@ -1405,7 +1438,7 @@ export class UserService extends ServiceBase {
           }
         }
       }
-      return super.update(call, context);
+      return await super.update(call, context);
     }
   }
 
