@@ -192,6 +192,7 @@ export class UserService extends ServiceBase {
     redisConfig.db = this.cfg.get('redis:db-indexes:db-findByToken') || 0;
     this.tokenRedisClient = createClient(redisConfig);
     this.tokenService = new TokenService(cfg, logger, authZ, this);
+    this.emailEnabled = this.cfg.get('service:enableEmail');
   }
 
   /**
@@ -1845,7 +1846,9 @@ export class UserService extends ServiceBase {
         let headers;
         if (techUsersCfg && techUsersCfg.length > 0) {
           const hbsUser = _.find(techUsersCfg, { id: 'hbs_user' });
-          headers = this.setAuthenticationHeaders(hbsUser.token);
+          if (hbsUser) {
+            headers = this.setAuthenticationHeaders(hbsUser.token);
+          }
         }
 
         response = await fetch(hbsTemplates.registrationSubjectTpl, { headers });

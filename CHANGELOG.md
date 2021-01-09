@@ -1,3 +1,7 @@
+## 0.1.18 (January 9th, 2021)
+
+- fix to set email enabled config on startup
+
 ## 0.1.17 (December 10th, 2020)
 
 - fix for invalidating findByToken cache
