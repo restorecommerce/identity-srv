@@ -238,7 +238,7 @@ export class UserService extends ServiceBase {
     if (token && token.interactive) {
       // insert token to tokens array
       const aql_token = `FOR doc in users FILTER doc.id == @docID UPDATE doc WITH
-      { tokens: APPEND(doc.tokens, @token)} IN users return doc`;
+      { tokens: PUSH(doc.tokens, @token)} IN users return doc`;
       const bindVars = Object.assign({
         docID: id,
         token

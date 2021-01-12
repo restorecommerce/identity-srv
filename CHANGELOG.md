@@ -1,3 +1,7 @@
+## 0.1.19 (January 12th, 2021)
+
+- changed the update tokens aql query from APPEND to PUSH
+
 ## 0.1.18 (January 9th, 2021)
 
 - fix to set email enabled config on startup
