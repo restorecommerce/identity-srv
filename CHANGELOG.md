@@ -1,3 +1,7 @@
+## 0.1.20 (January 15th, 2021)
+
+- fix to support both name and email fields for request password change method
+
 ## 0.1.19 (January 12th, 2021)
 
 - changed the update tokens aql query from APPEND to PUSH

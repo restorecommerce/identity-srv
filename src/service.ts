@@ -123,6 +123,7 @@ export interface Role extends BaseDocument {
 
 export interface ForgotPassword {
   name?: string; // username
+  email?: string;
   password?: string;
   subject?: Subject;
   api_key?: string;
@@ -1073,9 +1074,12 @@ export class UserService extends ServiceBase {
    */
   async requestPasswordChange(call: Call<ForgotPassword>, context?: any): Promise<any> {
     const logger = this.logger;
-    const reqName = call.request;
+    const { name, email } = call.request;
     const filter = toStruct({
-      name: { $eq: reqName.name }
+      $or: [
+        { name: { $eq: name } },
+        { email: { $eq: email } },
+      ]
     });
     let user;
     const users = await super.read({ request: { filter } });
