@@ -99,7 +99,7 @@
       "delete": "urn:restorecommerce:acs:names:action:delete",
       "organization": "urn:restorecommerce:acs:model:organization.Organization"
     },
-    "cache":  {
+    "cache": {
       "host": "localhost",
       "port": 6379,
       "db-index": 5,
@@ -486,6 +486,11 @@
             "grpcIdentity"
           ]
         },
+        "sendActivationEmail": {
+          "transport": [
+            "grpcIdentity"
+          ]
+        },
         "find": {
           "transport": [
             "grpcIdentity"
@@ -699,7 +704,7 @@
     "token": "io-restorecommerce-token-srv",
     "reflection": "io-restorecommerce-identity-reflection",
     "cis": "io-restorecommerce-identity-cis",
-    "health":  "grpc-health-v1"
+    "health": "grpc-health-v1"
   },
   "errors": {
     "INVALID_CREDENTIALS": {
@@ -723,6 +728,12 @@
     {
       "id": "upsert_user_tokens",
       "token": "change.this.token.number"
+    }
+  ],
+  "defaultRegisterUserRoles": [
+    {
+      "role": "user-r-id",
+      "attributes": []
     }
   ]
 }

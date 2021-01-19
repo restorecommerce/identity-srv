@@ -184,11 +184,7 @@ describe('testing identity-srv', () => {
 
   describe('testing User service', () => {
     describe('with test client', () => {
-      let userService;
-      let notificationService;
-      let testUserID;
-      let upserUserID;
-      let user;
+      let userService, notificationService, testUserID, upserUserID, user, testUserName;
       before(async function connectUserService(): Promise<void> {
         userService = await connect('client:service-user', 'user.resource');
         user = {
@@ -196,16 +192,12 @@ describe('testing identity-srv', () => {
           first_name: 'test',
           last_name: 'user',
           password: 'notsecure',
-          email: 'test@ms.restorecommerce.io',
-          role_associations: [{
-            role: 'user-r-id',
-            attributes: []
-          }]
+          email: 'test@ms.restorecommerce.io'
         };
       });
 
       describe('calling register', function registerUser(): void {
-        it('should create a user', async function registerUser(): Promise<void> {
+        it('should register a user', async function registerUser(): Promise<void> {
           const listener = function listener(message: any, context: any): void {
             user.name.should.equal(message.name);
             user.email.should.equal(message.email);
@@ -218,6 +210,7 @@ describe('testing identity-srv', () => {
           const data = result.data;
           should.exist(data.id);
           testUserID = result.data.id;
+          testUserName = result.data.name;
           should.exist(data.name);
           data.name.should.equal(user.name);
           should.exist(data.password_hash);
@@ -242,7 +235,22 @@ describe('testing identity-srv', () => {
           await topic.removeListener('registered', listener);
         });
 
-        it('should create guest User', async function registerUserAgain(): Promise<void> {
+        it('should re-send activation email for registered user', async function sendActivationEmail(): Promise<void> {
+          const listener = function listener(message: any, context: any): void {
+            message.id.should.equal(`identity#test@ms.restorecommerce.io`);
+          };
+          const renderingTopic = events.topic('io.restorecommerce.rendering');
+          const offset = await renderingTopic.$offset(-1);
+          await renderingTopic.on('renderRequest', listener);
+          const result = await userService.sendActivationEmail({ identifier: user.name });
+          should.exist(result);
+          should.not.exist(result.error);
+          result.data.should.be.empty();
+          await renderingTopic.$wait(offset);
+          await renderingTopic.removeListener('renderRequest', listener);
+        });
+
+        it('should register guest User', async function registerUserAgain(): Promise<void> {
           const guest_user = {
             id: 'guest_id',
             name: 'guest_user',
@@ -250,18 +258,14 @@ describe('testing identity-srv', () => {
             last_name: 'guest_last_name',
             password: 'notsecure',
             email: 'guest@guest.com',
-            guest: true,
-            role_associations: [{
-              role: 'user-r-id',
-              attributes: []
-            }]
+            guest: true
           };
           const result = await (userService.register(guest_user));
           should.exist(result);
           should.exist(result.data);
           result.data.id.should.equal('guest_id');
           result.data.guest.should.equal(true);
-          await userService.unregister({ id: 'guest_id' });
+          await userService.unregister({ identifier: 'guest_user' });
         });
 
         it('should throw an error when registering same user', async function registerUserAgain(): Promise<void> {
@@ -294,6 +298,7 @@ describe('testing identity-srv', () => {
           const invalidUser = _.cloneDeep(user);
           for (let user of userNameList) {
             invalidUser.name = user;
+            invalidUser.email = `${user}@${user}.com`;
             await testInvalidUser(invalidUser);
           }
         });
@@ -322,6 +327,7 @@ describe('testing identity-srv', () => {
           const invalidUser = _.cloneDeep(user);
           for (let user of userNameList) {
             invalidUser.name = user;
+            invalidUser.email = `${user}@${user}.com`;
             await testInvalidUser(invalidUser);
           }
         });
@@ -352,6 +358,7 @@ describe('testing identity-srv', () => {
           const invalidUser = _.cloneDeep(user);
           for (let user of userNameList) {
             invalidUser.name = user;
+            invalidUser.email = `${user}@${user}.com`;
             await testInvalidUser(invalidUser);
           }
         });
@@ -371,6 +378,7 @@ describe('testing identity-srv', () => {
           const invalidUser = _.cloneDeep(user);
           for (let user of userNameList) {
             invalidUser.name = user;
+            invalidUser.email = `${user}@${user}.com`;
             await testInvalidUser(invalidUser);
           }
         });
@@ -412,12 +420,16 @@ describe('testing identity-srv', () => {
           const invalidUser = _.cloneDeep(user);
           for (let user of userNameList) {
             invalidUser.name = user;
+            invalidUser.email = user;
             await testInvalidUser(invalidUser);
           }
         });
 
         it('should not create a user with no first or last name', async function registerUser(): Promise<void> {
           const invalidUser = _.cloneDeep(user);
+          // change name and email
+          invalidUser.name = 'test.user2';
+          invalidUser.email = 'test.user2@test.user2.com';
           delete invalidUser.first_name;
           const result = await userService.register(invalidUser);
           should.exist(result);
@@ -528,7 +540,7 @@ describe('testing identity-srv', () => {
           should.exist(result.data);
           should.exist(result.data.items);
           result.data.items[0].id.should.equal('testuser2');
-          await userService.unregister({ id: 'testuser2' });
+          await userService.unregister({ identifier: result.data.items[0].name });
         });
 
         it('should invite a user and confirm User Invitation', async function inviteUser(): Promise<void> {
@@ -538,14 +550,14 @@ describe('testing identity-srv', () => {
           userStatus.should.equal(false);
           // confirm Invitation
           await userService.confirmUserInvitation({
-            name: testuser2.name,
+            identifier: testuser2.name,
             password: testuser2.password, activation_code: result.data.items[0].activation_code
           });
           // read the user and now the status should be true
           const userData = await userService.find({ id: 'testuser2' });
           userData.data.items[0].active.should.equal(true);
           // unregister
-          await userService.unregister({ id: 'testuser2' });
+          await userService.unregister({ identifier: result.data.items[0].name });
         });
       });
 
@@ -651,7 +663,7 @@ describe('testing identity-srv', () => {
 
           const u = result.data.items[0];
           await (userService.activate({
-            name: u.name,
+            identifier: u.name,
             activation_code: u.activation_code,
           }));
 
@@ -728,7 +740,7 @@ describe('testing identity-srv', () => {
           should.exist(result.data.items);
           const pwHashA = result.data.items[0].password_hash;
           result = await (userService.changePassword({
-            id: testUserID,
+            identifier: testUserName,
             password: 'notsecure',
             new_password: 'newPassword'
           }));
@@ -759,7 +771,7 @@ describe('testing identity-srv', () => {
           activationCode.should.be.length(0);
 
           result = await userService.requestPasswordChange({
-            name: user.name
+            identifier: user.name
           });
           should.exist(result);
           should.not.exist(result.error);
@@ -788,7 +800,7 @@ describe('testing identity-srv', () => {
           const pwHashA = result.data.items[0].password_hash;
 
           result = await userService.confirmPasswordChange({
-            name: user.name,
+            identifier: user.name,
             password: 'newPassword2',
             activation_code: activationCode
           });
@@ -834,8 +846,8 @@ describe('testing identity-srv', () => {
           should.exist(result.data.items);
           const email_old = result.data.items[0].email;
           result = await (userService.requestEmailChange({
-            id: testUserID,
-            email: 'newmail@newmail.com',
+            identifier: testUserName,
+            new_email: 'newmail@newmail.com',
           }));
           should.exist(result);
           should.not.exist(result.error);
@@ -872,7 +884,7 @@ describe('testing identity-srv', () => {
           const activationCode = result.data.items[0].activation_code;
           result = await (userService.confirmEmailChange({
             activation_code: activationCode,
-            name: user.name
+            identifier: user.name
           }));
           should.exist(result);
           should.not.exist(result.error);
@@ -949,7 +961,7 @@ describe('testing identity-srv', () => {
       describe('calling unregister', function unregister(): void {
         it('should remove the user', async function unregister(): Promise<void> {
           await userService.unregister({
-            id: testUserID,
+            identifier: testUserName,
           });
 
           // this would throw an error since user does not exist
@@ -1002,9 +1014,8 @@ describe('testing identity-srv', () => {
           const listener = function listener(message: any, context: any): void {
             message.id.should.equal(`identity#${sampleUser.email}`);
           };
-
           await topic.on('renderRequest', listener);
-          const result = await (userService.sendInvitationEmail({ user_id: sampleUser.id, invited_by_user_id: invitingUser.id }));
+          const result = await (userService.sendInvitationEmail({ identifier: sampleUser.name, invited_by_user_identifier: invitingUser.name }));
           should.exist(result);
           should.not.exist(result.error);
           await topic.removeListener('renderRequest', listener);
@@ -1115,7 +1126,7 @@ describe('testing identity-srv', () => {
           should.exist(result.data);
           should.exist(result.data.items);
           result.data.items[0].id.should.equal('testuser');
-          await userService.unregister({ id: 'testuser' });
+          await userService.unregister({ identifier: result.data.items[0].name });
         });
 
         it('should not allow to create a User with invalid role existing in system', async () => {

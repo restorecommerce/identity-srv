@@ -70,7 +70,7 @@ export interface HierarchicalScope {
 }
 
 export interface UserInviationReq {
-  name: string;
+  identifier: string;
   password: string;
   activation_code: string;
 }
@@ -80,7 +80,6 @@ export interface FindUser {
   email?: string;
   name?: string;
   subject?: Subject;
-  api_key?: string;
 }
 
 export interface FindUserByToken {
@@ -88,17 +87,15 @@ export interface FindUserByToken {
 }
 
 export interface ActivateUser {
-  name: string;
+  identifier: string;
   activation_code: string;
   subject?: Subject;
-  api_key?: string;
 }
 
 export interface ConfirmEmailChange {
-  name: string;
+  identifier: string;
   activation_code: string;
   subject?: Subject;
-  api_key?: string;
 }
 
 export interface RoleAssociation {
@@ -112,8 +109,9 @@ export interface Attribute {
 }
 
 export interface EmailChange {
-  email: string;
-  id: string;
+  identifier: string;
+  new_email: string;
+  subject?: Subject;
 }
 
 export interface Role extends BaseDocument {
@@ -122,27 +120,38 @@ export interface Role extends BaseDocument {
 }
 
 export interface ForgotPassword {
-  name?: string; // username
-  email?: string;
-  password?: string;
+  identifier: string; // username
   subject?: Subject;
-  api_key?: string;
+}
+
+export interface SendInvitationEmailRequest {
+  identifier: string; // username or email
+  invited_by_user_identifier: string; // inviting user's username or email
+  subject?: Subject;
+}
+
+export interface UnregisterRequest {
+  identifier: string; // username or email
+  subject?: Subject;
+}
+
+export interface SendActivationEmailRequest {
+  identifier: string; // username or email
+  subject?: Subject;
 }
 
 export interface ChangePassword {
-  id: string;
+  identifier: string; // username or email
   password: string;
   new_password?: string;
   subject?: Subject;
-  api_key?: string;
 }
 
 export interface ConfirmPasswordChange {
-  name: string;
+  identifier: string;
   password: string;
   activation_code: string;
   subject?: Subject;
-  api_key?: string;
 }
 
 const marshallProtobufAny = (msg: any): any => {
@@ -819,6 +828,10 @@ export class UserService extends ServiceBase {
 
     // TODO: verify captcha_code before deleting
     delete user['captcha_code'];
+    // set default role_associations from configuration
+    if (this.cfg.get('defaultRegisterUserRoles')) {
+      user.role_associations = this.cfg.get('defaultRegisterUserRoles');
+    }
     const createdUser = await this.createUser(user, context);
 
     this.logger.info('user registered', user);
@@ -854,10 +867,21 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
-      // find the actual user object from DB using the UserInvitationReq username
+      // find the actual user object from DB using the UserInvitationReq identifier
       // activate user and update password
       const filter = toStruct({
-        name: { $eq: userInviteReq.name }
+        $or: [
+          {
+            name: {
+              $eq: userInviteReq.identifier
+            }
+          },
+          {
+            email: {
+              $eq: userInviteReq.identifier
+            }
+          }
+        ]
       });
       let user;
       const users = await super.read({ request: { filter } });
@@ -883,7 +907,7 @@ export class UserService extends ServiceBase {
         }
       };
       await super.update(serviceCall, context);
-      this.logger.info('password updated for invited user', { name: userInviteReq.name });
+      this.logger.info('password updated for invited user', { identifier: userInviteReq.identifier });
       return {};
     }
   }
@@ -950,7 +974,7 @@ export class UserService extends ServiceBase {
   async activate(call: Call<ActivateUser>, context?: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
-    const userName = request.name;
+    const identifier = request.identifier;
     const activationCode = request.activation_code;
     let subject = call.request.subject;
     let acsResponse: AccessResponse;
@@ -967,14 +991,26 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
-      if (!userName) {
+      if (!identifier) {
         throw new errors.InvalidArgument('argument id is empty');
       }
       if (!activationCode) {
         throw new errors.InvalidArgument('argument activation_code is empty');
       }
+      // check for the identifier against name or email in DB
       const filter = toStruct({
-        name: { $eq: userName }
+        $or: [
+          {
+            name: {
+              $eq: identifier
+            }
+          },
+          {
+            email: {
+              $eq: identifier
+            }
+          }
+        ]
       });
       const users = await super.read({ request: { filter } }, context);
       if (!users || users.total_count === 0) {
@@ -1017,23 +1053,35 @@ export class UserService extends ServiceBase {
   async changePassword(call: Call<ChangePassword>, context?: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
-    const userID = request.id;
+    const identifier = request.identifier;
 
     const pw = request.password;
     const newPw = request.new_password;
     let subject = call.request.subject;
+    // check for the identifier against name or email in DB
     const filter = toStruct({
-      id: { $eq: userID }
+      $or: [
+        {
+          name: {
+            $eq: identifier
+          }
+        },
+        {
+          email: {
+            $eq: identifier
+          }
+        }
+      ]
     });
     const users = await super.read({ request: { filter } }, context);
     if (_.size(users) === 0) {
-      logger.debug('user does not exist', userID);
+      logger.debug('user does not exist', { identifier });
       throw new errors.NotFound('user does not exist');
     }
     const user: User = users.items[0];
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, { id: userID, password: pw, new_password: newPw, meta: user.meta },
+      acsResponse = await checkAccessRequest(subject, { id: user.id, password: pw, new_password: newPw, meta: user.meta },
         AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -1058,7 +1106,7 @@ export class UserService extends ServiceBase {
         }
       };
       await super.update(serviceCall, context);
-      logger.info('password changed for user', userID);
+      logger.info('password changed for user', { identifier });
       await this.topics['user.resource'].emit('passwordChanged', user);
       return {};
     }
@@ -1074,11 +1122,20 @@ export class UserService extends ServiceBase {
    */
   async requestPasswordChange(call: Call<ForgotPassword>, context?: any): Promise<any> {
     const logger = this.logger;
-    const { name, email } = call.request;
+    const identifier = call.request.identifier;
+    // check for the identifier against name or email in DB
     const filter = toStruct({
       $or: [
-        { name: { $eq: name } },
-        { email: { $eq: email } },
+        {
+          name: {
+            $eq: identifier
+          }
+        },
+        {
+          email: {
+            $eq: identifier
+          }
+        }
       ]
     });
     let user;
@@ -1103,7 +1160,7 @@ export class UserService extends ServiceBase {
     // sending activation code via email
     if (this.emailEnabled) {
       await this.fetchHbsTemplates();
-      const renderRequest = this.makeConfirmationData(user, true);
+      const renderRequest = this.makeConfirmationData(user, true, identifier);
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
     return {};
@@ -1117,7 +1174,7 @@ export class UserService extends ServiceBase {
    */
   async confirmPasswordChange(call: Call<ConfirmPasswordChange>, context?: any): Promise<any> {
     const logger = this.logger;
-    const { name, activation_code } = call.request;
+    const { identifier, activation_code } = call.request;
     const newPassword = call.request.password;
     let subject = call.request.subject;
     let acsResponse: AccessResponse;
@@ -1135,8 +1192,20 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
+      // check for the identifier against name or email in DB
       const filter = toStruct({
-        name: { $eq: name }
+        $or: [
+          {
+            name: {
+              $eq: identifier
+            }
+          },
+          {
+            email: {
+              $eq: identifier
+            }
+          }
+        ]
       });
       let user;
       const users = await super.read({ request: { filter } });
@@ -1173,35 +1242,62 @@ export class UserService extends ServiceBase {
   async requestEmailChange(call: Call<EmailChange>, context?: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
-    const userID = request.id;
-    const email = request.email;
+    const identifier = request.identifier;
+    const new_email = request.new_email;
+    const subject = call.request.subject;
+    let acsResponse: AccessResponse;
+    // check for the identifier against name or email in DB
     const filter = toStruct({
-      id: { $eq: userID }
+      $or: [
+        {
+          name: {
+            $eq: identifier
+          }
+        },
+        {
+          email: {
+            $eq: identifier
+          }
+        }
+      ]
     });
     const users = await super.read({ request: { filter } }, context);
     if (users.total_count === 0) {
-      logger.debug('user does not exist', userID);
+      logger.debug('user does not exist', { identifier });
       throw new errors.NotFound('user does not exist');
     }
     const user: User = users.items[0];
-
-    user.new_email = email;
-    user.activation_code = this.idGen();
-    const serviceCall = {
-      request: {
-        items: [user]
-      }
-    };
-    await super.update(serviceCall, context);
-    logger.info('Email change requested for user', userID);
-    await this.topics['user.resource'].emit('emailChangeRequested', user);
-
-    if (this.emailEnabled) {
-      await this.fetchHbsTemplates();
-      const renderRequest = this.makeConfirmationData(user, false);
-      await this.topics.rendering.emit('renderRequest', renderRequest);
+    try {
+      acsResponse = await checkAccessRequest(subject, { id: user.id, identifier, new_email, meta: user.meta },
+        AuthZAction.MODIFY, 'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
     }
-    return {};
+
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      user.new_email = new_email;
+      user.activation_code = this.idGen();
+      const serviceCall = {
+        request: {
+          items: [user]
+        }
+      };
+      await super.update(serviceCall, context);
+      logger.info('Email change requested for user', { email: new_email });
+      await this.topics['user.resource'].emit('emailChangeRequested', user);
+
+      if (this.emailEnabled) {
+        await this.fetchHbsTemplates();
+        const renderRequest = this.makeConfirmationData(user, false, identifier, new_email);
+        await this.topics.rendering.emit('renderRequest', renderRequest);
+      }
+      return {};
+    }
   }
 
   /**
@@ -1213,11 +1309,23 @@ export class UserService extends ServiceBase {
   async confirmEmailChange(call: Call<ConfirmEmailChange>, context?: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
-    const name = request.name;
+    const identifier = request.identifier;
     const activationCode = request.activation_code;
 
+    // check for the identifier against name or email in DB
     const filter = toStruct({
-      name: { $eq: name }
+      $or: [
+        {
+          name: {
+            $eq: identifier
+          }
+        },
+        {
+          email: {
+            $eq: identifier
+          }
+        }
+      ]
     });
     const users = await super.read({ request: { filter } });
     if (users && users.total_count === 0) {
@@ -1599,14 +1707,35 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {} returns empty response
    */
-  async unregister(call: any, context?: any): Promise<any> {
+  async unregister(call: Call<UnregisterRequest>, context?: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
-    const userID = request.id;
-    logger.silly('unregister', userID);
-
+    const identifier = request.identifier;
+    logger.silly('unregister', identifier);
     let subject = call.request.subject;
-    const acsResources = await this.createMetadata(call.request.items, AuthZAction.DELETE, subject);
+
+    const filter = toStruct({
+      $or: [
+        {
+          name: {
+            $eq: identifier
+          }
+        },
+        {
+          email: {
+            $eq: identifier
+          }
+        }
+      ]
+    });
+    const users = await super.read({ request: { filter } }, context);
+
+    if (users && users.total_count === 0) {
+      logger.debug('user does not exist', { identifier });
+      throw new errors.NotFound(`user with identifier ${identifier} does not exist for unregistering`);
+    }
+
+    const acsResources = await this.createMetadata(users.items, AuthZAction.DELETE, subject);
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.DELETE,
@@ -1620,23 +1749,15 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
-      const filter = toStruct({
-        id: { $eq: userID }
-      });
-      const users = await super.read({ request: { filter } }, context);
-      if (users && users.total_count === 0) {
-        logger.debug('user does not exist', userID);
-        throw new errors.NotFound(`user with ${userID} does not exist for unregistering`);
-      }
-
       // delete user
+      let userID = users.items[0].id;
       const serviceCall = {
         request: {
           ids: [userID]
         }
       };
       await super.delete(serviceCall, context);
-      logger.info('user deleted', userID);
+      logger.info('user with identifier deleted', { identifier });
       await this.topics['user.resource'].emit('unregistered', userID);
       return {};
     }
@@ -1899,7 +2020,7 @@ export class UserService extends ServiceBase {
 
   private makeActivationEmailData(user: User): any {
     let activationURL: string = this.cfg.get('service:activationURL');
-    activationURL = `${activationURL}?user_name=${user.name}&activation_code=${user.activation_code}`;
+    activationURL = `${activationURL}?identifier=${user.name}&activation_code=${user.activation_code}`;
 
     const dataBody = {
       firstName: user.first_name,
@@ -1917,7 +2038,7 @@ export class UserService extends ServiceBase {
 
   private makeInvitationEmailData(user: User): any {
     let invitationURL: string = this.cfg.get('service:invitationURL');
-    invitationURL = `${invitationURL}?user_name=${user.name}&activation_code=${user.activation_code}`;
+    invitationURL = `${invitationURL}?identifier=${user.name}&activation_code=${user.activation_code}`;
 
     const dataBody = {
       firstName: user.first_name,
@@ -1940,13 +2061,13 @@ export class UserService extends ServiceBase {
       dataBody, dataSubject);
   }
 
-  private makeConfirmationData(user: User, passwordChange: boolean): any {
+  private makeConfirmationData(user: User, passwordChange: boolean, identifier: string, email?: string): any {
     const emailBody = this.changePWEmailBodyTpl;
     const emailSubject = this.changePWEmailSubjectTpl;
 
     let URL: string = passwordChange ? this.cfg.get('service:passwordChangeConfirmationURL')
       : this.cfg.get('service:emailConfirmationURL'); // prefix
-    URL = `${URL}?user_name=${user.name}&activation_code=${user.activation_code}`; // actual email
+    URL = `${URL}?identifier=${identifier}&activation_code=${user.activation_code}`; // actual email
 
     const dataBody = {
       firstName: user.first_name,
@@ -1956,13 +2077,14 @@ export class UserService extends ServiceBase {
     };
     const dataSubject = { passwordChange };
     return this.makeRenderRequestMsg(user, emailSubject, emailBody,
-      dataBody, dataSubject);
+      dataBody, dataSubject, email);
   }
 
   private makeRenderRequestMsg(user: User, subject: any, body: any,
-    dataBody: any, dataSubject: any): any {
+    dataBody: any, dataSubject: any, email?: string): any {
+    let userEmail = email ? email : user.email;
     return {
-      id: `identity#${user.email}`,
+      id: `identity#${userEmail}`,
       payload: [{
         templates: marshallProtobufAny({
           body: { body, layout: this.layoutTpl },
@@ -2206,22 +2328,27 @@ export class UserService extends ServiceBase {
     return resources;
   }
 
-  private async makeUserForInvitationData(data): Promise<any> {
-    const { user_id, invited_by_user_id } = data;
-    let user, invitedByUser;
-
-    const users = await super.read({ request: { filter: toStruct({ id: { $eq: user_id } }) } });
-    if (users.total_count === 1) {
-      user = users.items[0];
-    } else {
-      throw new errors.NotFound(`user with id ${user_id} not found`);
-    }
-
-    const invitedByUsers = await super.read({ request: { filter: toStruct({ id: { $eq: invited_by_user_id } }) } });
+  private async makeUserForInvitationData(user, invited_by_user_identifier): Promise<any> {
+    let invitedByUser;
+    const filter = toStruct({
+      $or: [
+        {
+          name: {
+            $eq: invited_by_user_identifier
+          }
+        },
+        {
+          email: {
+            $eq: invited_by_user_identifier
+          }
+        }
+      ]
+    });
+    const invitedByUsers = await super.read({ request: { filter } });
     if (invitedByUsers.total_count === 1) {
       invitedByUser = invitedByUsers.items[0];
     } else {
-      throw new errors.NotFound(`user with id ${invited_by_user_id} not found`);
+      throw new errors.NotFound(`user with identifier ${invited_by_user_identifier} not found`);
     }
 
     return {
@@ -2236,18 +2363,91 @@ export class UserService extends ServiceBase {
     };
   }
 
-  async sendInvitationEmail(call: any, context?: any): Promise<any> {
-    const user = call.request;
+  async sendActivationEmail(call: Call<SendActivationEmailRequest>, context?: any): Promise<any> {
+    const { identifier, subject } = call.request;
+    let user;
+    // check for the identifier against name or email in DB
+    const filter = toStruct({
+      $or: [
+        {
+          name: {
+            $eq: identifier
+          }
+        },
+        {
+          email: {
+            $eq: identifier
+          }
+        }
+      ]
+    });
+    const users = await super.read({ request: { filter } });
+    if (users.total_count === 1) {
+      user = users.items[0];
+      if (user.active) {
+        throw new errors.FailedPrecondition(`activation request to an active user ${identifier}`);
+      }
 
-    const userForInvitation = await this.makeUserForInvitationData(user);
+      if (this.emailEnabled && !user.guest) {
+        await this.fetchHbsTemplates();
+        const renderRequest = this.makeActivationEmailData(user);
+        await this.topics.rendering.emit('renderRequest', renderRequest);
+      }
+      return {};
+    } else {
+      throw new errors.NotFound(`user with identifier ${identifier} not found`);
+    }
+  }
 
-    if (this.emailEnabled && user.invite) {
-      await this.fetchHbsTemplates();
-      const renderRequest = this.makeInvitationEmailData(userForInvitation);
-      await this.topics.rendering.emit('renderRequest', renderRequest);
+  async sendInvitationEmail(call: Call<SendInvitationEmailRequest>, context?: any): Promise<any> {
+    const { identifier, invited_by_user_identifier, subject } = call.request;
+    let user;
+    // check for the identifier against name or email in DB
+    const filter = toStruct({
+      $or: [
+        {
+          name: {
+            $eq: identifier
+          }
+        },
+        {
+          email: {
+            $eq: identifier
+          }
+        }
+      ]
+    });
+    const users = await super.read({ request: { filter } });
+    if (users.total_count === 1) {
+      user = users.items[0];
+    } else {
+      throw new errors.NotFound(`user with identifier ${identifier} not found`);
     }
 
-    return {};
+    let acsResponse: AccessResponse;
+    try {
+      acsResponse = await checkAccessRequest(subject, { id: user.id, identifier, invited_by_user_identifier, meta: user.meta },
+        AuthZAction.MODIFY, 'user', this);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv:', err);
+      throw err;
+    }
+
+    if (acsResponse.decision != Decision.PERMIT) {
+      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+    }
+
+    if (acsResponse.decision === Decision.PERMIT) {
+      if (this.emailEnabled && user.invite) {
+        const userForInvitation = await this.makeUserForInvitationData(user, invited_by_user_identifier);
+        await this.fetchHbsTemplates();
+        const renderRequest = this.makeInvitationEmailData(userForInvitation);
+        await this.topics.rendering.emit('renderRequest', renderRequest);
+      } else {
+        this.logger.info('User invite not enabled for identifier', { identifier });
+      }
+      return {};
+    }
   }
 }
 
