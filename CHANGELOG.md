@@ -1,3 +1,11 @@
+## 0.1.21 (January 19th, 2021)
+
+- moved role_assoc from register and made it configurable,
+- updated requestPasswordChagne, confrmPasswordChange, requestEmailChange, confirmEmailChange, activate, sendInvitationEmailRequest, unregister, changePassword to use identifier field.
+- added sendActivationEmail rpc to resend registration emails
+- Add ACS checks for requestEmailChagne and changed the recipient to new email
+- up documentation, protos
+
 ## 0.1.20 (January 15th, 2021)
 
 - fix to support both name and email fields for request password change method
