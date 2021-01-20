@@ -930,14 +930,23 @@ export class UserService extends ServiceBase {
     }
 
     const emailAddress = split[1];
-    const user = await super.read({
-      request: {
-        filter: toStruct({
-          email: { $eq: emailAddress }
-        })
-      }
+
+    const filter = toStruct({
+      $or: [
+        {
+          email: {
+            $eq: emailAddress
+          }
+        },
+        {
+          new_email: {
+            $eq: emailAddress
+          }
+        }
+      ]
     });
 
+    const user = await super.read({ request: { filter } });
     if (_.isEmpty(user.items)) {
       this.logger.silly(`Received rendering response from unknown email address ${emailAddress}; discarding`);
       return;
@@ -1329,7 +1338,7 @@ export class UserService extends ServiceBase {
     });
     const users = await super.read({ request: { filter } });
     if (users && users.total_count === 0) {
-      logger.debug('user does not exist', name);
+      logger.debug('user does not exist', identifier);
       throw new errors.NotFound('user does not exist');
     }
 
