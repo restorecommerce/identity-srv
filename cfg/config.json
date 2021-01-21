@@ -367,10 +367,10 @@
       },
       "sendEmail": {
         "protos": [
-          "io/restorecommerce/notification.proto"
+          "io/restorecommerce/notification_req.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",
-        "messageObject": "io.restorecommerce.notification.Notification"
+        "messageObject": "io.restorecommerce.notification_req.NotificationReq"
       },
       "setApiKeyCommand": {
         "protos": [
@@ -428,8 +428,8 @@
             "renderResponse"
           ]
         },
-        "notification": {
-          "topic": "io.restorecommerce.notification"
+        "notificationReq": {
+          "topic": "io.restorecommerce.notification_req"
         }
       }
     },

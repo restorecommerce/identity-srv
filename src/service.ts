@@ -313,7 +313,7 @@ export class UserService extends ServiceBase {
           let users = await super.read({ request: { filter } }, context);
           if (users.total_count === 0) {
             logger.debug('No user found for provided token value', { token });
-            return resolve();;
+            return resolve(undefined);
           }
           if (users.total_count === 1) {
             logger.debug('found user from token', { users });
@@ -955,7 +955,7 @@ export class UserService extends ServiceBase {
     const responseBody = unmarshallProtobufAny(renderResponse.response[0]);
     const responseSubject = unmarshallProtobufAny(renderResponse.response[1]);
     const emailData = this.makeNotificationData(emailAddress, responseBody, responseSubject);
-    await this.topics.notification.emit('sendEmail', emailData);
+    await this.topics.notificationReq.emit('sendEmail', emailData);
   }
 
   private idGen(): string {
@@ -1529,7 +1529,7 @@ export class UserService extends ServiceBase {
                 }
                 return resolve(redisResp);
               }
-              resolve();
+              resolve(undefined);
             });
           });
         }

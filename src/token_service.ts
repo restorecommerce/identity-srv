@@ -260,7 +260,7 @@ export class TokenService {
                   resolve(err);
                 } else {
                   this.logger.info('Subject data deleted from Reids', { noOfKeys: numberOfDeletedKeys });
-                  resolve();
+                  resolve(undefined);
                 }
               });
             });
