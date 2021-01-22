@@ -253,14 +253,14 @@ export class TokenService {
           }
           if (id) {
             // flush token subject cache
-            await new Promise((resolve, reject) => {
+            await new Promise((resolve: any, reject) => {
               this.userService.tokenRedisClient.del(id, async (err, numberOfDeletedKeys) => {
                 if (err) {
                   this.logger.error('Error deleting user data from redis', err);
                   resolve(err);
                 } else {
                   this.logger.info('Subject data deleted from Reids', { noOfKeys: numberOfDeletedKeys });
-                  resolve(undefined);
+                  resolve();
                 }
               });
             });

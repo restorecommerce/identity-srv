@@ -278,7 +278,7 @@ export class UserService extends ServiceBase {
     let userData;
     const logger = this.logger;
     if (token) {
-      userData = await new Promise((resolve, reject) => {
+      userData = await new Promise((resolve: any, reject) => {
         this.tokenRedisClient.get(token, async (err, response) => {
           if (!err && response) {
             // user data
@@ -313,7 +313,7 @@ export class UserService extends ServiceBase {
           let users = await super.read({ request: { filter } }, context);
           if (users.total_count === 0) {
             logger.debug('No user found for provided token value', { token });
-            return resolve(undefined);
+            return resolve();
           }
           if (users.total_count === 1) {
             logger.debug('found user from token', { users });
