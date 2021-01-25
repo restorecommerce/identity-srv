@@ -440,6 +440,22 @@ The cached data is invalidated when User is logged_out or when token `Destroy` o
 |token |string |required |Token value
 |==========================================================================================================================
 
+[#api_user_sendActivationEmail]
+==== `SendActivationEmail`
+
+This endpoint sends activation email to the email id of the registered user. In case if the User is already activated suitable error response is sent, else activation email
+containg activation code is sent back. Requests are perfomed providing `io.restorecommerce.user.SendActivationEmailRequest` protobuf message
+as input and response is `google.protobuf.Empty` message.
+
+`io.restorecommerce.user.SendActivationEmailRequest`
+
+[width="100%",cols="20%,16%,20%,44%",options="header",]
+|==========================================================================================================================
+|Field |Type |Label |Description
+|identifier |string |required |User name or email
+|subject |`io.restorecommerce.auth.Subject` |optional |Subject details
+|==========================================================================================================================
+
 [#api_role]
 === `Role`
 
