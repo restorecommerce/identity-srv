@@ -1200,7 +1200,8 @@ describe('testing identity-srv', () => {
           should.exist(result.error.name);
           result.error.name.should.equal('PermissionDenied');
           should.exist(result.error.details);
-          result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:user, action:CREATE, target_scope:orgC; the response was DENY');
+          // since with in verify role associations we use modify action for making whatIsAllowedACS request
+          result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:user, action:MODIFY, target_scope:orgC; the response was DENY');
 
           // disable authorization
           cfg.set('authorization:enabled', false);
