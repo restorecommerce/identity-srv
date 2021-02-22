@@ -501,10 +501,16 @@ export class UserService extends ServiceBase {
       // Make whatIsAllowedACS request to retreive the set of applicable
       // policies and check for role scoping entity, if it exists then validate
       // the user role associations if not skip validation
-      let acsResponse: Decision | PolicySetRQ = await accessRequest(subject, {
-        entity: 'user',
-        args: { filter: [] }
-      }, AuthZAction.CREATE, this.authZ);
+      let acsResponse: Decision | PolicySetRQ;
+      try {
+        acsResponse = await accessRequest(subject, {
+          entity: 'user',
+          args: { filter: [] }
+        }, AuthZAction.MODIFY, this.authZ);
+      } catch(err) {
+        this.logger.error('Error making wahtIsAllowedACS request for verifying role associations', {message: err.message});
+        throw err;
+      }
       // decision is for apiKey
       if ((acsResponse as Decision) === Decision.PERMIT) {
         return;
@@ -535,9 +541,9 @@ export class UserService extends ServiceBase {
     }
     // check if the assignable_by_roles contain createAccessRole
     for (let user of usersList) {
-      let userRoleAssocs = user.role_associations;
+      let userRoleAssocs = user.role_associations ? user.role_associations : [];
       let targetUserRoleIds = [];
-      if (userRoleAssocs.length === 0) {
+      if (_.isEmpty(userRoleAssocs)) {
         continue;
       }
       for (let roleAssoc of userRoleAssocs) {
@@ -1408,7 +1414,10 @@ export class UserService extends ServiceBase {
     if (acsResponse.decision === Decision.PERMIT) {
       if (this.cfg.get('authorization:enabled')) {
         try {
-          await this.verifyUserRoleAssociations(items, subject);
+          const roleAssocsModified = await this.roleAssocsModified(items, context);
+          if (roleAssocsModified) {
+            await this.verifyUserRoleAssociations(items, subject);
+          }
         } catch (err) {
           // for unhandled promise rejection
           throw err;
@@ -1564,6 +1573,41 @@ export class UserService extends ServiceBase {
     }
   }
 
+  private async roleAssocsModified(usersList: User[], context?: any) {
+    this.logger.debug('Checking for changes in role-associations');
+    let roleAssocsModified = false;
+    for (let user of usersList) {
+      const userID = user.id;
+      const filter = toStruct({
+        id: { $eq: userID }
+      });
+      const userRoleAssoc = user.role_associations;
+      const users = await super.read({ request: { filter } }, context);
+      if (users && users.items && users.items.length > 0) {
+        let dbRoleAssoc = users.items[0].role_associations;
+        if (userRoleAssoc.length != dbRoleAssoc.length) {
+          roleAssocsModified = true;
+          this.logger.debug('Role associations length are not equal', { id: userID });
+          break;
+        } else {
+          // compare each role and its association
+          if (!_.isEqual(_.sortBy(userRoleAssoc, [(obj) => { return obj.role; }]), _.sortBy(dbRoleAssoc, [(obj) => { return obj.role; }]))) {
+            roleAssocsModified = true;
+            this.logger.debug('Role associations ojbects are not equal', { id: userID });
+            break;
+          } else {
+            this.logger.debug('Role assocations not changed for user', { id: userID });
+          }
+        }
+      } else {
+        this.logger.debug('User does not exist in DB and hence role associations should be validated');
+        roleAssocsModified = true;
+        break;
+      }
+    }
+    return roleAssocsModified;
+  }
+
   /**
    * Extends the generic upsert operation in order to upsert any fields
    * @param call
@@ -1594,7 +1638,10 @@ export class UserService extends ServiceBase {
     if (acsResponse.decision === Decision.PERMIT) {
       if (this.cfg.get('authorization:enabled')) {
         try {
-          await this.verifyUserRoleAssociations(usersList, subject);
+          const roleAssocsModified = await this.roleAssocsModified(usersList, context);
+          if (roleAssocsModified) {
+            await this.verifyUserRoleAssociations(usersList, subject);
+          }
         } catch (err) {
           // for unhandled promise rejection
           throw err;

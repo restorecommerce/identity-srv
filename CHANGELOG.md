@@ -1,3 +1,7 @@
+## 0.1.22 (February 22nd, 2021)
+
+- Added check to verify user roleAssociations only if the role associations are changed
+
 ## 0.1.21 (January 19th, 2021)
 
 - moved role_assoc from register and made it configurable,
