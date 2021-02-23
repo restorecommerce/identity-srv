@@ -1,3 +1,7 @@
+## 0.1.22 (February 23rd, 2021)
+
+- updated node and npm version
+
 ## 0.1.22 (February 22nd, 2021)
 
 - Added check to verify user roleAssociations only if the role associations are changed
