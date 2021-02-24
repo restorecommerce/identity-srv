@@ -1,4 +1,8 @@
-## 0.1.22 (February 23rd, 2021)
+## 0.1.24 (February 24th, 2020)
+
+- updated logger and service config
+
+## 0.1.23 (February 23rd, 2021)
 
 - updated node and npm version
 
