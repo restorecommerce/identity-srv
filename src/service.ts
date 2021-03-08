@@ -1,167 +1,30 @@
 import * as _ from 'lodash';
-import * as bcrypt from 'bcryptjs';
-import * as util from 'util';
 import * as uuid from 'uuid';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
-import { BaseDocument, DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
+import { DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from 'winston';
-import { ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest, PolicySetRQ, PermissionDenied } from '@restorecommerce/acs-client';
+import {
+  ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest,
+  PolicySetRQ, PermissionDenied, HierarchicalScope, RoleAssociation
+} from '@restorecommerce/acs-client';
 import { RedisClient, createClient } from 'redis';
-import { checkAccessRequest, ReadPolicyResponse, AccessResponse } from './utils';
+import { checkAccessRequest, password, unmarshallProtobufAny, marshallProtobufAny, getDefaultFilter, getNameFilter } from './utils';
 import { errors } from '@restorecommerce/chassis-srv';
 import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common';
-
 import {
-  validateFirstChar,
-  validateSymbolRepeat,
-  validateAllChar,
-  validateStrLen,
-  validateAtSymbol,
-  validateEmail
+  validateFirstChar, validateSymbolRepeat, validateAllChar,
+  validateStrLen, validateAtSymbol, validateEmail
 } from './validation';
 import { TokenService } from './token_service';
 import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base';
-
-const password = {
-  hash: (pw): string => {
-    const salt = bcrypt.genSaltSync(10);
-    const hash = bcrypt.hashSync(pw, salt);
-    return hash;
-  },
-  verify: (password_hash, pw) => {
-    return bcrypt.compareSync(pw, password_hash);
-  }
-};
-
-export type TUser = User | FindUser | ActivateUser;
-export interface Call<TUser> {
-  request?: TUser;
-  [key: string]: any;
-}
-
-export interface User extends BaseDocument {
-  name: string; // The name of the user, can be used for login
-  first_name: string;
-  last_name: string;
-  email: string; // Email address
-  new_email: string; // Email address
-  active: boolean; // If the user was activated via the activation process
-  activation_code: string; // Activation code used in the activation process
-  password: string; // Raw password, not stored
-  password_hash: string; // Encrypted password, stored
-  guest: boolean;
-  role_associations: RoleAssociation[];
-  locale_id: string;
-  timezone_id: string;
-  unauthenticated: boolean;
-  default_scope: string;
-  invite: boolean; // For user inviation
-  invited_by_user_name: string; // user who is inviting
-  invited_by_user_first_name: string; // First name of user inviting
-  invited_by_user_last_name: string; // Last name of user inviting
-}
-
-export interface HierarchicalScope {
-  id: string;
-  role?: string;
-  children?: HierarchicalScope[];
-}
-
-export interface UserInviationReq {
-  identifier: string;
-  password: string;
-  activation_code: string;
-}
-
-export interface FindUser {
-  id?: string;
-  email?: string;
-  name?: string;
-  subject?: Subject;
-}
-
-export interface FindUserByToken {
-  token?: string;
-}
-
-export interface ActivateUser {
-  identifier: string;
-  activation_code: string;
-  subject?: Subject;
-}
-
-export interface ConfirmEmailChange {
-  identifier: string;
-  activation_code: string;
-  subject?: Subject;
-}
-
-export interface RoleAssociation {
-  role: string; // role ID
-  attributes?: Attribute[];
-}
-
-export interface Attribute {
-  id: string;
-  value: string;
-}
-
-export interface EmailChange {
-  identifier: string;
-  new_email: string;
-  subject?: Subject;
-}
-
-export interface Role extends BaseDocument {
-  name: string;
-  description: string;
-}
-
-export interface ForgotPassword {
-  identifier: string; // username
-  subject?: Subject;
-}
-
-export interface SendInvitationEmailRequest {
-  identifier: string; // username or email
-  invited_by_user_identifier: string; // inviting user's username or email
-  subject?: Subject;
-}
-
-export interface UnregisterRequest {
-  identifier: string; // username or email
-  subject?: Subject;
-}
-
-export interface SendActivationEmailRequest {
-  identifier: string; // username or email
-  subject?: Subject;
-}
-
-export interface ChangePassword {
-  identifier: string; // username or email
-  password: string;
-  new_password?: string;
-  subject?: Subject;
-}
-
-export interface ConfirmPasswordChange {
-  identifier: string;
-  password: string;
-  activation_code: string;
-  subject?: Subject;
-}
-
-const marshallProtobufAny = (msg: any): any => {
-  return {
-    type_url: 'identity.rendering.renderRequest',
-    value: Buffer.from(JSON.stringify(msg))
-  };
-};
-
-const unmarshallProtobufAny = (msg: any): any => JSON.parse(msg.value.toString());
+import {
+  FindUser, AccessResponse, FindUserByToken, Call, ReadPolicyResponse,
+  User, UserInviationReq, ActivateUser, ChangePassword, ForgotPassword,
+  ConfirmPasswordChange, EmailChange, ConfirmEmailChange, UnregisterRequest,
+  SendActivationEmailRequest, SendInvitationEmailRequest
+} from './interface';
 
 const TECHNICAL_USER = 'TECHNICAL_USER';
 
@@ -185,6 +48,7 @@ export class UserService extends ServiceBase {
   authZCheck: boolean;
   tokenService: TokenService;
   tokenRedisClient: RedisClient;
+  uniqueEmailConstraint: boolean;
   constructor(cfg: any, topics: any, db: any, logger: Logger,
     isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ) {
     super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users'),
@@ -203,6 +67,14 @@ export class UserService extends ServiceBase {
     this.tokenRedisClient = createClient(redisConfig);
     this.tokenService = new TokenService(cfg, logger, authZ, this);
     this.emailEnabled = this.cfg.get('service:enableEmail');
+    const isConfigSet = this.cfg.get('service:uniqueEmailConstraint');
+    if (isConfigSet === undefined || isConfigSet) {
+      // by default if config is missing or set to true, email constraint is enabled
+      this.uniqueEmailConstraint = true;
+    } else if (isConfigSet === false) {
+      // if config is set to false in config
+      this.uniqueEmailConstraint = false;
+    }
   }
 
   /**
@@ -507,8 +379,8 @@ export class UserService extends ServiceBase {
           entity: 'user',
           args: { filter: [] }
         }, AuthZAction.MODIFY, this.authZ);
-      } catch(err) {
-        this.logger.error('Error making wahtIsAllowedACS request for verifying role associations', {message: err.message});
+      } catch (err) {
+        this.logger.error('Error making wahtIsAllowedACS request for verifying role associations', { message: err.message });
         throw err;
       }
       // decision is for apiKey
@@ -762,15 +634,18 @@ export class UserService extends ServiceBase {
       return user;
     }
 
-    logger.silly(
-      util.format('register is checking id:%s name:%s and email:%s',
-        user.name, user.email));
-    const filter = toStruct({
-      $or: [
-        { name: { $eq: user.name } },
-        { email: { $eq: user.email } },
-      ]
-    });
+    logger.silly('register is checking id, name and email', { id: user.id, name: user.name, email: user.email });
+    let filter;
+    if (this.uniqueEmailConstraint) {
+      filter = toStruct({
+        $or: [
+          { name: { $eq: user.name } },
+          { email: { $eq: user.email } },
+        ]
+      });
+    } else {
+      filter = getNameFilter(user.name);
+    }
     let users = await super.read({ request: { filter } }, context);
     if (users.total_count > 0) {
       let guest = false;
@@ -778,6 +653,7 @@ export class UserService extends ServiceBase {
       for (let user of users) {
         if (user.guest) {
           guest = true;
+          logger.debug('Guest user', { name: user.name });
         } else {
           logger.debug('user does already exist', users);
           throw new errors.AlreadyExists('user does already exist');
@@ -1161,7 +1037,7 @@ export class UserService extends ServiceBase {
       throw new errors.NotFound('user not found');
     }
 
-    logger.verbose('Received a password change request for user', user.id);
+    logger.verbose('Received a password change request for user', { id: user.id });
 
     // generating activation code
     user.activation_code = this.idGen();
@@ -1653,27 +1529,35 @@ export class UserService extends ServiceBase {
         // read the user from DB and update the special fields from DB
         // for user modification
         const user = items[i];
-        const filter = toStruct({
-          $or: [
-            {
-              name: {
-                $eq: user.name
+        let filter;
+        if (this.uniqueEmailConstraint) {
+          filter = toStruct({
+            $or: [
+              {
+                name: {
+                  $eq: user.name
+                }
+              },
+              {
+                email: {
+                  $eq: user.email
+                }
               }
-            },
-            {
-              email: {
-                $eq: user.email
-              }
-            }
-          ]
-        });
+            ]
+          });
+        } else {
+          filter = getNameFilter(user.name);
+        }
+
         const users = await super.read({ request: { filter } }, context);
         if (users.total_count === 0) {
           // call the create method, checks all conditions before inserting
           result.push(await this.createUser(user));
-        } else {
+        } else if (users.total_count === 1) {
           let updateResponse = await this.update({ request: { items: [user], subject } });
           result.push(updateResponse.items[0]);
+        } else if (users.total_count > 1) {
+          throw new errors.FailedPrecondition(`Invalid identifier provided, multiple users found for identifier ${user.name}`);
         }
       }
       return { items: result };
@@ -1697,20 +1581,12 @@ export class UserService extends ServiceBase {
     const obfuscateAuthNErrorReason = this.cfg.get('obfuscateAuthNErrorReason') ?
       this.cfg.get('obfuscateAuthNErrorReason') : false;
     // check for the identifier against name or email in DB
-    const filter = toStruct({
-      $or: [
-        {
-          name: {
-            $eq: identifier
-          }
-        },
-        {
-          email: {
-            $eq: identifier
-          }
-        }
-      ]
-    });
+    let filter;
+    if (this.uniqueEmailConstraint) {
+      filter = getDefaultFilter(identifier);
+    } else {
+      filter = getNameFilter(identifier);
+    }
 
     const users = await super.read({ request: { filter } }, context);
     if (users.total_count === 0) {
@@ -1719,6 +1595,8 @@ export class UserService extends ServiceBase {
       } else {
         throw new errors.NotFound('user not found');
       }
+    } else if (users.total_count > 0 || users.total_count != 1) {
+      throw new errors.FailedPrecondition(`Invalid identifier provided, multiple users found for identifier ${identifier}`);
     }
     const user = users.items[0];
     if (!user.active) {

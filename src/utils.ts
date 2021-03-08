@@ -8,42 +8,9 @@ import { TokenService } from './token_service';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { Client } from '@restorecommerce/grpc-client';
 import { createLogger } from '@restorecommerce/logger';
-
-export interface HierarchicalScope {
-  id: string;
-  role?: string;
-  children?: HierarchicalScope[];
-}
-
-export interface Response {
-  payload: any;
-  count: number;
-  status?: {
-    code: number;
-    message: string;
-  };
-}
-
-export interface AccessResponse {
-  decision: Decision;
-  response?: Response;
-}
-
-export interface FilterType {
-  field?: string;
-  operation?: 'lt' | 'lte' | 'gt' | 'gte' | 'eq' | 'in' | 'isEmpty' | 'iLike';
-  value?: string;
-  type?: 'string' | 'boolean' | 'number' | 'date' | 'array';
-}
-
-export interface ReadPolicyResponse extends AccessResponse {
-  policySet?: PolicySetRQ;
-  filter?: FilterType[];
-  custom_query_args?: {
-    custom_queries: any;
-    custom_arguments: any;
-  };
-}
+import * as bcrypt from 'bcryptjs';
+import { AccessResponse, ReadPolicyResponse } from './interface';
+import { toStruct } from '@restorecommerce/resource-base-interface';
 
 // Create a ids client instance
 let idsClientInstance;
@@ -125,3 +92,49 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
     custom_query_args: { custom_queries, custom_arguments }
   };
 }
+
+export const password = {
+  hash: (pw): string => {
+    const salt = bcrypt.genSaltSync(10);
+    const hash = bcrypt.hashSync(pw, salt);
+    return hash;
+  },
+  verify: (password_hash, pw) => {
+    return bcrypt.compareSync(pw, password_hash);
+  }
+};
+
+export const marshallProtobufAny = (msg: any): any => {
+  return {
+    type_url: 'identity.rendering.renderRequest',
+    value: Buffer.from(JSON.stringify(msg))
+  };
+};
+
+export const unmarshallProtobufAny = (msg: any): any => JSON.parse(msg.value.toString());
+
+export const getDefaultFilter = (identifier) => {
+  return toStruct({
+    $or: [
+      {
+        name: {
+          $eq: identifier
+        }
+      },
+      {
+        email: {
+          $eq: identifier
+        }
+      }
+    ]
+  });
+};
+
+export const getNameFilter = (userName) => {
+  return toStruct({
+    name: {
+      $eq: userName
+    }
+  }
+  );
+};
