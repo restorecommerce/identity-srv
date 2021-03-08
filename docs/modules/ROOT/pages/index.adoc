@@ -16,7 +16,7 @@ A microservice for identity management.
 * Password recovery as self-service
 * Un-registration as self-service
 * Customizable, optional email notifications to drive processes
-* Token management service 
+* Token management service
 * Authentication Log Service
 
 [#configuration]
@@ -82,7 +82,7 @@ A User resource.
 |unauthenticated |bool |optional |Set automatically to `true` upon user registry until its account is activated for the first time
 |guest |bool |optional |If user is guest
 |role_associations |https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/auth.proto#L39[`io.restorecommerce.auth.RoleAssociation`] [] |optional |Role associations
-|user_type |`io.restorecommerce.user.UserType` |optional |User Type - individula, organization or guest user
+|user_type |`io.restorecommerce.user.UserType` |optional |User Type - individual, organization or guest user
 |image |`io.restorecommerce.image.Image` |optional |Image
 |invite |bool |optional |used for user invitation
 |invited_by_user_name |string |optional |inviting User’s name
@@ -181,7 +181,7 @@ The microservice exposes the below CRUD operations for creating or modifying Use
 ==== `Create`
 
 Used to create a User (usually by privileged user). Requests are performed providing `io.restorecommerce.user.UserList`
-protobuf message as input and responses are a `io.restorecommerce.user.UserList` message. The User-to-Role associations
+protobuf message as input and responses are an `io.restorecommerce.user.UserList` message. The User-to-Role associations
 assignment is optionally secured by https://github.com/restorecommerce/access-control-srv[access-control-srv] with
 link:https://github.com/restorecommerce/identity-srv/blob/master/cfg/config.json#L71[configuration].
 If authorization is enabled this service uses https://github.com/restorecommerce/acs-client/[acs-client]
@@ -203,17 +203,17 @@ This API also checks if user name is complying with the following set of rules:
 ==== `Register`
 
 Used to register a User. Requests are performed providing `io.restorecommerce.user.RegisterRequest` protobuf message as
-input and responses are a `io.restorecommerce.user.User` message. The `io.restorecommerce.user.RoleAssociation` are associated using the preconfigured
+input and responses are an `io.restorecommerce.user.User` message. The `io.restorecommerce.user.RoleAssociation` are associated using the preconfigured
 role association from the https://github.com/restorecommerce/identity-srv/blob/master/cfg/config.json#L728[defaultRegisterUserRoles]. If a valid configuration for retrieving email-related
 http://handlebarsjs.com/[handlebars] templates from a remote server is provided, an email request is performed upon a
-successful registration. Such config should correspond to the `service/hbsTemplates` element in the config files.
+successful registration. Such configuration should correspond to the `service/hbsTemplates` element in the config files.
 The email contains the user’s activation code. Email requests are done by emitting a`sendEmail` notification event,
 which is consumed by http://github.com/restorecommerce/notification-srv[notification-srv] to send an email.
 Please note that this email operation also implies template rendering, which is performed by emitting a `renderRequest` event,
 which is consumed by the http://github.com/restorecommerce/rendering-srv[rendering-srv]. Therefore, the email sending
 step requires both a running instance of the rendering-srv and the notification-srv (or similar services which implement
 the given interfaces) as well as a remote server containing a set of email templates. This is decoupled from the service’s
-core functionalities and it is automatically disabled if no templates configuration is provided.
+core functionalities, and it is automatically disabled if no template configuration is provided.
 
 Moreover, the `Register` operation itself is optional and one can enable or disable it through the `service.register`
 configuration value. If disabled, the only endpoint for user creation is `Create`.
@@ -254,8 +254,8 @@ Requests are performed providing `io.restorecommerce.user.ActiveRequest` protobu
 [#api_user_change-password]
 ==== `ChangePassword`
 
-Used to change password for the User (User should be activated to perform this operation).
-Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest` protobuf message as input and responses are a `io.restorecommerce.user.User` message.
+Used to change password for the User (this User should be activated to perform this operation).
+Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest` protobuf message as input and responses are an `io.restorecommerce.user.User` message.
 
 `io.restorecommerce.user.ChangePasswordRequest`
 
@@ -288,9 +288,9 @@ specified upon the request.
 [#api_user_confirm-password-change]
 ==== `ConfirmPasswordChange`
 
-Used to confirm the user’s password change request. The input is a `io.restorecommerce.user.ConfirmPasswordChangeRequest`
+Used to confirm the user’s password change request. The input is an `io.restorecommerce.user.ConfirmPasswordChangeRequest`
 message and the response is a `google.protobuf.Empty` message. If the received activation code matches the previously
-generated activation code, the stored password hash value is replaced by a hash derived from the new password and the
+generated activation code, the stored password hash value is replaced by a hash derived from the new password, and the
 activation code is reset.
 
 `io.restorecommerce.user.ConfirmPasswordChangeRequest`
@@ -325,7 +325,7 @@ a newly-generated activation code.
 [#api_user_confirm-email-change]
 ==== `ConfirmEmailChange`
 
-Used to confirm the user’s email change request. The input is a `io.restorecommerce.user.ConfirmEmailChangeRequest`
+Used to confirm the user’s email change request. The input is an `io.restorecommerce.user.ConfirmEmailChangeRequest`
 message and the response is a `google.protobuf.Empty` message. If the received activation code matches the previously
 generated activation code, the value assigned to the `new_email` property is then assigned to the `email` property and
 `new_email` is set to null.
@@ -345,7 +345,7 @@ generated activation code, the value assigned to the `new_email` property is the
 
 Used to confirm user invitation. Requests are performed providing `io.restorecommerce.user.ConfirmUserInvitationRequest`
 protobuf message as input and responses are a `google.protobuf.Empty` message. For `Create` operation if the invite
-flag `io.restorecommerce.user.invite` is set to true then an inviation mail would be sent if `invitationURL` and `hbsTemplates`
+flag `io.restorecommerce.user.invite` is set to true then an invitation mail would be sent if `invitationURL` and `hbsTemplates`
 configuration values are setup accordingly.
 
 `io.restorecommerce.user.ConfirmUserInvitationRequest`
@@ -362,8 +362,8 @@ configuration values are setup accordingly.
 [#api_user_login]
 ==== `Login`
 
-Used to verify the User name or email with password and return User’s information in case the operation is successful.
-Requests are performed providing `io.restorecommerce.user.LoginRequest` protobuf message as input and the response is
+Used to verify the User name or email with a password and return User’s information in case the operation is successful.
+Requests are performed providing `io.restorecommerce.user.LoginRequest` protobuf message as input, and the response is
 `io.restorecommerce.user.User` message.
 
 `io.restorecommerce.user.LoginRequest`
@@ -394,7 +394,7 @@ as input and responses are a `google.protobuf.Empty` message.
 [#api_user_find]
 ==== `Find`
 
-A simplified version of `read`, which only filters users by username, email and/or ID. Requests are performed providing
+A simplified version of `read`, which only filters users by a username, email and/or ID. Requests are performed providing
 `io.restorecommerce.user.FindRequest` protobuf message as input and responses contain a list `io.restorecommerce.user.User` messages.
 
 `io.restorecommerce.user.FindRequest`
@@ -428,7 +428,7 @@ providing `io.restorecommerce.user.FindByRoleRequest` protobuf message as input 
 [#api_user_find-by-token]
 ==== `FindByToken`
 
-This endpoint returns the user data based on the provided token value. Requests are perfomed providing `io.restorecommerce.user.FindByTokenRequest` protobuf message
+This endpoint returns the user data based on the provided token value. Requests are performed providing `io.restorecommerce.user.FindByTokenRequest` protobuf message
 as input and response is `io.restorecommerce.user.User` data. For caching purpose this endpoint also stores the token information in Redis with key as token identifier and user data as value.
 The cached data is invalidated when User is logged_out or when token `Destroy` or `RevokeByGrantId` api is invoked.
 
@@ -444,7 +444,7 @@ The cached data is invalidated when User is logged_out or when token `Destroy` o
 ==== `SendActivationEmail`
 
 This endpoint sends activation email to the email id of the registered user. In case if the User is already activated suitable error response is sent, else activation email
-containg activation code is sent back. Requests are perfomed providing `io.restorecommerce.user.SendActivationEmailRequest` protobuf message
+containing activation code is sent back. Requests are performed providing `io.restorecommerce.user.SendActivationEmailRequest` protobuf message
 as input and response is `google.protobuf.Empty` message.
 
 `io.restorecommerce.user.SendActivationEmailRequest`
@@ -519,7 +519,7 @@ A Token resource.
 |scopes | string []|optional |identifier for RoleAssociation `io.restorecommerce.auth.RoleAssociation.id`
 |type | string |optional |token type ex: access_token, refresh_token etc
 |last_login | number |optional |epoch time of user last logged in
-|interactive| bool |optional |flag to indicate login from GUI
+|interactive| bool |optional |flag to indicate a login from GUI
 |==========================================================================================================================
 
 [#api_token_crud]
@@ -568,14 +568,14 @@ protobuf message as input and response is `google.protobuf.Any` message containi
 [#api_destroy_token]
 ==== `Destroy`
 
-This endpoint is used to destory or remove the token information from user entity `io.restorecommerce.user.User.tokens`.
+This endpoint is used to destroy or remove the token information from user entity `io.restorecommerce.user.User.tokens`.
 Requests are performed providing `io.restorecommerce.token.Identifier`
 protobuf message as input and response is `google.protobuf.Any` message containing token information.
 
 [width="100%",cols="23%,25%,27%,25%",options="header",]
 |=========================================================================================================================
 |Method Name |Request Type |Response Type |Description
-|Upsert |`io.restorecommerce.token.TokenData` |`google.protobuf.Any` |upserts token and returns sucess or failure message
+|Upsert |`io.restorecommerce.token.TokenData` |`google.protobuf.Any` |upserts token and returns success or failure message
 |Find |`io.restorecommerce.token.Identifier` |`google.protobuf.Any` |find token data
 |Destroy |`io.restorecommerce.token.Identifier` |`google.protobuf.Any` |destroy token
 |RevokeByGrantId |`io.restorecommerce.token.GrantId` |`google.protobuf.Any` |destroy token by its grantId property reference
@@ -595,14 +595,14 @@ List of events emitted by this microservice for below topics:
 |Topic Name |Event Name |Description
 |`io.restorecommerce.users.resource`        |`registered` |emitted upon user registration
 |                                           |`activated` |emitted upon user activation
-|                                           |`passwordChangeRequested` |emitted when user reqeusts for password change
+|                                           |`passwordChangeRequested` |emitted when user requests for password change
 |                                           |`passwordChanged` |emitted when password was changed successfully
-|                                           |`emailChangeRequested` |emitted when user reqeusts for email change
+|                                           |`emailChangeRequested` |emitted when user requests for email change
 |                                           |`emailChangeConfirmed` |emitted when user’s email was changed successfully
-|                                           |`unregistered` |emitted when an user is unregistered
-|                                           |`userCreated` |emitted when an user is created
-|                                           |`userModified` |emitted when an user is modified
-|                                           |`userDeleted` |emitted when an user is deleted
+|                                           |`unregistered` |emitted when a user is unregistered
+|                                           |`userCreated` |emitted when a user is created
+|                                           |`userModified` |emitted when a user is modified
+|                                           |`userDeleted` |emitted when a user is deleted
 |`io.restorecommerce.roles.resource`        |`roleCreated` |emitted upon role creation
 |                                           |`roleModified` |emitted upon role modification
 |                                           |`roleDeleted` |emitted when role deletion
