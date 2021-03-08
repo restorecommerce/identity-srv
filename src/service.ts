@@ -2142,7 +2142,7 @@ export class UserService extends ServiceBase {
 
     // add optional data if it is provided in the configuration
     // in the field "data"
-    const data = this.cfg.get('data');
+    const data = this.cfg.get('service:data');
     if (data && !_.isEmpty(data)) {
       dataBody.data = data;
       dataSubject.data = data;

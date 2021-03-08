@@ -30,6 +30,8 @@ The following service specific configuration properties are available:
 * `activationURL`: URL to show link in activation email to activate the account.
 * `emailConfirmationURL`: URL to show link in confirmation email to confirm email address change.
 * `invitationURL`: URL to show link in invitation email to accept invitation.
+* `data`: additional fields can be provided inside data. These fields can then be
+used inside the hbs templates.
 * `hbsTemplates`: contains URLs for https://handlebarsjs.com/[Handlebars templates] and served via external web application. These templates are used in email sent by system for different user operations like `Register`, `RequestEmailChange` and `RequestPasswordChange`.
 * `minUsernameLength`: minimum length for the user’s `name`.
 * `maxUsernameLength`: maximum length for the user’s `name`.
@@ -37,6 +39,29 @@ The following service specific configuration properties are available:
 * `authorization:enable`: default value is `true`, if set to `true` then access-control check is performed, if value is set to `false` then access-control check is overridden.
 * `authorization:enforce`: default value is `true`, if set to `true` then result of access-control-check is enforced, if value is set to `false` the result of access-control check if logged and ignored.
 * `defaultRegisterUserRoles`: default role associations configured to be used when registering users
+
+Example: We can add a field called `url` nested inside the `data` field in
+the `config.json` file, and then use this field in `registration_body.hbs` to
+generate some html with the interpolated url.
+Multiple fields are supported as-well.
+
+- config.json:
+[source,json]
+----
+{
+  "service": {
+    "data": {
+      "url": "https://www.google.com/"
+    }
+  }
+}
+----
+
+- registration_body.hbs:
+[source,html]
+----
+<a href="{{data.url}}">Google Main Page</a>
+----
 
 [#API]
 == API
