@@ -2139,6 +2139,14 @@ export class UserService extends ServiceBase {
   private makeRenderRequestMsg(user: User, subject: any, body: any,
     dataBody: any, dataSubject: any, email?: string): any {
     let userEmail = email ? email : user.email;
+
+    // add optional data if it is provided in the configuration
+    // in the field "data"
+    const data = this.cfg.get('data');
+    if (data && !_.isEmpty(data)) {
+      dataBody.data = data;
+      dataSubject.data = data;
+    }
     return {
       id: `identity#${userEmail}`,
       payload: [{

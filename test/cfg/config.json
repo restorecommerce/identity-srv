@@ -28,6 +28,9 @@
       "prettyPrint": true
     }
   },
+  "data": {
+    "test": "test"
+  },
   "redis": {
     "host": "localhost",
     "port": 6379,
