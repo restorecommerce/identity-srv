@@ -889,23 +889,12 @@ export class UserService extends ServiceBase {
         throw new errors.InvalidArgument('argument activation_code is empty');
       }
       // check for the identifier against name or email in DB
-      const filter = toStruct({
-        $or: [
-          {
-            name: {
-              $eq: identifier
-            }
-          },
-          {
-            email: {
-              $eq: identifier
-            }
-          }
-        ]
-      });
+      const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
       const users = await super.read({ request: { filter } }, context);
       if (!users || users.total_count === 0) {
         throw new errors.NotFound('user not found');
+      } else if (users.total_count > 1) {
+        throw new errors.InvalidArgument(`Invalid identifier provided for user activation, multiple users found for identifier ${identifier}`);
       }
       const user: User = users.items[0];
       if (user.active) {
@@ -950,24 +939,13 @@ export class UserService extends ServiceBase {
     const newPw = request.new_password;
     let subject = call.request.subject;
     // check for the identifier against name or email in DB
-    const filter = toStruct({
-      $or: [
-        {
-          name: {
-            $eq: identifier
-          }
-        },
-        {
-          email: {
-            $eq: identifier
-          }
-        }
-      ]
-    });
+    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
     const users = await super.read({ request: { filter } }, context);
-    if (_.size(users) === 0) {
+    if (!users || users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
       throw new errors.NotFound('user does not exist');
+    } else if (users.total_count > 1) {
+      throw new errors.InvalidArgument(`Invalid identifier provided for change password, multiple users found for identifier ${identifier}`);
     }
     const user: User = users.items[0];
     let acsResponse: AccessResponse;
@@ -1015,26 +993,15 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     const identifier = call.request.identifier;
     // check for the identifier against name or email in DB
-    const filter = toStruct({
-      $or: [
-        {
-          name: {
-            $eq: identifier
-          }
-        },
-        {
-          email: {
-            $eq: identifier
-          }
-        }
-      ]
-    });
+    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
     let user;
     const users = await super.read({ request: { filter } });
     if (users.total_count === 1) {
       user = users.items[0];
-    } else {
+    } else if (!users || users.total_count === 0) {
       throw new errors.NotFound('user not found');
+    } else if (users.total_count > 1) {
+      throw new errors.InvalidArgument(`Invalid identifier provided for request password change, multiple users found for identifier ${user.name}`);
     }
 
     logger.verbose('Received a password change request for user', { id: user.id });
@@ -1084,26 +1051,15 @@ export class UserService extends ServiceBase {
 
     if (acsResponse.decision === Decision.PERMIT) {
       // check for the identifier against name or email in DB
-      const filter = toStruct({
-        $or: [
-          {
-            name: {
-              $eq: identifier
-            }
-          },
-          {
-            email: {
-              $eq: identifier
-            }
-          }
-        ]
-      });
+      const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
       let user;
       const users = await super.read({ request: { filter } });
-      if (users.total_count === 1) {
-        user = users.items[0];
-      } else {
+      if (!users || users.total_count === 0 ){
         throw new errors.NotFound('user not found');
+      } else if (users.total_count === 1) {
+        user = users.items[0];
+      } else if (users.total_count > 1) {
+        throw new errors.InvalidArgument(`Invalid identifier provided for request password change, multiple users found for identifier ${user.name}`);
       }
 
       if (!user.activation_code || user.activation_code !== activation_code) {
@@ -1138,24 +1094,13 @@ export class UserService extends ServiceBase {
     const subject = call.request.subject;
     let acsResponse: AccessResponse;
     // check for the identifier against name or email in DB
-    const filter = toStruct({
-      $or: [
-        {
-          name: {
-            $eq: identifier
-          }
-        },
-        {
-          email: {
-            $eq: identifier
-          }
-        }
-      ]
-    });
+    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
     const users = await super.read({ request: { filter } }, context);
-    if (users.total_count === 0) {
+    if (!users || users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
       throw new errors.NotFound('user does not exist');
+    } else if (users.total_count > 1) {
+      throw new errors.InvalidArgument(`Invalid identifier provided for request email change, multiple users found for identifier ${identifier}`);
     }
     const user: User = users.items[0];
     try {
@@ -1557,7 +1502,7 @@ export class UserService extends ServiceBase {
           let updateResponse = await this.update({ request: { items: [user], subject } });
           result.push(updateResponse.items[0]);
         } else if (users.total_count > 1) {
-          throw new errors.FailedPrecondition(`Invalid identifier provided, multiple users found for identifier ${user.name}`);
+          throw new errors.InvalidArgument(`Invalid identifier provided user upsert, multiple users found for identifier ${user.name}`);
         }
       }
       return { items: result };
@@ -1581,12 +1526,7 @@ export class UserService extends ServiceBase {
     const obfuscateAuthNErrorReason = this.cfg.get('obfuscateAuthNErrorReason') ?
       this.cfg.get('obfuscateAuthNErrorReason') : false;
     // check for the identifier against name or email in DB
-    let filter;
-    if (this.uniqueEmailConstraint) {
-      filter = getDefaultFilter(identifier);
-    } else {
-      filter = getNameFilter(identifier);
-    }
+    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
 
     const users = await super.read({ request: { filter } }, context);
     if (users.total_count === 0) {
@@ -1595,8 +1535,8 @@ export class UserService extends ServiceBase {
       } else {
         throw new errors.NotFound('user not found');
       }
-    } else if (users.total_count > 0 || users.total_count != 1) {
-      throw new errors.FailedPrecondition(`Invalid identifier provided, multiple users found for identifier ${identifier}`);
+    } else if (users.total_count > 1) {
+      throw new errors.InvalidArgument(`Invalid identifier provided for login, multiple users found for identifier ${identifier}`);
     }
     const user = users.items[0];
     if (!user.active) {
