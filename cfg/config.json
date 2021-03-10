@@ -68,6 +68,11 @@
       "db-findByToken": 5
     }
   },
+  "urns": {
+    "ownerEntity": "urn:restorecommerce:acs:names:ownerIndicatoryEntity",
+    "user": "urn:restorecommerce:acs:model:user.User",
+    "ownerInstance": "urn:restorecommerce:acs:names:ownerInstance"
+  },
   "obfuscateAuthNErrorReason": false,
   "authorization": {
     "service": "acs-srv",

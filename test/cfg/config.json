@@ -39,6 +39,11 @@
     }
   },
   "obfuscateAuthNErrorReason": false,
+  "urns": {
+    "ownerEntity": "urn:restorecommerce:acs:names:ownerIndicatoryEntity",
+    "user": "urn:restorecommerce:acs:model:user.User",
+    "ownerInstance": "urn:restorecommerce:acs:names:ownerInstance"
+  },
   "authorization": {
     "service": "acs-srv",
     "enabled": true,
