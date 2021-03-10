@@ -753,7 +753,7 @@ export class UserService extends ServiceBase {
       // find the actual user object from DB using the UserInvitationReq identifier
       // activate user and update password
       const identifier = userInviteReq.identifier;
-      const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
+      const filter = getDefaultFilter(identifier);
       let user;
       const users = await super.read({ request: { filter } });
       if (users && users.total_count === 1) {
@@ -880,7 +880,7 @@ export class UserService extends ServiceBase {
         throw new errors.InvalidArgument('argument activation_code is empty');
       }
       // check for the identifier against name or email in DB
-      const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
+      const filter = getDefaultFilter(identifier);
       const users = await super.read({ request: { filter } }, context);
       if (!users || users.total_count === 0) {
         throw new errors.NotFound('user not found');
@@ -930,7 +930,7 @@ export class UserService extends ServiceBase {
     const newPw = request.new_password;
     let subject = call.request.subject;
     // check for the identifier against name or email in DB
-    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
+    const filter = getDefaultFilter(identifier);
     const users = await super.read({ request: { filter } }, context);
     if (!users || users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
@@ -984,7 +984,7 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     const identifier = call.request.identifier;
     // check for the identifier against name or email in DB
-    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
+    const filter = getDefaultFilter(identifier);
     let user;
     const users = await super.read({ request: { filter } });
     if (users.total_count === 1) {
@@ -1042,7 +1042,7 @@ export class UserService extends ServiceBase {
 
     if (acsResponse.decision === Decision.PERMIT) {
       // check for the identifier against name or email in DB
-      const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
+      const filter = getDefaultFilter(identifier);
       let user;
       const users = await super.read({ request: { filter } });
       if (!users || users.total_count === 0) {
@@ -1085,7 +1085,7 @@ export class UserService extends ServiceBase {
     const subject = call.request.subject;
     let acsResponse: AccessResponse;
     // check for the identifier against name or email in DB
-    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
+    const filter = getDefaultFilter(identifier);
     const users = await super.read({ request: { filter } }, context);
     if (!users || users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
@@ -1140,7 +1140,7 @@ export class UserService extends ServiceBase {
     const activationCode = request.activation_code;
 
     // check for the identifier against name or email in DB
-    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
+    const filter = getDefaultFilter(identifier);
     const users = await super.read({ request: { filter } });
     if (users && users.total_count === 0) {
       logger.debug('user does not exist', identifier);
@@ -1506,7 +1506,7 @@ export class UserService extends ServiceBase {
     const obfuscateAuthNErrorReason = this.cfg.get('obfuscateAuthNErrorReason') ?
       this.cfg.get('obfuscateAuthNErrorReason') : false;
     // check for the identifier against name or email in DB
-    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
+    const filter = getDefaultFilter(identifier);
 
     const users = await super.read({ request: { filter } }, context);
     if (users.total_count === 0) {
@@ -1568,7 +1568,7 @@ export class UserService extends ServiceBase {
     logger.silly('unregister', identifier);
     let subject = call.request.subject;
 
-    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
+    const filter = getDefaultFilter(identifier);
     const users = await super.read({ request: { filter } }, context);
 
     if (users && users.total_count === 0) {
@@ -2211,7 +2211,7 @@ export class UserService extends ServiceBase {
     const { identifier, subject } = call.request;
     let user;
     // check for the identifier against name or email in DB
-    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
+    const filter = getDefaultFilter(identifier);
     const users = await super.read({ request: { filter } });
     if (users.total_count === 1) {
       user = users.items[0];
@@ -2236,7 +2236,7 @@ export class UserService extends ServiceBase {
     const { identifier, invited_by_user_identifier, subject } = call.request;
     let user;
     // check for the identifier against name or email in DB
-    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
+    const filter = getDefaultFilter(identifier);
     const users = await super.read({ request: { filter } });
     if (users.total_count === 1) {
       user = users.items[0];
