@@ -5,7 +5,6 @@ import * as grpcClient from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import { Worker } from '../lib/worker';
 import { createServiceConfig } from '@restorecommerce/service-config';
-import { User } from '../lib/interface';
 import { Topic } from '@restorecommerce/kafka-client/lib/events/provider/kafka';
 import { createMockServer } from 'grpc-mock';
 import { updateConfig } from '@restorecommerce/acs-client';
@@ -267,14 +266,6 @@ describe('testing identity-srv', () => {
           result.error.name.should.equal('InvalidArgument');
           result.error.details.should.equal(`3 INVALID_ARGUMENT: Invalid identifier provided for send activation email, multiple users found for identifier test@ms.restorecommerce.io`);
         });
-        it('unregister throw an error when unregistering users with email identifier', async function unregisterUsers(): Promise<void> {
-          const result = await userService.unregister({ identifier: 'test@ms.restorecommerce.io' });
-          should.exist(result);
-          should.not.exist(result.data);
-          should.exist(result.error);
-          result.error.name.should.equal('InvalidArgument');
-          result.error.details.should.equal(`3 INVALID_ARGUMENT: Invalid identifier provided for unregistering, multiple users found for identifier test@ms.restorecommerce.io`);
-        });
         it('should successfully unregister user with user name as identifier', async function unregisterUsers(): Promise<void> {
           const result = await userService.unregister({ identifier: 'test.user1' });
           should.exist(result);
@@ -282,7 +273,7 @@ describe('testing identity-srv', () => {
           result.data.should.be.empty();
           await userService.unregister({ identifier: 'test.user2' });
           await userService.unregister({ identifier: 'test.user3' });
-          // await userService.unregister({ identifier: 'test.user4' });
+          await userService.unregister({ identifier: 'test.user4' });
           // TODO remove and put in end
           await roleService.delete({
             collection: true
@@ -290,6 +281,152 @@ describe('testing identity-srv', () => {
           await stopGrpcMockServer();
         });
       });
+
+      describe('calling createUsers', function createUser(): void {
+        const testusersTemplate = {
+          id: 'testuser1', name: 'testuser1',
+          first_name: 'test',
+          last_name: 'user',
+          password: 'notsecure',
+          email: 'test@ms.restorecommerce.io',
+          role_associations: [{
+            role: 'user-r-id',
+            attributes: []
+          }]
+        };
+        it('should create multiple users with same email and different user names', async function createUser(): Promise<void> {
+          let testUsers = [];
+          for (let i = 1; i <= 4; i++) {
+            let userObj = Object.assign(testusersTemplate, { id: `testuser${i}`, name: `testuser${i}` });
+            testUsers.push(_.cloneDeep(userObj));
+          }
+          const result = await userService.create({ items: testUsers });
+          should.exist(result);
+          should.exist(result.data);
+          should.exist(result.data.items);
+          result.data.items.length.should.equal(4);
+          
+        });
+        it('Shoul throw an error when trying to create an user with existing user name', async () => {
+          // testuser4 already exists from above test case
+          let testUser = Object.assign(testusersTemplate, { id: 'testuser5', name: 'testuser4'});
+          const result = await userService.create({ items: [testUser] });
+          should.exist(result);
+          should.not.exist(result.data);
+          should.exist(result.error);
+          result.error.name.should.equal('AlreadyExists');
+          result.error.details.should.equal('6 ALREADY_EXISTS: user does already exist');
+        });
+      });
+      describe('calling find', () => {
+        it('finding by email should return 4 created users', async () => {
+          const result = await userService.find({
+            email: 'test@ms.restorecommerce.io'
+          });
+          should.exist(result);
+          result.data.total_count.should.equal(4);
+        });
+        it('finding by name should return only specific user', async () => {
+          const result = await userService.find({
+            name: 'testuser1'
+          });
+          should.exist(result);
+          result.data.total_count.should.equal(1);
+        });
+      });
+
+      describe('login', () => {
+        it('should throw an error when logging in with email identifier which is not unique', async () => {
+          const result = await userService.login({
+            identifier: 'test@ms.restorecommerce.io',
+            password: 'notsecure',
+          });
+          should.exist(result);
+          should.exist(result.error);
+          should.not.exist(result.data);
+          should.exist(result.error.message);
+          result.error.name.should.equal('InvalidArgument');
+          result.error.details.should.equal('3 INVALID_ARGUMENT: Invalid identifier provided for login, multiple users found for identifier test@ms.restorecommerce.io');
+        });
+        it('should login with valid user name identifier and password', async () => {
+          const result = await userService.login({
+            identifier: 'testuser1',
+            password: 'notsecure',
+          });
+          should.exist(result);
+          should.not.exist(result.error);
+          should.exist(result.data);
+          const compareResult = await userService.find({
+            name: 'testuser1',
+          });
+          const userDBDoc = compareResult.data.items[0];
+          result.data.should.deepEqual(userDBDoc);
+        });
+      });
+
+      describe('Unregister', () => {
+        it ('should throw an error when unregistering with email identifier which is not unique', async () => {
+          const result = await userService.unregister({ identifier: 'test@ms.restorecommerce.io' });
+          should.exist(result);
+          should.not.exist(result.data);
+          should.exist(result.error);
+          result.error.name.should.equal('InvalidArgument');
+          result.error.details.should.equal(`3 INVALID_ARGUMENT: Invalid identifier provided for unregistering, multiple users found for identifier test@ms.restorecommerce.io`);
+        });
+        it ('should successfully unregister with unique user name as identifier', async () => {
+          const result = await userService.unregister({ identifier: 'testuser1' });
+          should.exist(result);
+          should.not.exist(result.error);
+          result.data.should.be.empty();
+          await userService.unregister({ identifier: 'testuser2' });
+          await userService.unregister({ identifier: 'testuser3' });
+          await userService.unregister({ identifier: 'testuser4' });
+          // TODO remove and put in end
+          await roleService.delete({
+            collection: true
+          });
+          await stopGrpcMockServer();
+        });
+      });
+
+      describe('Activate', () => {
+        let activation_code;
+        it ('should throw an error when activating with email identifier which is not unique', async () => {
+          // register 2 users
+          user.name = 'test.user1';
+          const result_1 = await userService.register(user);
+          user.name = 'test.user2';
+          const result_2 = await userService.register(user);
+          activation_code = result_1.data.activation_code;
+          const result = await userService.activate({
+            identifier: result_1.data.email,
+            activation_code
+          });
+          should.exist(result);
+          should.not.exist(result.data);
+          should.exist(result.error);
+          result.error.name.should.equal('InvalidArgument');
+          result.error.details.should.equal(`3 INVALID_ARGUMENT: Invalid identifier provided for user activation, multiple users found for identifier test@ms.restorecommerce.io`);
+        });
+        it ('should successfully activate user with unique user name as identifier', async () => {
+          const result = await userService.activate({
+            identifier: 'test.user1',
+            activation_code
+          });
+          should.exist(result);
+          should.not.exist(result.error);
+          result.data.should.be.empty();
+          // TODO remove and put in end
+          await roleService.delete({
+            collection: true
+          });
+          await userService.delete({
+            collection: true
+          });
+          await stopGrpcMockServer();
+        });
+      });
+
     });
   });
 });
