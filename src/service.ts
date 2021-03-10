@@ -79,14 +79,23 @@ export class UserService extends ServiceBase {
 
   /**
    * Endpoint to search for users containing any of the provided field values.
-   * @param {call} call request containing either userid, username or email
+   * @param {Call<FindUser>} call request containing either userid, username or email
    * @return the list of users found
    */
   async find(call: Call<FindUser>, context?: any): Promise<any> {
     let { id, name, email, subject } = call.request;
+    const findRequest = call.request;
+    const filter = toStruct({
+      $or: [
+        { id: { $eq: id } },
+        { name: { $eq: name } },
+        { email: { $eq: email } }
+      ]
+    });
+    findRequest.filter = filter;
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, { id, name, email },
+      acsResponse = await checkAccessRequest(subject, findRequest,
         AuthZAction.READ, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -97,14 +106,7 @@ export class UserService extends ServiceBase {
     }
     if (acsResponse.decision === Decision.PERMIT) {
       const logger = this.logger;
-      const filter = toStruct({
-        $or: [
-          { id: { $eq: id } },
-          { name: { $eq: name } },
-          { email: { $eq: email } }
-        ]
-      });
-      const users = await super.read({ request: { filter } }, context);
+      const users = await super.read({ request: findRequest }, context);
       if (users.total_count > 0) {
         logger.silly('found user(s)', { users });
         return users;
@@ -232,7 +234,6 @@ export class UserService extends ServiceBase {
 
   /**
    * Endpoint to check if User activation process is required.
-   * @param {call} call request containing either userid, username or email
    * @return true if the user activation process is required.
    */
   isUserActivationRequired(): Boolean {
@@ -751,26 +752,16 @@ export class UserService extends ServiceBase {
     if (acsResponse.decision === Decision.PERMIT) {
       // find the actual user object from DB using the UserInvitationReq identifier
       // activate user and update password
-      const filter = toStruct({
-        $or: [
-          {
-            name: {
-              $eq: userInviteReq.identifier
-            }
-          },
-          {
-            email: {
-              $eq: userInviteReq.identifier
-            }
-          }
-        ]
-      });
+      const identifier = userInviteReq.identifier;
+      const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
       let user;
       const users = await super.read({ request: { filter } });
       if (users && users.total_count === 1) {
         user = users.items[0];
-      } else {
+      } else if (users.total_count === 0) {
         throw new errors.NotFound('user not found');
+      } else if (users.total_count > 1) {
+        throw new errors.InvalidArgument(`Invalid identifier provided for user invitation confirmation, multiple users found for identifier ${identifier}`);
       }
 
       if ((!userInviteReq.activation_code) || userInviteReq.activation_code !== user.activation_code) {
@@ -789,7 +780,7 @@ export class UserService extends ServiceBase {
         }
       };
       await super.update(serviceCall, context);
-      this.logger.info('password updated for invited user', { identifier: userInviteReq.identifier });
+      this.logger.info('password updated for invited user', { identifier });
       return {};
     }
   }
@@ -1054,12 +1045,12 @@ export class UserService extends ServiceBase {
       const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
       let user;
       const users = await super.read({ request: { filter } });
-      if (!users || users.total_count === 0 ){
+      if (!users || users.total_count === 0) {
         throw new errors.NotFound('user not found');
       } else if (users.total_count === 1) {
         user = users.items[0];
       } else if (users.total_count > 1) {
-        throw new errors.InvalidArgument(`Invalid identifier provided for request password change, multiple users found for identifier ${user.name}`);
+        throw new errors.InvalidArgument(`Invalid identifier provided for confirm password change, multiple users found for identifier ${identifier}`);
       }
 
       if (!user.activation_code || user.activation_code !== activation_code) {
@@ -1138,7 +1129,7 @@ export class UserService extends ServiceBase {
 
   /**
    * Endpoint to confirm email change.
-   * @param  {Call} call request containing new email Id of User
+   * @param  {Call<ConfirmEmailChange>} call request containing new email Id of User
    * @param {any} context
    * @return {User} returns user details
    */
@@ -1149,24 +1140,13 @@ export class UserService extends ServiceBase {
     const activationCode = request.activation_code;
 
     // check for the identifier against name or email in DB
-    const filter = toStruct({
-      $or: [
-        {
-          name: {
-            $eq: identifier
-          }
-        },
-        {
-          email: {
-            $eq: identifier
-          }
-        }
-      ]
-    });
+    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
     const users = await super.read({ request: { filter } });
     if (users && users.total_count === 0) {
       logger.debug('user does not exist', identifier);
       throw new errors.NotFound('user does not exist');
+    } else if (users.total_count > 1) {
+      throw new errors.InvalidArgument(`Invalid identifier provided for confirm email change, multiple users found for identifier ${identifier}`);
     }
 
     const user: User = users.items[0];
@@ -1577,7 +1557,7 @@ export class UserService extends ServiceBase {
   /**
    * Endpoint unregister, delete a user
    * belonging to the user.
-   * @param  {any} call request containing list of userIds
+   * @param  {Call<UnregisterRequest>} call request containing list of userIds
    * @param {any} context
    * @return {} returns empty response
    */
@@ -1588,25 +1568,14 @@ export class UserService extends ServiceBase {
     logger.silly('unregister', identifier);
     let subject = call.request.subject;
 
-    const filter = toStruct({
-      $or: [
-        {
-          name: {
-            $eq: identifier
-          }
-        },
-        {
-          email: {
-            $eq: identifier
-          }
-        }
-      ]
-    });
+    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
     const users = await super.read({ request: { filter } }, context);
 
     if (users && users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
       throw new errors.NotFound(`user with identifier ${identifier} does not exist for unregistering`);
+    } else if (users.total_count > 1) {
+      throw new errors.InvalidArgument(`Invalid identifier provided for unregistering, multiple users found for identifier ${identifier}`);
     }
 
     const acsResources = await this.createMetadata(users.items, AuthZAction.DELETE, subject);
@@ -1752,10 +1721,11 @@ export class UserService extends ServiceBase {
     }
 
     const reqAttributes: any[] = call.attributes || call.request.attributes || [];
+    const findByRoleRequest = { role, filter: {} };
     let subject = call.request.subject;
     let acsResponse: ReadPolicyResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, { role }, AuthZAction.READ,
+      acsResponse = await checkAccessRequest(subject, findByRoleRequest, AuthZAction.READ,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -1788,7 +1758,7 @@ export class UserService extends ServiceBase {
 
       // note: inefficient, a custom AQL query should be the final solution
       const userResult = await super.read({
-        request: {}
+        request: { filter: findByRoleRequest.filter }
       }, {});
       if (_.isEmpty(userResult) || _.isEmpty(userResult.items) || userResult.items.total_count == 0) {
         throw new errors.NotFound('No users were found in the system');
@@ -2241,20 +2211,7 @@ export class UserService extends ServiceBase {
     const { identifier, subject } = call.request;
     let user;
     // check for the identifier against name or email in DB
-    const filter = toStruct({
-      $or: [
-        {
-          name: {
-            $eq: identifier
-          }
-        },
-        {
-          email: {
-            $eq: identifier
-          }
-        }
-      ]
-    });
+    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
     const users = await super.read({ request: { filter } });
     if (users.total_count === 1) {
       user = users.items[0];
@@ -2268,8 +2225,10 @@ export class UserService extends ServiceBase {
         await this.topics.rendering.emit('renderRequest', renderRequest);
       }
       return {};
-    } else {
+    } else if(users.total_count === 0 ) {
       throw new errors.NotFound(`user with identifier ${identifier} not found`);
+    } else if (users.total_count > 1) {
+      throw new errors.InvalidArgument(`Invalid identifier provided for send activation email, multiple users found for identifier ${identifier}`);
     }
   }
 
@@ -2277,25 +2236,14 @@ export class UserService extends ServiceBase {
     const { identifier, invited_by_user_identifier, subject } = call.request;
     let user;
     // check for the identifier against name or email in DB
-    const filter = toStruct({
-      $or: [
-        {
-          name: {
-            $eq: identifier
-          }
-        },
-        {
-          email: {
-            $eq: identifier
-          }
-        }
-      ]
-    });
+    const filter = this.uniqueEmailConstraint ? getDefaultFilter(identifier) : getNameFilter(identifier);
     const users = await super.read({ request: { filter } });
     if (users.total_count === 1) {
       user = users.items[0];
-    } else {
+    } else if (users.total_count === 0) {
       throw new errors.NotFound(`user with identifier ${identifier} not found`);
+    } else if (users.total_count > 1) {
+      throw new errors.InvalidArgument(`Invalid identifier provided for send invitation email, multiple users found for identifier ${identifier}`);
     }
 
     let acsResponse: AccessResponse;

@@ -1,4 +1,5 @@
 import { BaseDocument } from "@restorecommerce/resource-base-interface/lib/core/interfaces";
+import { Subject } from "@restorecommerce/acs-client";
 
 export type TUser = User | FindUser | ActivateUser;
 export interface Call<TUser> {
@@ -45,6 +46,7 @@ export interface FindUser {
   email?: string;
   name?: string;
   subject?: Subject;
+  filter?: any;
 }
 
 export interface FindUserByToken {
