@@ -182,8 +182,8 @@ describe('testing identity-srv', () => {
     });
   });
 
-  describe('testing User service', () => {
-    describe('with test client', () => {
+  describe('testing User service with email constraint (default)', () => {
+    describe('with test client with email constraint (default)', () => {
       let userService, notificationService, testUserID, upserUserID, user, testUserName;
       before(async function connectUserService(): Promise<void> {
         userService = await connect('client:service-user', 'user.resource');
@@ -574,7 +574,7 @@ describe('testing identity-srv', () => {
       });
 
       describe('find by role', function findUserByRole(): void {
-        it('should return a user', async function findUser(): Promise<void> {
+        it('should return a user for valid role', async function findUser(): Promise<void> {
           const result = await (userService.findByRole({
             role: 'normal_user',
           }));
@@ -582,6 +582,16 @@ describe('testing identity-srv', () => {
           should.not.exist(result.error);
           should.exist(result.data);
           should.exist(result.data.items);
+        });
+        it('should not return a user for invalid role', async function findUser(): Promise<void> {
+          const result = await (userService.findByRole({
+            role: 'invalid_role',
+          }));
+          should.exist(result);
+          should.exist(result.error);
+          should.exist(result.error.details);
+          should.not.exist(result.data);
+          result.error.details.should.equal('5 NOT_FOUND: Role invalid_role does not exist');
         });
       });
 
