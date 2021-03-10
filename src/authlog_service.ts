@@ -3,7 +3,8 @@ import { Logger } from 'winston';
 import { errors } from '@restorecommerce/chassis-srv';
 import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject } from '@restorecommerce/acs-client';
 import { Topic } from '@restorecommerce/kafka-client';
-import { AccessResponse, ReadPolicyResponse, checkAccessRequest } from './utils';
+import { checkAccessRequest } from './utils';
+import { AccessResponse, ReadPolicyResponse} from './interface';
 import * as _ from 'lodash';
 
 export class AuthenticationLogService extends ServiceBase {

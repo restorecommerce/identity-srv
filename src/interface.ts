@@ -1,5 +1,5 @@
-import { BaseDocument } from "@restorecommerce/resource-base-interface/lib/core/interfaces";
-import { Subject } from "@restorecommerce/acs-client";
+import { BaseDocument } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
+import { Subject, Decision, PolicySetRQ } from '@restorecommerce/acs-client';
 
 export type TUser = User | FindUser | ActivateUser;
 export interface Call<TUser> {

@@ -1,11 +1,11 @@
 import { errors } from '@restorecommerce/chassis-srv';
 import { Logger } from 'winston';
 import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject } from '@restorecommerce/acs-client';
-import { AccessResponse, checkAccessRequest } from './utils';
+import { checkAccessRequest } from './utils';
 import * as _ from 'lodash';
 import { UserService } from './service';
 import * as uuid from 'uuid';
-import { resolve } from 'dns';
+import { AccessResponse } from './interface';
 
 interface TokenData {
   id: string;
