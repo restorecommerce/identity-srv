@@ -1,3 +1,7 @@
+## 0.1.26 (March 11th, 2021)
+
+- update dependencies. 
+
 ## 0.1.25 (March 8th, 2021)
 
 - added optional field `data` to be used inside makeRenderRequestMsg
