@@ -992,7 +992,7 @@ export class UserService extends ServiceBase {
     } else if (!users || users.total_count === 0) {
       throw new errors.NotFound('user not found');
     } else if (users.total_count > 1) {
-      throw new errors.InvalidArgument(`Invalid identifier provided for request password change, multiple users found for identifier ${user.name}`);
+      throw new errors.InvalidArgument(`Invalid identifier provided for request password change, multiple users found for identifier ${identifier}`);
     }
 
     logger.verbose('Received a password change request for user', { id: user.id });
