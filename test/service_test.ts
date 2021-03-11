@@ -688,6 +688,7 @@ describe('testing identity-srv', () => {
           should.exist(result.data.items[0].active);
           result.data.items[0].active.should.be.true();
           result.data.items[0].activation_code.should.be.empty();
+          topic.removeListener('activated', listener);
         });
 
         it('should return verify password and return the user', async function login(): Promise<void> {
@@ -764,14 +765,10 @@ describe('testing identity-srv', () => {
           const pwHashB = result.data.items[0].password_hash;
           pwHashB.should.not.be.null();
           pwHashA.should.not.equal(pwHashB);
+          await topic.removeListener('passwordChanged', listener);
         });
 
         it('should generate a UUID when requesting a password change', async function requestPasswordChange(): Promise<void> {
-          const offset = await topic.$offset(-1);
-          // const listener = function listener(message: any, context: any): void {
-          //   // pwHashA.should.not.equal(message.password_hash);
-          // };
-          await topic.on('passwordChangeRequested', () => { });
           let result = await userService.find({
             id: testUserID,
           });
@@ -785,7 +782,6 @@ describe('testing identity-srv', () => {
           });
           should.exist(result);
           should.not.exist(result.error);
-          await topic.$wait(offset);
 
           result = await (userService.find({
             id: testUserID,
@@ -795,11 +791,6 @@ describe('testing identity-srv', () => {
         });
 
         it('should confirm a password change by providing the UUID', async function requestPasswordChange(): Promise<void> {
-          const offset = await topic.$offset(-1);
-          // const listener = function listener(message: any, context: any): void {
-          //   // pwHashA.should.not.equal(message.password_hash);
-          // };
-          await topic.on('passwordChanged', () => { });
           let result = await userService.find({
             id: testUserID,
           });
@@ -817,8 +808,6 @@ describe('testing identity-srv', () => {
 
           should.exist(result);
           should.not.exist(result.error);
-
-          await topic.$wait(offset);
 
           result = await (userService.find({
             id: testUserID,
@@ -872,6 +861,7 @@ describe('testing identity-srv', () => {
 
           const dbUser: User = result.data.items[0];
           validate(dbUser);
+          await topic.removeListener('emailChangeRequested', listener);
         });
 
         it('should change the user email upon confirmation', async function confirmEmailChange(): Promise<void> {
@@ -909,6 +899,7 @@ describe('testing identity-srv', () => {
           validate(dbUser);
           dbUser.new_email.should.be.empty();
           dbUser.activation_code.should.be.empty();
+          await topic.removeListener('emailChangeConfirmed', listener);
         });
       });
 
@@ -934,6 +925,7 @@ describe('testing identity-srv', () => {
           await topic.$wait(offset);
           should.exist(result);
           should.not.exist(result.error);
+          await topic.removeListener('userModified', listener);
         });
 
         it(`should allow to update special fields such as 'email' and 'password`, async function changeEmailId(): Promise<void> {
