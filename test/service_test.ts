@@ -53,7 +53,7 @@ let meta = {
   },
   {
     id: 'urn:restorecommerce:acs:names:ownerInstance',
-    value: 'orgC'
+    value: 'orgA'
   }]
 };
 
@@ -1087,7 +1087,7 @@ describe('testing identity-srv', () => {
 
         let subject = {
           id: 'admin_user_id',
-          scope: 'orgC',
+          scope: 'orgA',
           role_associations: [
             {
               role: 'admin-r-id',
@@ -1128,6 +1128,31 @@ describe('testing identity-srv', () => {
           should.exist(result.data);
           should.exist(result.data.items);
           result.data.items[0].id.should.equal('testuser');
+        });
+        it('should allow to update a User role_associations, first and last name with valid role and valid HR scope', async () => {
+          testUser.first_name = 'testFirstName';
+          testUser.last_name = 'testLastName';
+          // Add OrgB user scope as well
+          testUser.role_associations.push({
+            role: 'user-r-id',
+            attributes: [{
+              id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+              value: 'urn:restorecommerce:acs:model:organization.Organization'
+            },
+            {
+              id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+              value: 'orgB'
+            }]
+          });
+          const result = await userService.update({ items: testUser, subject });
+          should.exist(result);
+          should.exist(result.data);
+          should.exist(result.data.items);
+          result.data.items[0].id.should.equal('testuser');
+          result.data.items[0].first_name.should.equal('testFirstName');
+          result.data.items[0].last_name.should.equal('testLastName');
+          result.data.items[0].role_associations[0].attributes[1].value.should.equal('orgC');
+          result.data.items[0].role_associations[1].attributes[1].value.should.equal('orgB');
           await userService.unregister({ identifier: result.data.items[0].name });
         });
 
@@ -1139,7 +1164,7 @@ describe('testing identity-srv', () => {
           should.exist(result.error.name);
           result.error.name.should.equal('InvalidArgument');
           should.exist(result.error.details);
-          result.error.details.should.equal('3 INVALID_ARGUMENT: One or more of the target role IDs are invalid invalid_role, no such role exist in system');
+          result.error.details.should.equal('3 INVALID_ARGUMENT: The target role invalid_role is invalid and cannot be assigned to user test.user');
         });
 
         it('should not allow to create a User with role assocation which is not assignable', async () => {
@@ -1200,10 +1225,9 @@ describe('testing identity-srv', () => {
           should.not.exist(result.data);
           should.exist(result.error);
           should.exist(result.error.name);
-          result.error.name.should.equal('PermissionDenied');
+          result.error.name.should.equal('InvalidArgument');
           should.exist(result.error.details);
-          // since with in verify role associations we use modify action for making whatIsAllowedACS request
-          result.error.details.should.equal('7 PERMISSION_DENIED: Access not allowed for request with subject:admin_user_id, resource:user, action:MODIFY, target_scope:orgC; the response was DENY');
+          result.error.details.should.equal('3 INVALID_ARGUMENT: the role user-r-id cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
 
           // disable authorization
           cfg.set('authorization:enabled', false);

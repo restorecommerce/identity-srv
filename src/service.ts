@@ -441,11 +441,23 @@ export class UserService extends ServiceBase {
         this.logger.verbose(message);
         throw new errors.InvalidArgument(message);
       }
+      let dbTargetRoles = [];
       for (let targetRole of rolesData.items) {
+        dbTargetRoles.push(targetRole.id);
         if (!targetRole.assignable_by_roles ||
           !createAccessRole.some((role) => targetRole.assignable_by_roles.includes(role))) {
           let message = `The target role ${targetRole.id} cannot be assigned to` +
             ` user ${user.name} as user role ${createAccessRole} does not have permissions`;
+          this.logger.verbose(message);
+          throw new errors.InvalidArgument(message);
+        }
+      }
+
+      // validate target roles is a valid role in DB
+      for (let targetUserRoleId of targetUserRoleIds) {
+        if (!dbTargetRoles.includes(targetUserRoleId)) {
+          let message = `The target role ${targetUserRoleId} is invalid and cannot be assigned to` +
+            ` user ${user.name}`;
           this.logger.verbose(message);
           throw new errors.InvalidArgument(message);
         }
@@ -1382,18 +1394,32 @@ export class UserService extends ServiceBase {
       const filter = toStruct({
         id: { $eq: userID }
       });
-      const userRoleAssoc = user.role_associations;
+      const userRoleAssocs = user.role_associations;
       const users = await super.read({ request: { filter } }, context);
       if (users && users.items && users.items.length > 0) {
-        let dbRoleAssoc = users.items[0].role_associations;
-        if (userRoleAssoc.length != dbRoleAssoc.length) {
+        let dbRoleAssocs = users.items[0].role_associations;
+        if (userRoleAssocs.length != dbRoleAssocs.length) {
           roleAssocsModified = true;
           this.logger.debug('Role associations length are not equal', { id: userID });
           break;
         } else {
           // compare each role and its association
-          if (!_.isEqual(_.sortBy(userRoleAssoc, [(obj) => { return obj.role; }]), _.sortBy(dbRoleAssoc, [(obj) => { return obj.role; }]))) {
-            roleAssocsModified = true;
+          for (let userRoleAssoc of userRoleAssocs) {
+            let found = false;
+            for (let dbRoleAssoc of dbRoleAssocs) {
+              if (dbRoleAssoc.role === userRoleAssoc.role) {
+                if (_.isEqual(userRoleAssoc.attributes, dbRoleAssoc.attributes)) {
+                  found = true;
+                  break;
+                }
+              }
+            }
+            if (!found) {
+              roleAssocsModified = true;
+              break;
+            }
+          }
+          if (roleAssocsModified) {
             this.logger.debug('Role associations ojbects are not equal', { id: userID });
             break;
           } else {
@@ -2225,7 +2251,7 @@ export class UserService extends ServiceBase {
         await this.topics.rendering.emit('renderRequest', renderRequest);
       }
       return {};
-    } else if(users.total_count === 0 ) {
+    } else if (users.total_count === 0) {
       throw new errors.NotFound(`user with identifier ${identifier} not found`);
     } else if (users.total_count > 1) {
       throw new errors.InvalidArgument(`Invalid identifier provided for send activation email, multiple users found for identifier ${identifier}`);
