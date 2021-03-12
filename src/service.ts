@@ -85,13 +85,19 @@ export class UserService extends ServiceBase {
   async find(call: Call<FindUser>, context?: any): Promise<any> {
     let { id, name, email, subject } = call.request;
     const findRequest = call.request;
+    let filterObj = [];
+    if (id) {
+      filterObj.push({ id: { $eq: id } });
+    }
+    if (name) {
+      filterObj.push({ name: { $eq: name } });
+    }
+    if (email) {
+      filterObj.push({ email: { $eq: email } });
+    }
     const filter = toStruct({
-      $or: [
-        { id: { $eq: id } },
-        { name: { $eq: name } },
-        { email: { $eq: email } }
-      ]
-    });
+      $or: filterObj
+    }, true);
     findRequest.filter = filter;
     let acsResponse: AccessResponse;
     try {
@@ -106,7 +112,7 @@ export class UserService extends ServiceBase {
     }
     if (acsResponse.decision === Decision.PERMIT) {
       const logger = this.logger;
-      const users = await super.read({ request: findRequest }, context);
+      const users = await super.read({ request: { filter: findRequest.filter } }, context);
       if (users.total_count > 0) {
         logger.silly('found user(s)', { users });
         return users;
