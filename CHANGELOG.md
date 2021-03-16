@@ -1,4 +1,13 @@
-## 0.1.24 (February 24th, 2020)
+## 0.1.26 (March 11th, 2021)
+
+- update dependencies. 
+
+## 0.1.25 (March 8th, 2021)
+
+- added optional field `data` to be used inside makeRenderRequestMsg
+when it is provided in the config.json. 
+
+## 0.1.24 (February 24th, 2021)
 
 - updated logger and service config
 
@@ -13,9 +22,9 @@
 ## 0.1.21 (January 19th, 2021)
 
 - moved role_assoc from register and made it configurable,
-- updated requestPasswordChagne, confrmPasswordChange, requestEmailChange, confirmEmailChange, activate, sendInvitationEmailRequest, unregister, changePassword to use identifier field.
+- updated requestPasswordChange, confirmPasswordChange, requestEmailChange, confirmEmailChange, activate, sendInvitationEmailRequest, unregister, changePassword to use identifier field.
 - added sendActivationEmail rpc to resend registration emails
-- Add ACS checks for requestEmailChagne and changed the recipient to new email
+- Add ACS checks for requestEmailChange and changed the recipient to new email
 - up documentation, protos
 
 ## 0.1.20 (January 15th, 2021)
