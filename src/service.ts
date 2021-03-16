@@ -2,7 +2,7 @@ import * as _ from 'lodash';
 import * as uuid from 'uuid';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as fetch from 'node-fetch';
-import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
+import { ServiceBase, ResourcesAPIBase, toStruct, toObject } from '@restorecommerce/resource-base-interface';
 import { DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from 'winston';
 import {
@@ -84,9 +84,10 @@ export class UserService extends ServiceBase {
    */
   async find(call: Call<FindUser>, context?: any): Promise<any> {
     let { id, name, email, subject } = call.request;
+    const readRequest = call.request;
     let acsResponse: AccessResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, { id, name, email },
+      acsResponse = await checkAccessRequest(subject, readRequest,
         AuthZAction.READ, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -97,14 +98,27 @@ export class UserService extends ServiceBase {
     }
     if (acsResponse.decision === Decision.PERMIT) {
       const logger = this.logger;
-      const filter = toStruct({
+      const filterObj = {
         $or: [
           { id: { $eq: id } },
           { name: { $eq: name } },
           { email: { $eq: email } }
         ]
-      });
-      const users = await super.read({ request: { filter } }, context);
+      };
+      // add ACS filters if subject is not tech user
+      let acsFilterObj;
+      if (subject.id != 'upsert_user_tokens') {
+        if (readRequest.filter && _.isArray(readRequest.filter)) {
+          acsFilterObj = toObject(readRequest.filter, true);
+        } else if (readRequest.filter && !_.isArray(readRequest.filter)) {
+          acsFilterObj = toObject(readRequest.filter);
+        }
+        if (acsFilterObj) {
+          _.merge(filterObj, acsFilterObj);
+        }
+      }
+      readRequest.filter = toStruct(filterObj);
+      const users = await super.read({ request: readRequest }, context);
       if (users.total_count > 0) {
         logger.silly('found user(s)', { users });
         return users;
