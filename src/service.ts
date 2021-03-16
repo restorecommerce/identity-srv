@@ -106,16 +106,20 @@ export class UserService extends ServiceBase {
         ]
       };
       // add ACS filters if subject is not tech user
-      let acsFilterObj;
-      if (subject.id != 'upsert_user_tokens') {
+      let acsFilterObj, techUser;
+      const techUsersCfg = this.cfg.get('techUsers');
+      if (techUsersCfg && techUsersCfg.length > 0) {
+        techUser = _.find(techUsersCfg, { id: subject.id });
+      }
+      if (!techUser) {
         if (readRequest.filter && _.isArray(readRequest.filter)) {
           acsFilterObj = toObject(readRequest.filter, true);
         } else if (readRequest.filter && !_.isArray(readRequest.filter)) {
           acsFilterObj = toObject(readRequest.filter);
         }
-        if (acsFilterObj) {
-          _.merge(filterObj, acsFilterObj);
-        }
+      }
+      if (!_.isEmpty(acsFilterObj)) {
+        _.merge(filterObj, acsFilterObj);
       }
       readRequest.filter = toStruct(filterObj);
       const users = await super.read({ request: readRequest }, context);
