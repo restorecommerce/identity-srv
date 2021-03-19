@@ -9,7 +9,7 @@ import {
   ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest,
   PolicySetRQ, PermissionDenied, HierarchicalScope, RoleAssociation
 } from '@restorecommerce/acs-client';
-import { RedisClient, createClient } from 'redis';
+import Redis from 'ioredis';
 import { checkAccessRequest, password, unmarshallProtobufAny, marshallProtobufAny, getDefaultFilter, getNameFilter } from './utils';
 import { errors } from '@restorecommerce/chassis-srv';
 import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common';
@@ -44,10 +44,10 @@ export class UserService extends ServiceBase {
   emailStyle: string;
   roleService: RoleService;
   authZ: ACSAuthZ;
-  redisClient: RedisClient;
+  redisClient: Redis;
   authZCheck: boolean;
   tokenService: TokenService;
-  tokenRedisClient: RedisClient;
+  tokenRedisClient: Redis;
   uniqueEmailConstraint: boolean;
   constructor(cfg: any, topics: any, db: any, logger: Logger,
     isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ) {
@@ -61,10 +61,10 @@ export class UserService extends ServiceBase {
     this.authZ = authZ;
     const redisConfig = cfg.get('redis');
     redisConfig.db = cfg.get('redis:db-indexes:db-subject');
-    this.redisClient = createClient(redisConfig);
+    this.redisClient = new Redis(redisConfig);
     this.authZCheck = this.cfg.get('authorization:enabled');
     redisConfig.db = this.cfg.get('redis:db-indexes:db-findByToken') || 0;
-    this.tokenRedisClient = createClient(redisConfig);
+    this.tokenRedisClient = new Redis(redisConfig);
     this.tokenService = new TokenService(cfg, logger, authZ, this);
     this.emailEnabled = this.cfg.get('service:enableEmail');
     const isConfigSet = this.cfg.get('service:uniqueEmailConstraint');
@@ -2325,7 +2325,7 @@ export class UserService extends ServiceBase {
 
 export class RoleService extends ServiceBase {
   logger: Logger;
-  redisClient: RedisClient;
+  redisClient: Redis;
   cfg: any;
   authZ: ACSAuthZ;
   authZCheck: boolean;
@@ -2335,7 +2335,7 @@ export class RoleService extends ServiceBase {
     this.logger = logger;
     const redisConfig = cfg.get('redis');
     redisConfig.db = cfg.get('redis:db-indexes:db-subject');
-    this.redisClient = createClient(redisConfig);
+    this.redisClient = new Redis(redisConfig);
     this.authZ = authZ;
     this.cfg = cfg;
     this.authZCheck = this.cfg.get('authorization:enabled');

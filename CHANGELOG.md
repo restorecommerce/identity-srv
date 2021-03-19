@@ -1,6 +1,13 @@
+## 0.1.27 (March 19th, 2021)
+
+- added unique email constraint feature
+- fix `roleAssocsModified` to compare only role and attributes, modified the verifyRoleAssocs to check for invalid roles provided and fixed tests
+- migrated redis to ioredis
+- updated dependencies
+
 ## 0.1.26 (March 11th, 2021)
 
-- update dependencies. 
+- update dependencies.
 
 ## 0.1.25 (March 8th, 2021)
 
