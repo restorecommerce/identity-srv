@@ -1,3 +1,8 @@
+## 0.1.28 (March 23rd, 2021)
+
+- fix find operation for assigning filter only if its provided
+- updated role Assoc modified to compare attributes id and values
+
 ## 0.1.27 (March 19th, 2021)
 
 - added unique email constraint feature

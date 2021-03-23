@@ -1,6 +1,6 @@
 {
   "name": "@restorecommerce/identity-srv",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "description": "Restorecommerce identity service",
   "main": "lib/start.js",
   "author": "n-fuse GmbH",
