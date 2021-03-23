@@ -98,11 +98,19 @@ export class UserService extends ServiceBase {
     }
     if (acsResponse.decision === Decision.PERMIT) {
       const logger = this.logger;
+      const filterStructure = {};
+      if (id) {
+        Object.assign(filterStructure, { id: { $eq: id } });
+      }
+      if (name) {
+        Object.assign(filterStructure, { name: { $eq: name } });
+      }
+      if (email) {
+        Object.assign(filterStructure, { email: { $eq: email } });
+      }
       const filterObj = {
         $or: [
-          { id: { $eq: id } },
-          { name: { $eq: name } },
-          { email: { $eq: email } }
+          filterStructure
         ]
       };
       // add ACS filters if subject is not tech user
@@ -1424,22 +1432,33 @@ export class UserService extends ServiceBase {
             let found = false;
             for (let dbRoleAssoc of dbRoleAssocs) {
               if (dbRoleAssoc.role === userRoleAssoc.role) {
-                if (_.isEqual(userRoleAssoc.attributes, dbRoleAssoc.attributes)) {
+                let i = 0;
+                const attrLenght = userRoleAssoc.attributes.length;
+                for (let dbAttribute of dbRoleAssoc.attributes) {
+                  for (let userAttribute of userRoleAssoc.attributes) {
+                    if (userAttribute.id === dbAttribute.id && userAttribute.value === dbAttribute.value) {
+                      i++;
+                    }
+                  }
+                }
+                if (attrLenght === i) {
                   found = true;
+                  break;
+                } else {
+                  found = false;
                   break;
                 }
               }
             }
             if (!found) {
               roleAssocsModified = true;
-              break;
             }
-          }
-          if (roleAssocsModified) {
-            this.logger.debug('Role associations ojbects are not equal', { id: userID });
-            break;
-          } else {
-            this.logger.debug('Role assocations not changed for user', { id: userID });
+            if (roleAssocsModified) {
+              this.logger.debug('Role associations ojbects are not equal', { id: userID });
+              break;
+            } else {
+              this.logger.debug('Role assocations not changed for user', { id: userID });
+            }
           }
         }
       } else {
@@ -1447,8 +1466,8 @@ export class UserService extends ServiceBase {
         roleAssocsModified = true;
         break;
       }
+      return roleAssocsModified;
     }
-    return roleAssocsModified;
   }
 
   /**
