@@ -394,6 +394,7 @@ export class UserService extends ServiceBase {
 
     subject.hierarchical_scopes = hierarchical_scopes;
     let createAccessRole = [];
+    let skipValidatingScopingInstance = false;
     try {
       // Make whatIsAllowedACS request to retreive the set of applicable
       // policies and check for role scoping entity, if it exists then validate
@@ -423,6 +424,11 @@ export class UserService extends ServiceBase {
                 if (ruleAttr.id === this.cfg.get('authorization:urns:role')) {
                   // rule's role which give's user the acess to create User
                   createAccessRole.push(ruleAttr.value);
+                  // check if there is no scoping then skip comparing / validating role scope instance
+                  // ex: superAdmin who does not have role scoping instance
+                  if (ruleSubjectAttrs.length === 1) {
+                    skipValidatingScopingInstance = true;
+                  }
                 }
                 if (ruleAttr.id === this.cfg.get('authorization:urns:roleScopingEntity')) {
                   validateRoleScope = true;
@@ -486,6 +492,11 @@ export class UserService extends ServiceBase {
           throw new errors.InvalidArgument(message);
         }
       }
+    }
+
+    if (skipValidatingScopingInstance) {
+      this.logger.debug('Skipping validation of role scoping instance', { role: createAccessRole });
+      return;
     }
 
     if (validateRoleScope) {
@@ -1443,9 +1454,6 @@ export class UserService extends ServiceBase {
                 }
                 if (attrLenght === i) {
                   found = true;
-                  break;
-                } else {
-                  found = false;
                   break;
                 }
               }
