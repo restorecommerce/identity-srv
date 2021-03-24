@@ -1444,7 +1444,7 @@ export class UserService extends ServiceBase {
             for (let dbRoleAssoc of dbRoleAssocs) {
               if (dbRoleAssoc.role === userRoleAssoc.role) {
                 let i = 0;
-                const attrLenght = userRoleAssoc.attributes.length;
+                const attrLength = userRoleAssoc.attributes.length;
                 for (let dbAttribute of dbRoleAssoc.attributes) {
                   for (let userAttribute of userRoleAssoc.attributes) {
                     if (userAttribute.id === dbAttribute.id && userAttribute.value === dbAttribute.value) {
@@ -1452,7 +1452,7 @@ export class UserService extends ServiceBase {
                     }
                   }
                 }
-                if (attrLenght === i) {
+                if (attrLength === i) {
                   found = true;
                   break;
                 }
@@ -1462,7 +1462,7 @@ export class UserService extends ServiceBase {
               roleAssocsModified = true;
             }
             if (roleAssocsModified) {
-              this.logger.debug('Role associations ojbects are not equal', { id: userID });
+              this.logger.debug('Role associations objects are not equal', { id: userID });
               break;
             } else {
               this.logger.debug('Role assocations not changed for user', { id: userID });
