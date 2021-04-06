@@ -1,3 +1,7 @@
+## 0.1.29 (April 6th, 2021)
+
+- fix to reject for expired tokens on `findByToken`
+
 ## 0.1.28 (March 23rd, 2021)
 
 - fix find operation for assigning filter only if its provided

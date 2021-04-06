@@ -239,11 +239,8 @@ export class UserService extends ServiceBase {
                 await this.update({ request: { items: [user], subject: tokenTechUser } });
                 return resolve(user);
               } else if (dbToken && dbToken.expires_in < Math.round(new Date().getTime() / 1000)) {
-                logger.debug('Token expired, updating subject to remove token');
-                // delete token
-                tokenTechUser.scope = users.items[0].default_scope;
-                const updatedUser = _.remove(users.items[0].tokens, { token });
-                await this.update({ request: { items: [updatedUser], subject: tokenTechUser } });
+                logger.debug('Token expired');
+                reject(new errors.InvalidArgument('Token expired'));
                 return;
               }
             }
