@@ -98,11 +98,19 @@ export class UserService extends ServiceBase {
     }
     if (acsResponse.decision === Decision.PERMIT) {
       const logger = this.logger;
+      const filterStructure = {};
+      if (id) {
+        Object.assign(filterStructure, { id: { $eq: id } });
+      }
+      if (name) {
+        Object.assign(filterStructure, { name: { $eq: name } });
+      }
+      if (email) {
+        Object.assign(filterStructure, { email: { $eq: email } });
+      }
       const filterObj = {
         $or: [
-          { id: { $eq: id } },
-          { name: { $eq: name } },
-          { email: { $eq: email } }
+          filterStructure
         ]
       };
       // add ACS filters if subject is not tech user
@@ -231,11 +239,8 @@ export class UserService extends ServiceBase {
                 await this.update({ request: { items: [user], subject: tokenTechUser } });
                 return resolve(user);
               } else if (dbToken && dbToken.expires_in < Math.round(new Date().getTime() / 1000)) {
-                logger.debug('Token expired, updating subject to remove token');
-                // delete token
-                tokenTechUser.scope = users.items[0].default_scope;
-                const updatedUser = _.remove(users.items[0].tokens, { token });
-                await this.update({ request: { items: [updatedUser], subject: tokenTechUser } });
+                logger.debug('Token expired');
+                reject(new errors.InvalidArgument('Token expired'));
                 return;
               }
             }
@@ -386,6 +391,7 @@ export class UserService extends ServiceBase {
 
     subject.hierarchical_scopes = hierarchical_scopes;
     let createAccessRole = [];
+    let skipValidatingScopingInstance = false;
     try {
       // Make whatIsAllowedACS request to retreive the set of applicable
       // policies and check for role scoping entity, if it exists then validate
@@ -415,6 +421,11 @@ export class UserService extends ServiceBase {
                 if (ruleAttr.id === this.cfg.get('authorization:urns:role')) {
                   // rule's role which give's user the acess to create User
                   createAccessRole.push(ruleAttr.value);
+                  // check if there is no scoping then skip comparing / validating role scope instance
+                  // ex: superAdmin who does not have role scoping instance
+                  if (ruleSubjectAttrs.length === 1) {
+                    skipValidatingScopingInstance = true;
+                  }
                 }
                 if (ruleAttr.id === this.cfg.get('authorization:urns:roleScopingEntity')) {
                   validateRoleScope = true;
@@ -478,6 +489,11 @@ export class UserService extends ServiceBase {
           throw new errors.InvalidArgument(message);
         }
       }
+    }
+
+    if (skipValidatingScopingInstance) {
+      this.logger.debug('Skipping validation of role scoping instance', { role: createAccessRole });
+      return;
     }
 
     if (validateRoleScope) {
@@ -1424,7 +1440,16 @@ export class UserService extends ServiceBase {
             let found = false;
             for (let dbRoleAssoc of dbRoleAssocs) {
               if (dbRoleAssoc.role === userRoleAssoc.role) {
-                if (_.isEqual(userRoleAssoc.attributes, dbRoleAssoc.attributes)) {
+                let i = 0;
+                const attrLength = userRoleAssoc.attributes.length;
+                for (let dbAttribute of dbRoleAssoc.attributes) {
+                  for (let userAttribute of userRoleAssoc.attributes) {
+                    if (userAttribute.id === dbAttribute.id && userAttribute.value === dbAttribute.value) {
+                      i++;
+                    }
+                  }
+                }
+                if (attrLength === i) {
                   found = true;
                   break;
                 }
@@ -1432,14 +1457,13 @@ export class UserService extends ServiceBase {
             }
             if (!found) {
               roleAssocsModified = true;
-              break;
             }
-          }
-          if (roleAssocsModified) {
-            this.logger.debug('Role associations ojbects are not equal', { id: userID });
-            break;
-          } else {
-            this.logger.debug('Role assocations not changed for user', { id: userID });
+            if (roleAssocsModified) {
+              this.logger.debug('Role associations objects are not equal', { id: userID });
+              break;
+            } else {
+              this.logger.debug('Role assocations not changed for user', { id: userID });
+            }
           }
         }
       } else {
@@ -1447,8 +1471,8 @@ export class UserService extends ServiceBase {
         roleAssocsModified = true;
         break;
       }
+      return roleAssocsModified;
     }
-    return roleAssocsModified;
   }
 
   /**
