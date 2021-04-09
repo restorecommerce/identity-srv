@@ -10,4 +10,8 @@ coverage/
 
 *.log
 *~
+
+buildImage.bash
+Dockerfile
+.dockerignore
 lib/
