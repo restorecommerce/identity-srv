@@ -12,9 +12,6 @@ coverage/
 *~
 
 buildImage.bash
-buildImageBuildkit.bash
 Dockerfile
-buildkit.Dockerfile
 .dockerignore
-buildkit.dockerignore
 lib/
