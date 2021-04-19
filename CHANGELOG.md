@@ -1,3 +1,7 @@
+## 0.1.30 (April 19th, 2021)
+
+- fix to flush `findByToken` cache on user update
+
 ## 0.1.29 (April 6th, 2021)
 
 - fix to reject for expired tokens on `findByToken`

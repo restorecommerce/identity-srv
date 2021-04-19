@@ -1309,39 +1309,59 @@ export class UserService extends ServiceBase {
         }
 
         // Flush findByToken redis data
-        if (subject && subject.token) {
-          await new Promise((resolve, reject) => {
-            this.tokenRedisClient.get(subject.token, async (err, response) => {
-              if (!err && response) {
-                const redisResp = JSON.parse(response);
-                const redisRoleAssocs = redisResp.role_associations;
-                const redisTokens = redisResp.tokens;
-                const redisID = redisResp.id;
-                let roleAssocEqual;
-                let tokensEqual;
-                let updatedRoleAssocs = user.role_associations;
-                let updatedTokens = user.tokens;
-                if (redisID === user.id) {
-                  for (let obj of updatedRoleAssocs) {
-                    roleAssocEqual = _.find(redisRoleAssocs, obj);
-                    if (!roleAssocEqual) {
-                      this.logger.debug('Subject Role assocation has been updated', obj);
-                      break;
+        if (user && user.tokens && user.tokens.length > 0) {
+          for (let token of user.tokens) {
+            const tokenValue = token.token;
+            await new Promise((resolve, reject) => {
+              this.tokenRedisClient.get(tokenValue, async (err, response) => {
+                if (!err && response) {
+                  const redisResp = JSON.parse(response);
+                  const redisRoleAssocs = redisResp.role_associations;
+                  const redisTokens = redisResp.tokens;
+                  const redisID = redisResp.id;
+                  let roleAssocEqual;
+                  let tokensEqual;
+                  let updatedRoleAssocs = user.role_associations;
+                  let updatedTokens = user.tokens;
+                  if (redisID === user.id) {
+                    for (let userRoleAssoc of updatedRoleAssocs) {
+                      let found = false;
+                      for (let redisRoleAssoc of redisRoleAssocs) {
+                        if (redisRoleAssoc.role === userRoleAssoc.role) {
+                          let i = 0;
+                          const attrLenght = userRoleAssoc.attributes.length;
+                          for (let redisAttribute of redisRoleAssoc.attributes) {
+                            for (let userAttribute of userRoleAssoc.attributes) {
+                              if (userAttribute.id === redisAttribute.id && userAttribute.value === redisAttribute.value) {
+                                i++;
+                              }
+                            }
+                          }
+                          if (attrLenght === i) {
+                            found = true;
+                            roleAssocEqual = true;
+                            break;
+                          }
+                        }
+                      }
+                      if (!found) {
+                        this.logger.debug('Subject Role assocation has been updated', { userRoleAssoc });
+                        roleAssocEqual = false;
+                        break;
+                      }
                     }
                   }
-                } else {
-                  roleAssocEqual = true;
-                }
-                // to ignore interactive tokens use case
-                if (_.isEmpty(updatedTokens)) {
-                  tokensEqual = true;
-                }
-                if (redisID === user.id) {
-                  for (let token of updatedTokens) {
-                    if (!token.interactive) {
+                  if (redisID === user.id) {
+                    for (let token of updatedTokens) {
                       // compare only token scopes (since it now contains last_login as well)
                       for (let redisToken of redisTokens) {
                         if (redisToken.token === token.token) {
+                          if (!redisToken.scopes) {
+                            redisToken.scopes  = [];
+                          }
+                          if (!token.scopes) {
+                            token.scopes = [];
+                          }
                           tokensEqual = _.isEqual(redisToken.scopes.sort(), token.scopes.sort());
                         }
                       }
@@ -1349,43 +1369,26 @@ export class UserService extends ServiceBase {
                         this.logger.debug('Subject Token scope has been updated', token);
                         break;
                       }
-                    } else {
-                      tokensEqual = true;
                     }
                   }
-                } else {
-                  tokensEqual = true;
-                }
-                // restore interactive tokens on update (when not provided)
-                if (redisID && (redisID === user.id)) {
-                  if (redisTokens && redisTokens.length > 0) {
-                    let userTokens = user.tokens;
-                    let interactiveTokens = [];
-                    for (let token of redisTokens) {
-                      if (token.interactive) {
-                        interactiveTokens.push(token);
+                  if (!roleAssocEqual || !tokensEqual || (updatedRoleAssocs.length != redisRoleAssocs.length)) {
+                    // flush token subject cache
+                    this.tokenRedisClient.del(tokenValue, async (err, numberOfDeletedKeys) => {
+                      if (err) {
+                        this.logger.error('Error deleting cached findByTOken data from redis', { err });
+                        reject(err);
+                      } else {
+                        this.logger.info('Redis cached data for findByToken deleted successfully', { token: tokenValue });
                       }
-                    }
-                    user.tokens = _.unionBy(userTokens, interactiveTokens);
+                      resolve(numberOfDeletedKeys);
+                    });
                   }
+                  return resolve(redisResp);
                 }
-                if (!roleAssocEqual || !tokensEqual || (updatedRoleAssocs.length != redisRoleAssocs.length)) {
-                  // flush token subject cache
-                  this.tokenRedisClient.del(subject.token, async (err, numberOfDeletedKeys) => {
-                    if (err) {
-                      this.logger.error('Error deleting cached findByTOken data from redis', { err });
-                      reject(err);
-                    } else {
-                      this.logger.info('Redis cached data for findByToken deleted successfully', { token: subject.token });
-                    }
-                    resolve(numberOfDeletedKeys);
-                  });
-                }
-                return resolve(redisResp);
-              }
-              resolve(undefined);
+                resolve(undefined);
+              });
             });
-          });
+          }
         }
 
         // Update password if it contains that field by updating hash
@@ -2471,7 +2474,7 @@ export class RoleService extends ServiceBase {
         if (roles.total_count === 0) {
           throw new errors.NotFound('roles not found for updating');
         }
-        const rolesDB = roles.data.items[0];
+        const rolesDB = roles.items[0];
         // update meta information from existing Object in case if its
         // not provided in request
         if (!role.meta) {
