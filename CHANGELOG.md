@@ -1,6 +1,6 @@
 ## 0.1.30 (April 19th, 2021)
 
-- fix to flush `findByToken` cache on user update
+- fix to flush chaced data of `findByToken` (done on user update).
 
 ## 0.1.29 (April 6th, 2021)
 
