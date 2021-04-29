@@ -11,6 +11,7 @@ import { AuthenticationLogService } from './authlog_service';
 import { TokenService } from './token_service';
 import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base';
 import { Database } from 'arangojs';
+import 'source-map-support/register';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
@@ -90,6 +91,8 @@ export class Worker {
   userService: UserService;
   authZ: ACSAuthZ;
   redisClient: Redis;
+  roleService: RoleService;
+
   constructor(cfg?: any) {
     this.cfg = cfg || createServiceConfig(process.cwd());
     this.logger = createLogger(this.cfg.get('logger'));
@@ -155,7 +158,7 @@ export class Worker {
     this.redisClient = new Redis(redisConfig);
 
     // init ACS cache
-    initializeCache();
+    // await initializeCache();
 
     const cis = new UserCommandInterface(server, this.cfg, logger, events, this.redisClient);
 
@@ -182,7 +185,7 @@ export class Worker {
     const topicTypes = _.keys(kafkaCfg.topics);
     for (let topicType of topicTypes) {
       const topicName = kafkaCfg.topics[topicType].topic;
-      this.topics[topicType] = events.topic(topicName);
+      this.topics[topicType] = await events.topic(topicName);
       const offSetValue = await this.offsetStore.getOffset(topicName);
       logger.info('subscribing to topic with offset value', topicName, offSetValue);
       if (kafkaCfg.topics[topicType].events) {
@@ -196,19 +199,15 @@ export class Worker {
 
     // user service
     logger.verbose('Setting up user and role services');
-    const roleService = new RoleService(cfg, db,
-      this.topics['role.resource'], logger, true, this.authZ);
-    const userService = new UserService(cfg,
-      this.topics, db, logger, true, roleService, this.authZ);
-    const authLogService = new AuthenticationLogService(cfg, db,
-      this.topics['authlog.resource'], logger, true, this.authZ);
-    this.userService = userService;
+    this.roleService = new RoleService(cfg, db, this.topics['role.resource'], logger, true, this.authZ);
+    this.userService = new UserService(cfg, this.topics, db, logger, true, this.roleService, this.authZ);
+    const authLogService = new AuthenticationLogService(cfg, db, this.topics['authlog.resource'], logger, true, this.authZ);
 
     // token service
-    const tokenService = new TokenService(cfg, logger, this.authZ, userService);
+    const tokenService = new TokenService(cfg, logger, this.authZ, this.userService);
 
-    await server.bind(serviceNamesCfg.user, userService);
-    await server.bind(serviceNamesCfg.role, roleService);
+    await server.bind(serviceNamesCfg.user, this.userService);
+    await server.bind(serviceNamesCfg.role, this.roleService);
     await server.bind(serviceNamesCfg.authenticationLog, authLogService);
     await server.bind(serviceNamesCfg.token, tokenService);
     await server.bind(serviceNamesCfg.cis, cis);
@@ -236,9 +235,14 @@ export class Worker {
 
   async stop(): Promise<any> {
     this.logger.info('Shutting down');
-    await this.server.stop();
-    await this.events.stop();
-    await this.offsetStore.stop();
+    await Promise.all([
+      this.server.stop(),
+      this.events.stop(),
+      this.offsetStore.stop(),
+      this.redisClient.quit(),
+      this.roleService.stop(),
+      this.userService.stop()
+    ]);
   }
 }
 

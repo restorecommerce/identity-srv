@@ -171,8 +171,12 @@
     "kafka": {
       "provider": "kafka",
       "groupId": "restore-identity-srv",
-      "clientId": "restore-identity-srv",
-      "kafkaHost": "localhost:29092",
+      "kafka": {
+        "clientId": "restore-identity-srv",
+        "brokers": [
+          "localhost:29092"
+        ]
+      },
       "latestOffset": false,
       "userCreated": {
         "protos": [

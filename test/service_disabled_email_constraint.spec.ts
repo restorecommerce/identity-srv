@@ -1,9 +1,8 @@
-import * as mocha from 'mocha';
 import * as should from 'should';
 import * as _ from 'lodash';
 import * as grpcClient from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
-import { Worker } from '../lib/worker';
+import { Worker } from '../src/worker';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { Topic } from '@restorecommerce/kafka-client/lib/events/provider/kafka';
 import { createMockServer } from 'grpc-mock';
@@ -17,7 +16,6 @@ const Events = kafkaClient.Events;
 
 let cfg: any;
 let worker: Worker;
-let client;
 let logger;
 
 // For event listeners
@@ -37,13 +35,16 @@ async function start(): Promise<void> {
 async function connect(clientCfg: string, resourceName: string): Promise<any> { // returns a gRPC service
   logger = worker.logger;
 
+  if (events) {
+    await events.stop();
+    events = undefined;
+  }
+
   events = new Events(cfg.get('events:kafka'), logger);
   await (events.start());
-  topic = events.topic(cfg.get(`events:kafka:topics:${resourceName}:topic`));
+  topic = await events.topic(cfg.get(`events:kafka:topics:${resourceName}:topic`));
 
-  client = new grpcClient.Client(cfg.get(clientCfg), logger);
-  const service = await client.connect();
-  return service;
+  return new grpcClient.Client(cfg.get(clientCfg), logger);
 }
 
 let meta = {
@@ -130,6 +131,7 @@ const stopGrpcMockServer = async () => {
 describe('testing identity-srv', () => {
 
   before(async function startServer(): Promise<void> {
+    this.timeout(60000);
     await start();
     // disable authorization
     cfg.set('authorization:enabled', false);
@@ -138,14 +140,30 @@ describe('testing identity-srv', () => {
   });
 
   after(async function stopServer(): Promise<void> {
-    await worker.stop();
+    this.timeout(60000);
+    worker && await worker.stop();
+    events && await events.stop();
+  });
+
+  it('should do stuff', async function () {
+    this.timeout(20000);
+    console.log('doing stuff');
+    await new Promise(r => setTimeout(r, 10000));
   });
 
   describe('testing Role service', () => {
+    let role: any;
+
+    before(async function connectRoleService(): Promise<void> {
+      role = await connect('client:service-role', 'role.resource');
+      roleService = await role.connect();
+    });
+
+    after(async function stopRoleService(): Promise<void> {
+      await role.end();
+    });
+
     describe('with test client', () => {
-      before(async function connectRoleService(): Promise<void> {
-        roleService = await connect('client:service-role', 'role.resource');
-      });
 
       it('should create roles', async () => {
         const roles = [
@@ -184,18 +202,24 @@ describe('testing identity-srv', () => {
   });
 
   describe('testing User service with disabled email constraint', () => {
+    let userService, testUserID, user, testUserName, userBaseService;
+    before(async function connectUserService(): Promise<void> {
+      userBaseService = await connect('client:service-user', 'user.resource');
+      userService = await userBaseService.connect();
+      user = {
+        name: 'test.user1', // this user is used in the next tests
+        first_name: 'test',
+        last_name: 'user',
+        password: 'notsecure',
+        email: 'test@ms.restorecommerce.io'
+      };
+    });
+
+    after(async function stopUserService(): Promise<void> {
+      await userBaseService.end();
+    });
+
     describe('with test client with disabled email constraint', () => {
-      let userService, testUserID, user, testUserName;
-      before(async function connectUserService(): Promise<void> {
-        userService = await connect('client:service-user', 'user.resource');
-        user = {
-          name: 'test.user1', // this user is used in the next tests
-          first_name: 'test',
-          last_name: 'user',
-          password: 'notsecure',
-          email: 'test@ms.restorecommerce.io'
-        };
-      });
 
       describe('calling register', function registerUser(): void {
         it('should allow to register a user with same email but different names', async function registerUser(): Promise<void> {
@@ -234,7 +258,7 @@ describe('testing identity-srv', () => {
           userPolicySetRQ.policy_sets[0].policies[0].rules[0] = permitUserRule;
           // start mock acs-srv - needed for read operation since acs-client makes a req to acs-srv
           // to get applicable policies although acs-lookup is disabled
-          startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: userPolicySetRQ },
+          await startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: userPolicySetRQ },
           { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'PERMIT' } }]);
           // read by email
           const getResult = await userService.read({

@@ -77,6 +77,11 @@ export class UserService extends ServiceBase {
     }
   }
 
+  async stop(): Promise<void> {
+    await this.redisClient.quit();
+    await this.tokenRedisClient.quit();
+  }
+
   /**
    * Endpoint to search for users containing any of the provided field values.
    * @param {Call<FindUser>} call request containing either userid, username or email
@@ -2366,6 +2371,10 @@ export class RoleService extends ServiceBase {
     this.authZ = authZ;
     this.cfg = cfg;
     this.authZCheck = this.cfg.get('authorization:enabled');
+  }
+
+  async stop(): Promise<void> {
+    await this.redisClient.quit();
   }
 
   async create(call: any, context?: any): Promise<any> {

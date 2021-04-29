@@ -26,7 +26,7 @@
   "logger": {
     "console": {
       "handleExceptions": false,
-      "level": "fatal",
+      "level": "info",
       "colorize": true,
       "prettyPrint": true
     }
@@ -34,7 +34,7 @@
   "redis": {
     "host": "localhost",
     "port": 6379,
-    "offsetStoreInterval": 1000,
+    "offsetStoreInterval": 10000,
     "db-indexes": {
       "db-offsetStore": 0,
       "db-subject": 4,
@@ -265,8 +265,12 @@
     "kafka": {
       "provider": "kafka",
       "groupId": "restore-identity-srv-test",
-      "clientId": "restore-identity-srv-test",
-      "kafkaHost": "0.0.0.0:29092",
+      "kafka": {
+        "clientId": "restore-identity-srv-test",
+        "brokers": [
+          "localhost:29092"
+        ]
+      },
       "latestOffset": true,
       "userModified": {
         "protos": [

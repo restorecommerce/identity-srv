@@ -1,16 +1,12 @@
-import * as mocha from 'mocha';
 import * as should from 'should';
 import * as _ from 'lodash';
 import * as grpcClient from '@restorecommerce/grpc-client';
-import * as kafkaClient from '@restorecommerce/kafka-client';
-import { Worker } from '../lib/worker';
+import { Events, Topic } from '@restorecommerce/kafka-client';
+import { Worker } from '../src/worker';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { User } from '../lib/interface';
-import { Topic } from '@restorecommerce/kafka-client/lib/events/provider/kafka';
 import { createMockServer } from 'grpc-mock';
 import { updateConfig } from '@restorecommerce/acs-client';
-
-const Events = kafkaClient.Events;
 
 /*
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
@@ -22,7 +18,7 @@ let client;
 let logger;
 
 // For event listeners
-let events;
+let events: Events;
 let topic: Topic;
 let roleService: any;
 let mockServer: any;
@@ -36,13 +32,23 @@ async function start(): Promise<void> {
 async function connect(clientCfg: string, resourceName: string): Promise<any> { // returns a gRPC service
   logger = worker.logger;
 
-  events = new Events(cfg.get('events:kafka'), logger);
+  if (events) {
+    await events.stop();
+    events = undefined;
+  }
+
+  events = new Events({
+    ...cfg.get('events:kafka'),
+    groupId: 'restore-identity-srv-test-runner',
+    kafka: {
+      ...cfg.get('events:kafka:kafka'),
+    }
+  }, logger);
   await (events.start());
-  topic = events.topic(cfg.get(`events:kafka:topics:${resourceName}:topic`));
+  topic = await events.topic(cfg.get(`events:kafka:topics:${resourceName}:topic`));
 
   client = new grpcClient.Client(cfg.get(clientCfg), logger);
-  const service = await client.connect();
-  return service;
+  return await client.connect();
 }
 
 let meta = {
@@ -129,6 +135,7 @@ const stopGrpcMockServer = async () => {
 describe('testing identity-srv', () => {
 
   before(async function startServer(): Promise<void> {
+    this.timeout(60000);
     await start();
     // disable authorization
     cfg.set('authorization:enabled', false);
@@ -137,7 +144,9 @@ describe('testing identity-srv', () => {
   });
 
   after(async function stopServer(): Promise<void> {
+    this.timeout(60000);
     await worker.stop();
+    await events.stop();
   });
 
   describe('testing Role service', () => {
@@ -198,6 +207,7 @@ describe('testing identity-srv', () => {
 
       describe('calling register', function registerUser(): void {
         it('should register a user', async function registerUser(): Promise<void> {
+          this.timeout(30000);
           const listener = function listener(message: any, context: any): void {
             user.name.should.equal(message.name);
             user.email.should.equal(message.email);
@@ -236,13 +246,16 @@ describe('testing identity-srv', () => {
         });
 
         it('should re-send activation email for registered user', async function sendActivationEmail(): Promise<void> {
+          this.timeout(60000);
           const listener = function listener(message: any, context: any): void {
             message.id.should.equal(`identity#test@ms.restorecommerce.io`);
           };
-          const renderingTopic = events.topic('io.restorecommerce.rendering');
+
+          const renderingTopic = await events.topic('io.restorecommerce.rendering');
           const offset = await renderingTopic.$offset(-1);
           await renderingTopic.on('renderRequest', listener);
           const result = await userService.sendActivationEmail({ identifier: user.name });
+
           should.exist(result);
           should.not.exist(result.error);
           result.data.should.be.empty();
@@ -688,7 +701,7 @@ describe('testing identity-srv', () => {
           should.exist(result.data.items[0].active);
           result.data.items[0].active.should.be.true();
           result.data.items[0].activation_code.should.be.empty();
-          topic.removeListener('activated', listener);
+          await topic.removeListener('activated', listener);
         });
 
         it('should return verify password and return the user', async function login(): Promise<void> {
@@ -739,6 +752,7 @@ describe('testing identity-srv', () => {
 
       describe('calling changePassword', function changePassword(): void {
         it('should change the password', async function changePassword(): Promise<void> {
+          this.timeout(30000);
           const offset = await topic.$offset(-1);
           const listener = function listener(message: any, context: any): void {
             pwHashA.should.not.equal(message.password_hash);
@@ -820,7 +834,7 @@ describe('testing identity-srv', () => {
 
       describe('calling changeEmail', function changeEmailId(): void {
         it('should request the email change and persist it without overriding the old email', async function requestEmailChange(): Promise<void> {
-          this.timeout(3000);
+          this.timeout(30000);
           const validate = (user: User) => {
             const new_email = user.new_email;
             const email = user.email;
@@ -865,7 +879,7 @@ describe('testing identity-srv', () => {
         });
 
         it('should change the user email upon confirmation', async function confirmEmailChange(): Promise<void> {
-          this.timeout(3000);
+          this.timeout(30000);
           const validate = (user: User) => {
             const email = user.email;
             email.should.equal('newmail@newmail.com');
@@ -1124,6 +1138,7 @@ describe('testing identity-srv', () => {
           cfg.set('authorization:enforce', true);
           updateConfig(cfg);
           const result = await userService.create({ items: testUser, subject });
+          console.log({result});
           should.exist(result);
           should.exist(result.data);
           should.exist(result.data.items);
@@ -1145,6 +1160,7 @@ describe('testing identity-srv', () => {
             }]
           });
           const result = await userService.update({ items: testUser, subject });
+          console.log({result});
           should.exist(result);
           should.exist(result.data);
           should.exist(result.data.items);
