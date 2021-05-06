@@ -145,12 +145,6 @@ describe('testing identity-srv', () => {
     events && await events.stop();
   });
 
-  it('should do stuff', async function () {
-    this.timeout(20000);
-    console.log('doing stuff');
-    await new Promise(r => setTimeout(r, 10000));
-  });
-
   describe('testing Role service', () => {
     let role: any;
 

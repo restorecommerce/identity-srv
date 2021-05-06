@@ -5,7 +5,7 @@ import { createLogger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { Logger } from 'winston';
 import { UserService, RoleService } from './service';
-import { ACSAuthZ, initAuthZ, updateConfig, initializeCache } from '@restorecommerce/acs-client';
+import { ACSAuthZ, initAuthZ, updateConfig, authZ as FallbackAuthZ } from '@restorecommerce/acs-client';
 import Redis from 'ioredis';
 import { AuthenticationLogService } from './authlog_service';
 import { TokenService } from './token_service';
@@ -149,8 +149,7 @@ export class Worker {
       isEventsEnabled = false;
     }
 
-    let authZ = await initAuthZ(this.cfg) as ACSAuthZ;
-    this.authZ = authZ;
+    this.authZ = (await initAuthZ(this.cfg) || FallbackAuthZ) as ACSAuthZ;
 
     // init redis client for subject index
     const redisConfig = cfg.get('redis');

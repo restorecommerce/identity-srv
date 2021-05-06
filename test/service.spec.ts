@@ -1138,7 +1138,6 @@ describe('testing identity-srv', () => {
           cfg.set('authorization:enforce', true);
           updateConfig(cfg);
           const result = await userService.create({ items: testUser, subject });
-          console.log({result});
           should.exist(result);
           should.exist(result.data);
           should.exist(result.data.items);
@@ -1160,7 +1159,6 @@ describe('testing identity-srv', () => {
             }]
           });
           const result = await userService.update({ items: testUser, subject });
-          console.log({result});
           should.exist(result);
           should.exist(result.data);
           should.exist(result.data.items);
