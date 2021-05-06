@@ -4,7 +4,7 @@ import * as grpcClient from '@restorecommerce/grpc-client';
 import { Events, Topic } from '@restorecommerce/kafka-client';
 import { Worker } from '../src/worker';
 import { createServiceConfig } from '@restorecommerce/service-config';
-import { User } from '../lib/interface';
+import { User } from '../src/interface';
 import { createMockServer } from 'grpc-mock';
 import { updateConfig } from '@restorecommerce/acs-client';
 
