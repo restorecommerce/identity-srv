@@ -149,7 +149,7 @@ export class Worker {
       isEventsEnabled = false;
     }
 
-    this.authZ = (await initAuthZ(this.cfg) || FallbackAuthZ) as ACSAuthZ;
+    this.authZ = await initAuthZ(this.cfg) as ACSAuthZ;
 
     // init redis client for subject index
     const redisConfig = cfg.get('redis');
