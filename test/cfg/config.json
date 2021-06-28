@@ -26,7 +26,7 @@
   "logger": {
     "console": {
       "handleExceptions": false,
-      "level": "info",
+      "level": "error",
       "colorize": true,
       "prettyPrint": true
     }
@@ -86,151 +86,69 @@
     }
   },
   "client": {
-    "service-user": {
-      "transports": {
-        "grpc": {
-          "service": "io.restorecommerce.user.Service",
-          "protos": [
-            "io/restorecommerce/user.proto"
-          ],
-          "protoRoot": "node_modules/@restorecommerce/protos/",
-          "timeout": 3000
+    "user": {
+      "address": "localhost:50051",
+      "proto": {
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "protoPath": "io/restorecommerce/user.proto",
+        "services": {
+          "user": {
+            "packageName": "io.restorecommerce.user",
+            "serviceName": "Service"
+          }
         }
-      },
-      "loadbalancer": {
-        "name": "roundRobin"
-      },
-      "publisher": {
-        "name": "static",
-        "instances": [
-          "grpc://localhost:50051"
-        ]
-      },
-      "endpoints": {
-        "activate": {},
-        "changePassword": {},
-        "requestEmailChange": {},
-        "confirmEmailChange": {},
-        "confirmUserInvitation": {},
-        "requestPasswordChange": {},
-        "confirmPasswordChange": {},
-        "sendInvitationEmail": {},
-        "find": {},
-        "register": {},
-        "unregister": {},
-        "login": {},
-        "findByRole": {},
-        "create": {},
-        "read": {},
-        "delete": {},
-        "update": {},
-        "upsert": {},
-        "sendActivationEmail": {}
       }
     },
-    "service-role": {
-      "transports": {
-        "grpc": {
-          "service": "io.restorecommerce.role.Service",
-          "protos": [
-            "io/restorecommerce/role.proto"
-          ],
-          "protoRoot": "node_modules/@restorecommerce/protos/",
-          "timeout": 3000
+    "role": {
+      "address": "localhost:50051",
+      "proto": {
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "protoPath": "io/restorecommerce/role.proto",
+        "services": {
+          "role": {
+            "packageName": "io.restorecommerce.role",
+            "serviceName": "Service"
+          }
         }
-      },
-      "loadbalancer": {
-        "name": "roundRobin"
-      },
-      "publisher": {
-        "name": "static",
-        "instances": [
-          "grpc://localhost:50051"
-        ]
-      },
-      "endpoints": {
-        "read": {},
-        "create": {},
-        "delete": {},
-        "update": {},
-        "upsert": {}
       }
     },
-    "service-reflection": {
-      "transports": {
-        "grpc": {
-          "service": "grpc.reflection.v1alpha.ServerReflection",
-          "protos": [
-            "io/restorecommerce/user.proto",
-            "grpc/reflection/v1alpha/reflection.proto"
-          ],
-          "protoRoot": "node_modules/@restorecommerce/protos/",
-          "timeout": 3000
+    "reflection": {
+      "address": "localhost:50051",
+      "proto": {
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "protoPath": "grpc/reflection/v1alpha/reflection.proto",
+        "services": {
+          "reflection": {
+            "packageName": "grpc.reflection.v1alpha",
+            "serviceName": "ServerReflection"
+          }
         }
-      },
-      "loadbalancer": {
-        "name": "roundRobin"
-      },
-      "publisher": {
-        "name": "static",
-        "instances": [
-          "grpc://localhost:50051"
-        ]
-      },
-      "endpoints": {
-        "serverReflectionInfo": {}
       }
     },
-    "service-ci": {
-      "transports": {
-        "grpc": {
-          "service": "io.restorecommerce.commandinterface.Service",
-          "protos": [
-            "io/restorecommerce/commandinterface.proto"
-          ],
-          "protoRoot": "node_modules/@restorecommerce/protos/",
-          "timeout": 3000
+    "commandinterface": {
+      "address": "localhost:50051",
+      "proto": {
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "protoPath": "io/restorecommerce/commandinterface.proto",
+        "services": {
+          "commandinterface": {
+            "packageName": "io.restorecommerce.commandinterface",
+            "serviceName": "Service"
+          }
         }
-      },
-      "loadbalancer": {
-        "name": "roundRobin"
-      },
-      "publisher": {
-        "name": "static",
-        "instances": [
-          "grpc://localhost:50051"
-        ]
-      },
-      "endpoints": {
-        "reset": {},
-        "restore": {},
-        "check": {},
-        "version": {}
       }
     },
     "acs-srv": {
-      "transports": {
-        "grpc": {
-          "service": "io.restorecommerce.access_control.Service",
-          "protos": [
-            "io/restorecommerce/access_control.proto"
-          ],
-          "protoRoot": "node_modules/@restorecommerce/protos/",
-          "timeout": 3000
+      "address": "localhost:50061",
+      "proto": {
+        "protoRoot": "node_modules/@restorecommerce/protos/",
+        "protoPath": "io/restorecommerce/access_control.proto",
+        "services": {
+          "acs-srv": {
+            "packageName": "io.restorecommerce.access_control",
+            "serviceName": "Service"
+          }
         }
-      },
-      "loadbalancer": {
-        "name": "roundRobin"
-      },
-      "publisher": {
-        "name": "static",
-        "instances": [
-          "grpc://localhost:50061"
-        ]
-      },
-      "endpoints": {
-        "isAllowed": {},
-        "whatIsAllowed": {}
       }
     }
   },

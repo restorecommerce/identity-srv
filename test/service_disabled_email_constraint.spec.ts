@@ -1,12 +1,13 @@
 import * as should from 'should';
 import * as _ from 'lodash';
-import * as grpcClient from '@restorecommerce/grpc-client';
+import { GrpcClient } from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import { Worker } from '../src/worker';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { Topic } from '@restorecommerce/kafka-client/lib/events/provider/kafka';
 import { createMockServer } from 'grpc-mock';
 import { updateConfig } from '@restorecommerce/acs-client';
+import { FilterOperation } from '@restorecommerce/resource-base-interface';
 
 const Events = kafkaClient.Events;
 
@@ -24,6 +25,7 @@ let topic: Topic;
 let roleService: any;
 let mockServer: any;
 
+/* eslint-disable */
 async function start(): Promise<void> {
   cfg = createServiceConfig(process.cwd() + '/test');
   // disable unique email constraint, by default it is true
@@ -44,7 +46,7 @@ async function connect(clientCfg: string, resourceName: string): Promise<any> { 
   await (events.start());
   topic = await events.topic(cfg.get(`events:kafka:topics:${resourceName}:topic`));
 
-  return new grpcClient.Client(cfg.get(clientCfg), logger);
+  return new GrpcClient(cfg.get(clientCfg), logger);
 }
 
 let meta = {
@@ -256,9 +258,13 @@ describe('testing identity-srv', () => {
           { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'PERMIT' } }]);
           // read by email
           const getResult = await userService.read({
-            filter: grpcClient.toStruct({
-              email: data.email
-            })
+            filters: [{
+              filter: [{
+                field: 'email',
+                operation: FilterOperation.eq,
+                value: data.value
+              }]
+            }]
           });
           should.exist(getResult);
           should.exist(getResult.data);

@@ -1,6 +1,6 @@
 import * as should from 'should';
 import * as _ from 'lodash';
-import * as grpcClient from '@restorecommerce/grpc-client';
+import { GrpcClient } from '@restorecommerce/grpc-client';
 import { Events, Topic } from '@restorecommerce/kafka-client';
 import { Worker } from '../src/worker';
 import { createServiceConfig } from '@restorecommerce/service-config';
@@ -23,6 +23,7 @@ let topic: Topic;
 let roleService: any;
 let mockServer: any;
 
+/* eslint-disable */
 async function start(): Promise<void> {
   cfg = createServiceConfig(process.cwd() + '/test');
   worker = new Worker(cfg);
