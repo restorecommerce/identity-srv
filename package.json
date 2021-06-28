@@ -1,6 +1,6 @@
 {
   "name": "@restorecommerce/identity-srv",
-  "version": "0.1.30",
+  "version": "0.1.31",
   "description": "Restorecommerce identity service",
   "main": "lib/start.js",
   "author": "n-fuse GmbH",
@@ -22,8 +22,8 @@
     "@restorecommerce/cluster-service": "^0.1.4",
     "@restorecommerce/grpc-client": "^0.0.9",
     "@restorecommerce/kafka-client": "^0.1.13",
-    "@restorecommerce/logger": "^0.6.4",
-    "@restorecommerce/protos": "^0.0.22",
+    "@restorecommerce/logger": "^0.8.1",
+    "@restorecommerce/protos": "^0.0.23",
     "@restorecommerce/resource-base-interface": "^0.0.9",
     "@restorecommerce/service-config": "^0.4.1",
     "bcryptjs": "^2.4.3",
@@ -70,6 +70,6 @@
     "build": "npm-run-all lint build:clean build:tsc"
   },
   "engines": {
-    "node": ">= 12.0.0"
+    "node": ">= 16.0.0"
   }
 }

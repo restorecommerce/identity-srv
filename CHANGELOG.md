@@ -1,3 +1,8 @@
+## 0.1.31 (June 28th, 2021)
+
+- updated node version to 16.3
+- updated logger and protos
+
 ## 0.1.30 (April 19th, 2021)
 
 - fix to flush chaced data of `findByToken` (done on user update).
