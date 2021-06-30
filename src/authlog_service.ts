@@ -1,10 +1,10 @@
-import { ServiceBase, ResourcesAPIBase, toStruct } from '@restorecommerce/resource-base-interface';
+import { ServiceBase, ResourcesAPIBase, FilterOperation } from '@restorecommerce/resource-base-interface';
 import { Logger } from 'winston';
 import { errors } from '@restorecommerce/chassis-srv';
 import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject } from '@restorecommerce/acs-client';
 import { Topic } from '@restorecommerce/kafka-client';
 import { checkAccessRequest } from './utils';
-import { AccessResponse, ReadPolicyResponse} from './interface';
+import { AccessResponse, ReadPolicyResponse } from './interface';
 import * as _ from 'lodash';
 
 export class AuthenticationLogService extends ServiceBase {
@@ -87,10 +87,14 @@ export class AuthenticationLogService extends ServiceBase {
       for (let i = 0; i < items.length; i += 1) {
         // read the role from DB and check if it exists
         const auth_log = items[i];
-        const filter = toStruct({
-          id: { $eq: auth_log.id }
-        });
-        const auth_logs = await super.read({ request: { filter } }, context);
+        const filters = [{
+          filter: [{
+            field: 'id',
+            operation: FilterOperation.eq,
+            value: auth_log.id
+          }]
+        }];
+        const auth_logs = await super.read({ request: { filters } }, context);
         if (auth_logs.total_count === 0) {
           throw new errors.NotFound('roles not found for updating');
         }
@@ -203,10 +207,14 @@ export class AuthenticationLogService extends ServiceBase {
       logger.silly('deleting Role IDs:', { authLogIDs });
       // Check each user exist if one of the user does not exist throw an error
       for (let authLogID of authLogIDs) {
-        const filter = toStruct({
-          id: { $eq: authLogID }
-        });
-        const roles = await super.read({ request: { filter } }, context);
+        const filters = [{
+          filter: [{
+            field: 'id',
+            operation: FilterOperation.eq,
+            value: authLogID
+          }]
+        }];
+        const roles = await super.read({ request: { filters } }, context);
         if (roles.total_count === 0) {
           logger.debug('AuthLog does not exist for deleting:', { authLogID });
           throw new errors.NotFound(`AuthLog with ${authLogID} does not exist for deleting`);
@@ -255,14 +263,15 @@ export class AuthenticationLogService extends ServiceBase {
         resource.meta = {};
       }
       if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
+        const filters = [{
+          filter: [{
+            field: 'id',
+            operation: FilterOperation.eq,
+            value: resource.id
+          }]
+        }];
         let result = await super.read({
-          request: {
-            filter: toStruct({
-              id: {
-                $eq: resource.id
-              }
-            })
-          }
+          request: { filters }
         });
         // update owner info
         if (result.items.length === 1) {

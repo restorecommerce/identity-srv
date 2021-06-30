@@ -2,15 +2,15 @@ import * as _ from 'lodash';
 import * as uuid from 'uuid';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as fetch from 'node-fetch';
-import { ServiceBase, ResourcesAPIBase, toStruct, toObject } from '@restorecommerce/resource-base-interface';
-import { DocumentMetadata } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
+import { ServiceBase, ResourcesAPIBase, FilterOperation } from '@restorecommerce/resource-base-interface';
+import { DocumentMetadata, OperatorType } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from 'winston';
 import {
   ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest,
-  PolicySetRQ, PermissionDenied, HierarchicalScope, RoleAssociation
+  PolicySetRQ, HierarchicalScope, RoleAssociation
 } from '@restorecommerce/acs-client';
 import Redis from 'ioredis';
-import { checkAccessRequest, password, unmarshallProtobufAny, marshallProtobufAny, getDefaultFilter, getNameFilter } from './utils';
+import { checkAccessRequest, password, unmarshallProtobufAny, marshallProtobufAny, getDefaultFilter, getNameFilter, returnStatus } from './utils';
 import { errors } from '@restorecommerce/chassis-srv';
 import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common';
 import {
@@ -23,7 +23,7 @@ import {
   FindUser, AccessResponse, FindUserByToken, Call, ReadPolicyResponse,
   User, UserInviationReq, ActivateUser, ChangePassword, ForgotPassword,
   ConfirmPasswordChange, EmailChange, ConfirmEmailChange, UnregisterRequest,
-  SendActivationEmailRequest, SendInvitationEmailRequest
+  SendActivationEmailRequest, SendInvitationEmailRequest, UserPayload
 } from './interface';
 
 const TECHNICAL_USER = 'TECHNICAL_USER';
@@ -96,52 +96,80 @@ export class UserService extends ServiceBase {
         AuthZAction.READ, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
     if (acsResponse.decision === Decision.PERMIT) {
       const logger = this.logger;
-      const filterStructure = {};
+      const filterStructure: any = {
+        filters: [{
+          filter: []
+        }]
+      };
       if (id) {
-        Object.assign(filterStructure, { id: { $eq: id } });
+        // Object.assign(filterStructure, { id: { $eq: id } });
+        filterStructure.filters[0].filter.push({
+          field: 'id',
+          operation: FilterOperation.eq,
+          value: id
+        });
       }
       if (name) {
-        Object.assign(filterStructure, { name: { $eq: name } });
+        // Object.assign(filterStructure, { name: { $eq: name } });
+        filterStructure.filters[0].filter.push({
+          field: 'name',
+          operation: FilterOperation.eq,
+          value: name
+        });
       }
       if (email) {
-        Object.assign(filterStructure, { email: { $eq: email } });
+        // Object.assign(filterStructure, { email: { $eq: email } });
+        filterStructure.filters[0].filter.push({
+          field: 'email',
+          operation: FilterOperation.eq,
+          value: email
+        });
       }
-      const filterObj = {
-        $or: [
-          filterStructure
-        ]
-      };
+      if (filterStructure[0].filter.length > 1) {
+        filterStructure.filters[0].operator = OperatorType.or;
+      }
+      // const filterObj: any = {
+      //   $or: [
+      //     filterStructure
+      //   ]
+      // };
       // add ACS filters if subject is not tech user
       let acsFilterObj, techUser;
       const techUsersCfg = this.cfg.get('techUsers');
       if (techUsersCfg && techUsersCfg.length > 0) {
         techUser = _.find(techUsersCfg, { id: subject.id });
       }
-      if (!techUser) {
-        if (readRequest.filter && _.isArray(readRequest.filter)) {
-          acsFilterObj = toObject(readRequest.filter, true);
-        } else if (readRequest.filter && !_.isArray(readRequest.filter)) {
-          acsFilterObj = toObject(readRequest.filter);
-        }
+      if (!techUser && readRequest.filters) {
+        acsFilterObj = readRequest.filters;
       }
+      console.log('Filter Structure is......', filterStructure);
+      console.log('Read Req filters modified by ACS req is....', readRequest.filters);
+      console.log('ACS Filter Obj is....', acsFilterObj);
       if (!_.isEmpty(acsFilterObj)) {
-        _.merge(filterObj, acsFilterObj);
+        _.merge(filterStructure, acsFilterObj);
       }
-      readRequest.filter = toStruct(filterObj);
+      console.log('FINAL MERGED FILTER IS>...........', filterStructure);
+      // readRequest.filters = filterStructure;
+      // TODO check and modify Filter
       const users = await super.read({ request: readRequest }, context);
       if (users.total_count > 0) {
         logger.silly('found user(s)', { users });
         return users;
       }
       logger.silly('user(s) could not be found for request', call.request);
-      throw new errors.NotFound('user not found');
+      return {
+        status: {
+          code: 404,
+          message: 'user not found'
+        }
+      };
     }
   }
 
@@ -208,21 +236,23 @@ export class UserService extends ServiceBase {
           }
           // when not set in redis
           // regex filter search field for token array
-          const filter = toStruct({
-            'tokens[*].token': {
-              $in: token
-            }
-          });
-          let users = await super.read({ request: { filter } }, context);
+          const filters = [{
+            filter: [{
+              field: 'tokens[*].token',
+              operation: FilterOperation.in,
+              value: token
+            }]
+          }];
+          let users = await super.read({ request: { filters } }, context);
           if (users.total_count === 0) {
             logger.debug('No user found for provided token value', { token });
             return resolve();
           }
           if (users.total_count === 1) {
             logger.debug('found user from token', { users });
-            if (users.items && users.items[0]) {
+            if (users.items && users.items[0] && users.items[0].payload) {
               // validate token expiry and delete if expired
-              const dbToken = _.find(users.items[0].tokens, { token });
+              const dbToken = _.find(users.items[0].payload.tokens, { token });
               let tokenTechUser: any = {};
               const techUsersCfg = this.cfg.get('techUsers');
               if (techUsersCfg && techUsersCfg.length > 0) {
@@ -230,11 +260,11 @@ export class UserService extends ServiceBase {
               }
 
               if ((dbToken && dbToken.expires_in === 0) || (dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000))) {
-                this.tokenRedisClient.set(token, JSON.stringify(users.items[0]));
+                this.tokenRedisClient.set(token, JSON.stringify(users.items[0].payload));
                 logger.debug('Stored user data to redis cache successfully');
                 // update token last_login
-                let user = users.items[0];
-                if (user && user.tokens && user.tokens.length > 0) {
+                let user = users.items[0].payload;
+                if (user && user && user.tokens && user.tokens.length > 0) {
                   for (let user_token of user.tokens) {
                     if (user_token.token === token) {
                       user_token.last_login = new Date().getTime();
@@ -286,10 +316,20 @@ export class UserService extends ServiceBase {
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return {
+        status: {
+          code: err.code,
+          message: err.message
+        }
+      };
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return {
+        status: {
+          code: acsResponse.response.status.code,
+          message: acsResponse.response.status.message
+        }
+      };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -304,8 +344,8 @@ export class UserService extends ServiceBase {
    * @return type is any since it can be guest or user type
    */
   async create(call: any, context?: any): Promise<any> {
-    const usersList: User[] = call.request.items;
-    const insertedUsers = [];
+    const usersList: UserPayload[] = call.request.items;
+    const insertedUsers = { items: [], status: { code: 0, message: '' } };
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
     let subject = call.request.subject;
@@ -317,10 +357,20 @@ export class UserService extends ServiceBase {
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv', err);
-      throw err;
+      return {
+        status: {
+          code: err.code,
+          message: err.message
+        }
+      };
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return {
+        status: {
+          code: acsResponse.response.status.code,
+          message: acsResponse.response.status.message
+        }
+      };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -329,11 +379,16 @@ export class UserService extends ServiceBase {
           await this.verifyUserRoleAssociations(usersList, subject);
         } catch (err) {
           // for unhandled promise rejection
-          throw err;
+          return {
+            status: {
+              code: err.code,
+              message: err.message
+            }
+          };
         }
       }
       for (let i = 0; i < usersList.length; i++) {
-        let user: User = usersList[i];
+        let user: User = usersList[i].payload;
         user.activation_code = '';
         user.active = true;
         user.unauthenticated = false;
@@ -342,7 +397,7 @@ export class UserService extends ServiceBase {
           user.activation_code = this.idGen();
           user.unauthenticated = true;
         }
-        insertedUsers.push(await this.createUser(user, context));
+        insertedUsers.items.push(await this.createUser(user, context));
 
         if (this.emailEnabled && user.invite) {
           await this.fetchHbsTemplates();
@@ -351,11 +406,13 @@ export class UserService extends ServiceBase {
           await this.topics.rendering.emit('renderRequest', renderRequest);
         }
       }
+      insertedUsers.status.code = 200;
+      insertedUsers.status.message = 'success';
       return insertedUsers;
     }
   }
 
-  private async verifyUserRoleAssociations(usersList: User[], subject: any): Promise<void> {
+  private async verifyUserRoleAssociations(usersList: UserPayload[], subject: any): Promise<void> {
     let validateRoleScope = false;
     let token, redisHRScopesKey, user;
     let hierarchical_scopes = [];
@@ -446,7 +503,8 @@ export class UserService extends ServiceBase {
     }
     // check if the assignable_by_roles contain createAccessRole
     for (let user of usersList) {
-      let userRoleAssocs = user.role_associations ? user.role_associations : [];
+      let payload = user.payload;
+      let userRoleAssocs = payload.role_associations ? payload.role_associations : [];
       let targetUserRoleIds = [];
       if (_.isEmpty(userRoleAssocs)) {
         continue;
@@ -456,14 +514,16 @@ export class UserService extends ServiceBase {
       }
       // read all target roles at once and check for each role's assign_by_role
       // contains createAccessRole
-      const filter = toStruct({
-        id: {
-          $in: targetUserRoleIds
-        }
-      });
+      const filters = [{
+        filter: [{
+          field: 'id',
+          operation: FilterOperation.in,
+          value: targetUserRoleIds
+        }]
+      }];
       let rolesData = await this.roleService.read({
         request: {
-          filter,
+          filters,
           subject
         }
       });
@@ -478,8 +538,9 @@ export class UserService extends ServiceBase {
         dbTargetRoles.push(targetRole.id);
         if (!targetRole.assignable_by_roles ||
           !createAccessRole.some((role) => targetRole.assignable_by_roles.includes(role))) {
+          const userName = user.payload && user.payload.name ? user.payload.name : undefined;
           let message = `The target role ${targetRole.id} cannot be assigned to` +
-            ` user ${user.name} as user role ${createAccessRole} does not have permissions`;
+            ` user ${userName} as user role ${createAccessRole} does not have permissions`;
           this.logger.verbose(message);
           throw new errors.InvalidArgument(message);
         }
@@ -488,8 +549,9 @@ export class UserService extends ServiceBase {
       // validate target roles is a valid role in DB
       for (let targetUserRoleId of targetUserRoleIds) {
         if (!dbTargetRoles.includes(targetUserRoleId)) {
+          const userName = user.payload && user.payload.name ? user.payload.name : undefined;
           let message = `The target role ${targetUserRoleId} is invalid and cannot be assigned to` +
-            ` user ${user.name}`;
+            ` user ${userName}`;
           this.logger.verbose(message);
           throw new errors.InvalidArgument(message);
         }
@@ -523,15 +585,16 @@ export class UserService extends ServiceBase {
         throw new errors.InvalidArgument('No Hierarchical Scopes could be found');
       }
       for (let user of usersList) {
-        if (user.role_associations && user.role_associations.length > 0) {
-          this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, subject);
-          if (!_.isEmpty(user.tokens)) {
-            for (let token of user.tokens) {
+        let payload = user.payload;
+        if (payload.role_associations && payload.role_associations.length > 0) {
+          this.validateUserRoleAssociations(payload.role_associations, hrScopes, payload.name, subject);
+          if (!_.isEmpty(payload.tokens)) {
+            for (let token of payload.tokens) {
               if (!token.interactive && !_.isEmpty(token.scopes)) {
                 for (let scope of token.scopes) {
                   // if scope is not found in role assoc invalid scope assignemnt in token
-                  if (!_.find(user.role_associations, { id: scope })) {
-                    let message = `Invalid token scope ${scope} found for Subject ${user.id}`;
+                  if (!_.find(payload.role_associations, { id: scope })) {
+                    let message = `Invalid token scope ${scope} found for Subject ${payload.id}`;
                     this.logger.verbose(message);
                     throw new errors.InvalidArgument(message);
                   }
@@ -629,7 +692,7 @@ export class UserService extends ServiceBase {
    * Validates User and creates it in DB,
    * @param user
    */
-  private async createUser(user: User, context?: any): Promise<User> {
+  private async createUser(user: User, context?: any): Promise<UserPayload> {
     const logger = this.logger;
 
     // User creation
@@ -637,16 +700,16 @@ export class UserService extends ServiceBase {
 
     this.setUserDefaults(user);
     if ((!user.password && !user.invite && (user.user_type != TECHNICAL_USER))) {
-      throw new errors.InvalidArgument('argument password is empty');
+      return returnStatus(400, 'argument password is empty');
     }
     if (!user.email) {
-      throw new errors.InvalidArgument('argument email is empty');
+      return returnStatus(400, 'argument email is empty');
     }
     if (!user.name) {
-      throw new errors.InvalidArgument('argument name is empty');
+      return returnStatus(400, 'argument name is empty');
     }
     if (user.user_type && user.user_type === TECHNICAL_USER && user.password) {
-      throw new errors.InvalidArgument('argument password should be empty for technical user');
+      return returnStatus(400, 'argument password should be empty for technical user');
     }
 
     const serviceCfg = this.cfg.get('service');
@@ -660,11 +723,11 @@ export class UserService extends ServiceBase {
       const errorMessage = `Error while validating username: ${user.name}, ` +
         `error: ${err.name}, message:${err.details}`;
       logger.error(errorMessage);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
 
     if (_.isEmpty(user.first_name) || _.isEmpty(user.last_name)) {
-      throw new errors.InvalidArgument('User register requires both first and last name');
+      return returnStatus(400, 'User register requires both first and last name');
     }
 
     // Since for guestUser he should be able to register with same email ID multiple times
@@ -681,32 +744,39 @@ export class UserService extends ServiceBase {
       await super.create(serviceCall, context);
       logger.info('guest user registered', user);
       await (this.topics['user.resource'].emit('registered', user));
-      return user;
+      return { payload: user, status: { code: 200, message: 'success' } };
     }
 
     logger.silly('register is checking id, name and email', { id: user.id, name: user.name, email: user.email });
-    let filter;
+    let filters;
     if (this.uniqueEmailConstraint) {
-      filter = toStruct({
-        $or: [
-          { name: { $eq: user.name } },
-          { email: { $eq: user.email } },
-        ]
-      });
+      filters = [{
+        filter: [{
+          field: 'name',
+          operation: FilterOperation.eq,
+          value: user.name
+        },
+        {
+          field: 'email',
+          operation: FilterOperation.eq,
+          value: user.email
+        }],
+        operator: OperatorType.or
+      }];
     } else {
-      filter = getNameFilter(user.name);
+      filters = getNameFilter(user.name);
     }
-    let users = await super.read({ request: { filter } }, context);
+    let users = await super.read({ request: { filters } }, context);
     if (users.total_count > 0) {
       let guest = false;
       users = users.items;
       for (let user of users) {
-        if (user.guest) {
+        if (user.payload.guest) {
           guest = true;
           logger.debug('Guest user', { name: user.name });
         } else {
           logger.debug('user does already exist', users);
-          throw new errors.AlreadyExists('user does already exist');
+          return returnStatus(409, 'user does already exist');
         }
       }
     }
@@ -719,7 +789,7 @@ export class UserService extends ServiceBase {
     }
 
     if (!this.roleService.verifyRoles(user.role_associations)) {
-      throw new errors.InvalidArgument(`Invalid role ID in role associations`);
+      return returnStatus(400, 'Invalid role ID in role associations');
     }
 
     const serviceCall = {
@@ -743,7 +813,7 @@ export class UserService extends ServiceBase {
     const register = this.cfg.get('service:register');
     if (!register) {
       this.logger.info('Endpoint register has been disabled');
-      throw new errors.FailedPrecondition('Endpoint register has been disabled');
+      return returnStatus(412, 'Endpoint register has been disabled');
     }
     // Create User
     const userActivationRequired: Boolean = this.isUserActivationRequired();
@@ -792,30 +862,30 @@ export class UserService extends ServiceBase {
       }, AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
       // find the actual user object from DB using the UserInvitationReq identifier
       // activate user and update password
       const identifier = userInviteReq.identifier;
-      const filter = getDefaultFilter(identifier);
+      const filters = getDefaultFilter(identifier);
       let user;
-      const users = await super.read({ request: { filter } });
+      const users = await super.read({ request: { filters } });
       if (users && users.total_count === 1) {
-        user = users.items[0];
+        user = users.items[0].payload;
       } else if (users.total_count === 0) {
-        throw new errors.NotFound('user not found');
+        return returnStatus(404, 'user not found');
       } else if (users.total_count > 1) {
-        throw new errors.InvalidArgument(`Invalid identifier provided for user invitation confirmation, multiple users found for identifier ${identifier}`);
+        return returnStatus(400, `Invalid identifier provided for user invitation confirmation, multiple users found for identifier ${identifier}`);
       }
 
       if ((!userInviteReq.activation_code) || userInviteReq.activation_code !== user.activation_code) {
         this.logger.debug('wrong activation code', { user });
-        throw new errors.FailedPrecondition('wrong activation code');
+        return returnStatus(412, 'wrong activation code');
       }
       user.active = true;
       user.unauthenticated = false;
@@ -853,22 +923,21 @@ export class UserService extends ServiceBase {
 
     const emailAddress = split[1];
 
-    const filter = toStruct({
-      $or: [
-        {
-          email: {
-            $eq: emailAddress
-          }
-        },
-        {
-          new_email: {
-            $eq: emailAddress
-          }
-        }
-      ]
-    });
+    const filters = [{
+      filter: [{
+        field: 'email',
+        operation: FilterOperation.eq,
+        value: emailAddress
+      },
+      {
+        field: 'new_email',
+        operation: FilterOperation.eq,
+        value: emailAddress
+      }],
+      operator: OperatorType.or
+    }];
 
-    const user = await super.read({ request: { filter } });
+    const user = await super.read({ request: { filters } });
     if (_.isEmpty(user.items)) {
       this.logger.silly(`Received rendering response from unknown email address ${emailAddress}; discarding`);
       return;
@@ -914,38 +983,38 @@ export class UserService extends ServiceBase {
         AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
       if (!identifier) {
-        throw new errors.InvalidArgument('argument id is empty');
+        return returnStatus(400, 'argument id is empty');
       }
       if (!activationCode) {
-        throw new errors.InvalidArgument('argument activation_code is empty');
+        return returnStatus(400, 'argument activation_code is empty');
       }
       // check for the identifier against name or email in DB
-      const filter = getDefaultFilter(identifier);
-      const users = await super.read({ request: { filter } }, context);
+      const filters = getDefaultFilter(identifier);
+      const users = await super.read({ request: { filters } }, context);
       if (!users || users.total_count === 0) {
-        throw new errors.NotFound('user not found');
+        return returnStatus(404, 'user not found');
       } else if (users.total_count > 1) {
-        throw new errors.InvalidArgument(`Invalid identifier provided for user activation, multiple users found for identifier ${identifier}`);
+        return returnStatus(400, `Invalid identifier provided for user activation, multiple users found for identifier ${identifier}`);
       }
-      const user: User = users.items[0];
+      const user: User = users.items[0].payload;
       if (user.active) {
         logger.debug('activation request to an active user' +
           ' which still has the activation code', user);
-        throw new errors.FailedPrecondition('activation request to an active user' +
-          ' which still has the activation code');
+        return returnStatus(412, 'activation request to an active user' +
+        ' which still has the activation code');
       }
       if ((!user.activation_code) || user.activation_code !== activationCode) {
         logger.debug('wrong activation code', user);
-        throw new errors.FailedPrecondition('wrong activation code');
+        return returnStatus(412, 'wrong activation code');
       }
 
       user.active = true;
@@ -979,32 +1048,32 @@ export class UserService extends ServiceBase {
     const newPw = request.new_password;
     let subject = call.request.subject;
     // check for the identifier against name or email in DB
-    const filter = getDefaultFilter(identifier);
-    const users = await super.read({ request: { filter } }, context);
+    const filters = getDefaultFilter(identifier);
+    const users = await super.read({ request: { filters } }, context);
     if (!users || users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
-      throw new errors.NotFound('user does not exist');
+      return returnStatus(404, 'user does not exist');
     } else if (users.total_count > 1) {
-      throw new errors.InvalidArgument(`Invalid identifier provided for change password, multiple users found for identifier ${identifier}`);
+      return returnStatus(400, `Invalid identifier provided for change password, multiple users found for identifier ${identifier}`);
     }
-    const user: User = users.items[0];
+    const user: User = users.items[0].payload;
     let acsResponse: AccessResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id: user.id, password: pw, new_password: newPw, meta: user.meta },
         AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
       const userPWhash = user.password_hash;
       if (!password.verify(userPWhash, pw)) {
-        throw new errors.Unauthenticated('password does not match');
+        return returnStatus(401, 'password does not match');
       }
 
       const password_hash = password.hash(newPw);
@@ -1033,15 +1102,15 @@ export class UserService extends ServiceBase {
     const logger = this.logger;
     const identifier = call.request.identifier;
     // check for the identifier against name or email in DB
-    const filter = getDefaultFilter(identifier);
+    const filters = getDefaultFilter(identifier);
     let user;
-    const users = await super.read({ request: { filter } });
+    const users = await super.read({ request: { filters } });
     if (users.total_count === 1) {
-      user = users.items[0];
+      user = users.items[0].payload;
     } else if (!users || users.total_count === 0) {
-      throw new errors.NotFound('user not found');
+      return returnStatus(404, 'user not found');
     } else if (users.total_count > 1) {
-      throw new errors.InvalidArgument(`Invalid identifier provided for request password change, multiple users found for identifier ${identifier}`);
+      return returnStatus(400, `Invalid identifier provided for request password change, multiple users found for identifier ${identifier}`);
     }
 
     logger.verbose('Received a password change request for user', { id: user.id });
@@ -1083,28 +1152,28 @@ export class UserService extends ServiceBase {
       }, AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
       // check for the identifier against name or email in DB
-      const filter = getDefaultFilter(identifier);
+      const filters = getDefaultFilter(identifier);
       let user;
-      const users = await super.read({ request: { filter } });
+      const users = await super.read({ request: { filters } });
       if (!users || users.total_count === 0) {
-        throw new errors.NotFound('user not found');
+        return returnStatus(404, 'user not found');
       } else if (users.total_count === 1) {
-        user = users.items[0];
+        user = users.items[0].payload;
       } else if (users.total_count > 1) {
-        throw new errors.InvalidArgument(`Invalid identifier provided for confirm password change, multiple users found for identifier ${identifier}`);
+        return returnStatus(400, `Invalid identifier provided for confirm password change, multiple users found for identifier ${identifier}`);
       }
 
       if (!user.activation_code || user.activation_code !== activation_code) {
         logger.debug('wrong activation code upon password change confirmation for user', user.name);
-        throw new errors.FailedPrecondition('wrong activation code');
+        return returnStatus(412, 'wrong activation code');
       }
 
       user.activation_code = '';
@@ -1134,25 +1203,25 @@ export class UserService extends ServiceBase {
     const subject = call.request.subject;
     let acsResponse: AccessResponse;
     // check for the identifier against name or email in DB
-    const filter = getDefaultFilter(identifier);
-    const users = await super.read({ request: { filter } }, context);
+    const filters = getDefaultFilter(identifier);
+    const users = await super.read({ request: { filters } }, context);
     if (!users || users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
-      throw new errors.NotFound('user does not exist');
+      return returnStatus(404, 'user does not exist');
     } else if (users.total_count > 1) {
-      throw new errors.InvalidArgument(`Invalid identifier provided for request email change, multiple users found for identifier ${identifier}`);
+      return returnStatus(400, `Invalid identifier provided for request email change, multiple users found for identifier ${identifier}`);
     }
-    const user: User = users.items[0];
+    const user: User = users.items[0].payload;
     try {
       acsResponse = await checkAccessRequest(subject, { id: user.id, identifier, new_email, meta: user.meta },
         AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1189,16 +1258,16 @@ export class UserService extends ServiceBase {
     const activationCode = request.activation_code;
 
     // check for the identifier against name or email in DB
-    const filter = getDefaultFilter(identifier);
-    const users = await super.read({ request: { filter } });
+    const filters = getDefaultFilter(identifier);
+    const users = await super.read({ request: { filters } });
     if (users && users.total_count === 0) {
       logger.debug('user does not exist', identifier);
-      throw new errors.NotFound('user does not exist');
+      return returnStatus(404, 'user does not exist');
     } else if (users.total_count > 1) {
-      throw new errors.InvalidArgument(`Invalid identifier provided for confirm email change, multiple users found for identifier ${identifier}`);
+      return returnStatus(400, `Invalid identifier provided for confirm email change, multiple users found for identifier ${identifier}`);
     }
 
-    const user: User = users.items[0];
+    const user: User = users.items[0].payload;
     let subject = call.request.subject;
     let acsResponse: AccessResponse;
     try {
@@ -1208,16 +1277,16 @@ export class UserService extends ServiceBase {
       }, AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
       if (user.activation_code !== activationCode) {
         logger.debug('wrong activation code upon email confirmation for user', user);
-        throw new errors.FailedPrecondition('wrong activation code');
+        return returnStatus(412, 'wrong activation code');
       }
       user.email = user.new_email;
       user.new_email = '';
@@ -1243,7 +1312,7 @@ export class UserService extends ServiceBase {
   async update(call: any, context?: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
-      throw new errors.InvalidArgument('No items were provided for update');
+      return returnStatus(400, 'No items were provided for update');
     }
     const items = call.request.items;
     let subject = call.request.subject;
@@ -1255,10 +1324,10 @@ export class UserService extends ServiceBase {
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1270,26 +1339,30 @@ export class UserService extends ServiceBase {
           }
         } catch (err) {
           // for unhandled promise rejection
-          throw err;
+          return returnStatus(err.code, err.message);
         }
       }
       for (let i = 0; i < items.length; i += 1) {
         // read the user from DB and update the special fields from DB
         // for user modification
-        const user = items[i];
+        const user = items[i].payload;
         if (!user.id) {
-          throw new errors.InvalidArgument('Subject identifier missing for update operation');
+          return returnStatus(400, 'Subject identifier missing for update operation');
         }
-        const filter = toStruct({
-          id: { $eq: user.id }
-        });
-        const users = await super.read({ request: { filter } }, context);
+        const filters = [{
+          filter: [{
+            field: 'id',
+            operation: FilterOperation.eq,
+            value: user.id
+          }]
+        }];
+        const users = await super.read({ request: { filters } }, context);
         if (users.total_count === 0) {
-          throw new errors.NotFound('user not found');
+          return returnStatus(404, 'user not found');
         }
-        let dbUser = users.items[0];
+        let dbUser = users.items[0].payload;
         if (dbUser.name != user.name) {
-          throw new errors.InvalidArgument('User name field cannot be updated');
+          return returnStatus(400, 'User name field cannot be updated');
         }
         // update meta information from existing Object in case if its
         // not provided in request
@@ -1306,10 +1379,10 @@ export class UserService extends ServiceBase {
               'user', this, undefined, false);
           } catch (err) {
             this.logger.error('Error occurred requesting access-control-srv:', err);
-            throw err;
+            return returnStatus(err.code, err.message);
           }
           if (acsResponse.decision != Decision.PERMIT) {
-            throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+            return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
           }
         }
 
@@ -1362,7 +1435,7 @@ export class UserService extends ServiceBase {
                       for (let redisToken of redisTokens) {
                         if (redisToken.token === token.token) {
                           if (!redisToken.scopes) {
-                            redisToken.scopes  = [];
+                            redisToken.scopes = [];
                           }
                           if (!token.scopes) {
                             token.scopes = [];
@@ -1431,13 +1504,17 @@ export class UserService extends ServiceBase {
     let roleAssocsModified = false;
     for (let user of usersList) {
       const userID = user.id;
-      const filter = toStruct({
-        id: { $eq: userID }
-      });
+      const filters = [{
+        filter: [{
+          field: 'id',
+          operation: FilterOperation.eq,
+          value: user.id
+        }]
+      }];
       const userRoleAssocs = user.role_associations;
-      const users = await super.read({ request: { filter } }, context);
+      const users = await super.read({ request: { filters } }, context);
       if (users && users.items && users.items.length > 0) {
-        let dbRoleAssocs = users.items[0].role_associations;
+        let dbRoleAssocs = users.items[0].payload.role_associations;
         if (userRoleAssocs.length != dbRoleAssocs.length) {
           roleAssocsModified = true;
           this.logger.debug('Role associations length are not equal', { id: userID });
@@ -1491,7 +1568,7 @@ export class UserService extends ServiceBase {
   async upsert(call: any, context?: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
-      throw new errors.InvalidArgument('No items were provided for upsert');
+      return returnStatus(400, 'No items were provided for upsert');
     }
 
     const usersList = call.request.items;
@@ -1503,11 +1580,11 @@ export class UserService extends ServiceBase {
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1519,7 +1596,7 @@ export class UserService extends ServiceBase {
           }
         } catch (err) {
           // for unhandled promise rejection
-          throw err;
+          return returnStatus(err.code, err.message);
         }
       }
       let result = [];
@@ -1528,27 +1605,27 @@ export class UserService extends ServiceBase {
         // read the user from DB and update the special fields from DB
         // for user modification
         const user = items[i];
-        let filter;
+        let filters;
         if (this.uniqueEmailConstraint) {
-          filter = toStruct({
-            $or: [
-              {
-                name: {
-                  $eq: user.name
-                }
-              },
-              {
-                email: {
-                  $eq: user.email
-                }
-              }
-            ]
-          });
+
+          filters = [{
+            filter: [{
+              field: 'name',
+              operation: FilterOperation.eq,
+              value: user.name
+            },
+            {
+              field: 'email',
+              operation: FilterOperation.eq,
+              value: user.email
+            }],
+            operator: OperatorType.or
+          }];
         } else {
-          filter = getNameFilter(user.name);
+          filters = getNameFilter(user.name);
         }
 
-        const users = await super.read({ request: { filter } }, context);
+        const users = await super.read({ request: { filters } }, context);
         if (users.total_count === 0) {
           // call the create method, checks all conditions before inserting
           result.push(await this.createUser(user));
@@ -1556,10 +1633,11 @@ export class UserService extends ServiceBase {
           let updateResponse = await this.update({ request: { items: [user], subject } });
           result.push(updateResponse.items[0]);
         } else if (users.total_count > 1) {
-          throw new errors.InvalidArgument(`Invalid identifier provided user upsert, multiple users found for identifier ${user.name}`);
+          return returnStatus(400, `Invalid identifier provided user upsert, multiple users found for identifier ${user.name}`);
         }
       }
-      return { items: result };
+      const status = { code: 200, message: 'success' };
+      return { items: result, status };
     }
   }
 
@@ -1574,30 +1652,30 @@ export class UserService extends ServiceBase {
     if (_.isEmpty(call) || _.isEmpty(call.request) ||
       (_.isEmpty(call.request.identifier) || (_.isEmpty(call.request.password) &&
         _.isEmpty(call.request.token)))) {
-      throw new errors.InvalidArgument('Missing credentials');
+      return returnStatus(400, 'Missing credentials');
     }
     const identifier = call.request.identifier;
     const obfuscateAuthNErrorReason = this.cfg.get('obfuscateAuthNErrorReason') ?
       this.cfg.get('obfuscateAuthNErrorReason') : false;
     // check for the identifier against name or email in DB
-    const filter = getDefaultFilter(identifier);
+    const filters = getDefaultFilter(identifier);
 
-    const users = await super.read({ request: { filter } }, context);
+    const users = await super.read({ request: { filters } }, context);
     if (users.total_count === 0) {
       if (obfuscateAuthNErrorReason) {
-        throw new errors.FailedPrecondition('Invalid credentials provided, user inactive or account does not exist');
+        return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist');
       } else {
-        throw new errors.NotFound('user not found');
+        return returnStatus(404, 'user not found');
       }
     } else if (users.total_count > 1) {
-      throw new errors.InvalidArgument(`Invalid identifier provided for login, multiple users found for identifier ${identifier}`);
+      return returnStatus(400, `Invalid identifier provided for login, multiple users found for identifier ${identifier}`);
     }
-    const user = users.items[0];
+    const user = users.items[0].payload;
     if (!user.active) {
       if (obfuscateAuthNErrorReason) {
-        throw new errors.FailedPrecondition('Invalid credentials provided, user inactive or account does not exist');
+        return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist');
       } else {
-        throw new errors.FailedPrecondition('user is inactive');
+        return returnStatus(412, 'user is inactive');
       }
     }
 
@@ -1609,22 +1687,22 @@ export class UserService extends ServiceBase {
         }
       }
       if (obfuscateAuthNErrorReason) {
-        throw new errors.FailedPrecondition('Invalid credentials provided, user inactive or account does not exist');
+        return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist');
       } else {
-        throw new errors.Unauthenticated('password does not match');
+        return returnStatus(401, 'password does not match');
       }
     } else if (!user.user_type || user.user_type != TECHNICAL_USER) {
       const match = password.verify(user.password_hash, call.request.password);
       if (!match) {
         if (obfuscateAuthNErrorReason) {
-          throw new errors.FailedPrecondition('Invalid credentials provided, user inactive or account does not exist');
+          return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist');
         } else {
-          throw new errors.Unauthenticated('password does not match');
+          return returnStatus(401, 'password does not match');
         }
       }
       return user;
     } else {
-      throw new errors.NotFound('user not found');
+      return returnStatus(404, 'user not found');
     }
   }
 
@@ -1642,14 +1720,14 @@ export class UserService extends ServiceBase {
     logger.silly('unregister', identifier);
     let subject = call.request.subject;
 
-    const filter = getDefaultFilter(identifier);
-    const users = await super.read({ request: { filter } }, context);
+    const filters = getDefaultFilter(identifier);
+    const users = await super.read({ request: { filters } }, context);
 
     if (users && users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
-      throw new errors.NotFound(`user with identifier ${identifier} does not exist for unregistering`);
+      return returnStatus(404, `user with identifier ${identifier} does not exist for unregistering`);
     } else if (users.total_count > 1) {
-      throw new errors.InvalidArgument(`Invalid identifier provided for unregistering, multiple users found for identifier ${identifier}`);
+      return returnStatus(400, `Invalid identifier provided for unregistering, multiple users found for identifier ${identifier}`);
     }
 
     const acsResources = await this.createMetadata(users.items, AuthZAction.DELETE, subject);
@@ -1659,15 +1737,15 @@ export class UserService extends ServiceBase {
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
       // delete user
-      let userID = users.items[0].id;
+      let userID = users.items[0].payload.id;
       const serviceCall = {
         request: {
           ids: [userID]
@@ -1716,10 +1794,10 @@ export class UserService extends ServiceBase {
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1740,13 +1818,17 @@ export class UserService extends ServiceBase {
       logger.silly('Deleting User IDs:', { userIDs });
       // Check each user exist if one of the user does not exist throw an error
       for (let userID of userIDs) {
-        const filter = toStruct({
-          id: { $eq: userID }
-        });
-        const users = await super.read({ request: { filter } }, context);
+        const filters = [{
+          filter: [{
+            field: 'id',
+            operation: FilterOperation.eq,
+            value: userID
+          }]
+        }];
+        const users = await super.read({ request: { filters } }, context);
         if (users.total_count === 0) {
           logger.debug('User does not exist for deleting:', { userID });
-          throw new errors.NotFound(`User with ${userID} does not exist for deleting`);
+          return returnStatus(404, `User with ${userID} does not exist for deleting`);
         }
       }
 
@@ -1771,10 +1853,10 @@ export class UserService extends ServiceBase {
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1791,11 +1873,11 @@ export class UserService extends ServiceBase {
   async findByRole(call: any, context?: any): Promise<any> {
     const role: string = call.role || call.request.role || undefined;
     if (!role) {
-      throw new errors.InvalidArgument('missing role name');
+      return returnStatus(400, 'missing role name');
     }
 
     const reqAttributes: any[] = call.attributes || call.request.attributes || [];
-    const findByRoleRequest = { role, filter: {} };
+    const findByRoleRequest = { role, filters: {} };
     let subject = call.request.subject;
     let acsResponse: ReadPolicyResponse;
     try {
@@ -1803,18 +1885,23 @@ export class UserService extends ServiceBase {
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new errors.PermissionDenied(acsResponse.response.status.message);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
+      const filters = [{
+        filter: [{
+          field: 'name',
+          operation: FilterOperation.eq,
+          value: role
+        }]
+      }];
       const result = await this.roleService.read({
         request: {
-          filter: toStruct({
-            name: { $eq: role }
-          }),
+          filters,
           field: [{
             name: 'id',
             include: true
@@ -1824,28 +1911,29 @@ export class UserService extends ServiceBase {
       });
 
       if (_.isEmpty(result) || _.isEmpty(result.items) || result.items.total_count == 0) {
-        throw new errors.NotFound(`Role ${role} does not exist`);
+        return returnStatus(404, `Role ${role} does not exist`);
       }
 
-      const roleObj = result.items[0];
+      const roleObj = result.items[0].payload;
       const id = roleObj.id;
 
       // note: inefficient, a custom AQL query should be the final solution
+      let roleRequestFiltersWithACS: any = findByRoleRequest.filters;
       const userResult = await super.read({
-        request: { filter: findByRoleRequest.filter }
+        request: { filters: roleRequestFiltersWithACS }
       }, {});
       if (_.isEmpty(userResult) || _.isEmpty(userResult.items) || userResult.items.total_count == 0) {
-        throw new errors.NotFound('No users were found in the system');
+        return returnStatus(404, 'No users were found in the system');
       }
 
-      const users: User[] = userResult.items;
+      const users = userResult.items;
 
-      let usersWithRole = [];
+      let usersWithRole = { items: [] };
 
       for (let user of users) {
         let found = false;
-        if (user.role_associations) {
-          for (let roleAssoc of user.role_associations) {
+        if (user && user.payload && user.payload.role_associations) {
+          for (let roleAssoc of user.payload.role_associations) {
             if (roleAssoc.role == id) {
               found = true;
               if (roleAssoc.attributes && reqAttributes) {
@@ -1858,7 +1946,7 @@ export class UserService extends ServiceBase {
               }
 
               if (found) {
-                usersWithRole.push(user);
+                usersWithRole.items.push(user);
                 break;
               }
             }
@@ -2082,7 +2170,7 @@ export class UserService extends ServiceBase {
       // that org is the only one present before actually deleting the user
       const users = result.items || [];
       for (let i = 0; i < users.length; i += 1) {
-        const user: User = _.cloneDeep(users[i]);
+        const user: User = _.cloneDeep(users[i].payload);
         const associations = _.cloneDeep(user.role_associations);
         for (let k = associations.length - 1; k >= 0; k -= 1) {
           const attributes = associations[k].attributes;
@@ -2131,12 +2219,16 @@ export class UserService extends ServiceBase {
   private async getNormalUserRoleID(context: any, subject: Subject): Promise<any> {
     let roleID;
     const roleName = this.cfg.get('roles:normalUser');
-    const filter = toStruct(
-      { name: { $eq: roleName } },
-    );
-    const role: any = await this.roleService.read({ request: { filter, subject } }, context);
+    const filters = [{
+      filter: [{
+        field: 'name',
+        operation: FilterOperation.eq,
+        value: roleName
+      }]
+    }];
+    const role: any = await this.roleService.read({ request: { filters, subject } }, context);
     if (role) {
-      roleID = role.items[0].id;
+      roleID = role.items[0].payload.id;
     }
     return roleID;
   }
@@ -2210,18 +2302,17 @@ export class UserService extends ServiceBase {
           resource.meta = {};
         }
         if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
-          let result = await super.read({
-            request: {
-              filter: toStruct({
-                id: {
-                  $eq: resource.id
-                }
-              })
-            }
-          });
+          const filters = [{
+            filter: [{
+              field: 'id',
+              operation: FilterOperation.eq,
+              value: resource.id
+            }]
+          }];
+          let result = await super.read({ request: { filters } });
           // update owner info
           if (result.items.length === 1) {
-            let item = result.items[0];
+            let item = result.items[0].payload;
             resource.meta.owner = item.meta.owner;
           } else if (result.items.length === 0 && !resource.meta.owner) {
             let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
@@ -2256,25 +2347,26 @@ export class UserService extends ServiceBase {
 
   private async makeUserForInvitationData(user, invited_by_user_identifier): Promise<any> {
     let invitedByUser;
-    const filter = toStruct({
-      $or: [
+    const filters = [{
+      filter: [
         {
-          name: {
-            $eq: invited_by_user_identifier
-          }
+          field: 'name',
+          operation: FilterOperation.eq,
+          value: invited_by_user_identifier
         },
         {
-          email: {
-            $eq: invited_by_user_identifier
-          }
+          field: 'email',
+          operation: FilterOperation.eq,
+          value: invited_by_user_identifier
         }
-      ]
-    });
-    const invitedByUsers = await super.read({ request: { filter } });
+      ],
+      operator: OperatorType.or
+    }];
+    const invitedByUsers = await super.read({ request: { filters } });
     if (invitedByUsers.total_count === 1) {
       invitedByUser = invitedByUsers.items[0];
     } else {
-      throw new errors.NotFound(`user with identifier ${invited_by_user_identifier} not found`);
+      return returnStatus(404, `user with identifier ${invited_by_user_identifier} not found`);
     }
 
     return {
@@ -2293,12 +2385,12 @@ export class UserService extends ServiceBase {
     const { identifier, subject } = call.request;
     let user;
     // check for the identifier against name or email in DB
-    const filter = getDefaultFilter(identifier);
-    const users = await super.read({ request: { filter } });
+    const filters = getDefaultFilter(identifier);
+    const users = await super.read({ request: { filters } });
     if (users.total_count === 1) {
-      user = users.items[0];
+      user = users.items[0].payload;
       if (user.active) {
-        throw new errors.FailedPrecondition(`activation request to an active user ${identifier}`);
+        return returnStatus(412, `activation request to an active user ${identifier}`);
       }
 
       if (this.emailEnabled && !user.guest) {
@@ -2308,9 +2400,9 @@ export class UserService extends ServiceBase {
       }
       return {};
     } else if (users.total_count === 0) {
-      throw new errors.NotFound(`user with identifier ${identifier} not found`);
+      return returnStatus(404, `user with identifier ${identifier} not found`);
     } else if (users.total_count > 1) {
-      throw new errors.InvalidArgument(`Invalid identifier provided for send activation email, multiple users found for identifier ${identifier}`);
+      return returnStatus(400, `Invalid identifier provided for send activation email, multiple users found for identifier ${identifier}`);
     }
   }
 
@@ -2318,14 +2410,14 @@ export class UserService extends ServiceBase {
     const { identifier, invited_by_user_identifier, subject } = call.request;
     let user;
     // check for the identifier against name or email in DB
-    const filter = getDefaultFilter(identifier);
-    const users = await super.read({ request: { filter } });
+    const filters = getDefaultFilter(identifier);
+    const users = await super.read({ request: { filters } });
     if (users.total_count === 1) {
-      user = users.items[0];
+      user = users.items[0].payload;
     } else if (users.total_count === 0) {
-      throw new errors.NotFound(`user with identifier ${identifier} not found`);
+      return returnStatus(404, `user with identifier ${identifier} not found`);
     } else if (users.total_count > 1) {
-      throw new errors.InvalidArgument(`Invalid identifier provided for send invitation email, multiple users found for identifier ${identifier}`);
+      return returnStatus(400, `Invalid identifier provided for send invitation email, multiple users found for identifier ${identifier}`);
     }
 
     let acsResponse: AccessResponse;
@@ -2334,11 +2426,11 @@ export class UserService extends ServiceBase {
         AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -2379,7 +2471,7 @@ export class RoleService extends ServiceBase {
 
   async create(call: any, context?: any): Promise<any> {
     if (!call || !call.request || !call.request.items || call.request.items.length == 0) {
-      throw new errors.InvalidArgument('No role was provided for creation');
+      return returnStatus(400, 'No role was provided for creation');
     }
 
     const items = call.request.items;
@@ -2391,30 +2483,20 @@ export class RoleService extends ServiceBase {
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
-      for (let role of items) {
-        // check unique constraint for role name
-        if (!role.name) {
-          throw new errors.InvalidArgument('argument role name is empty');
-        }
-        const result = await super.read({
-          request: {
-            filter: toStruct({
-              name: { $eq: role.name }
-            })
-          }
-        }, context);
-        if (result && result.items && result.items.length > 0) {
-          throw new errors.AlreadyExists(`Role ${role.name} already exists`);
-        }
+      let createRoleResponse;
+      try {
+        createRoleResponse = super.create(call, context);
+      } catch (err) {
+        return returnStatus(err.code, err.message);
       }
-      return super.create(call, context);
+      return createRoleResponse;
     }
   }
 
@@ -2433,10 +2515,10 @@ export class RoleService extends ServiceBase {
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -2452,7 +2534,7 @@ export class RoleService extends ServiceBase {
   async update(call: any, context?: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
-      throw new errors.InvalidArgument('No items were provided for update');
+      return returnStatus(400, 'No items were provided for update');
     }
 
     const items = call.request.items;
@@ -2465,25 +2547,29 @@ export class RoleService extends ServiceBase {
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
       for (let i = 0; i < items.length; i += 1) {
         // read the role from DB and check if it exists
         const role = items[i];
-        const filter = toStruct({
-          id: { $eq: role.id }
-        });
-        const roles = await super.read({ request: { filter } }, context);
+        const filters = [{
+          filter: [{
+            field: 'id',
+            operation: FilterOperation.eq,
+            value: role.id
+          }]
+        }];
+        const roles = await super.read({ request: { filters } }, context);
         if (roles.total_count === 0) {
-          throw new errors.NotFound('roles not found for updating');
+          return roles;
         }
-        const rolesDB = roles.items[0];
+        const rolesDB = roles.items[0].payload;
         // update meta information from existing Object in case if its
         // not provided in request
         if (!role.meta) {
@@ -2499,10 +2585,10 @@ export class RoleService extends ServiceBase {
               'role', this, undefined, false);
           } catch (err) {
             this.logger.error('Error occurred requesting access-control-srv:', err);
-            throw err;
+            return returnStatus(err.code, err.message);
           }
           if (acsResponse.decision != Decision.PERMIT) {
-            throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+            return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
           }
         }
       }
@@ -2518,7 +2604,7 @@ export class RoleService extends ServiceBase {
   async upsert(call: any, context?: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
-      throw new errors.InvalidArgument('No items were provided for upsert');
+      return returnStatus(400, 'No items were provided for upsert');
     }
 
     let subject = call.request.subject;
@@ -2529,11 +2615,11 @@ export class RoleService extends ServiceBase {
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -2567,11 +2653,11 @@ export class RoleService extends ServiceBase {
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -2592,13 +2678,17 @@ export class RoleService extends ServiceBase {
       logger.silly('deleting Role IDs:', { roleIDs });
       // Check each user exist if one of the user does not exist throw an error
       for (let roleID of roleIDs) {
-        const filter = toStruct({
-          id: { $eq: roleID }
-        });
-        const roles = await super.read({ request: { filter } }, context);
+        const filters = [{
+          filter: [{
+            field: 'id',
+            operation: FilterOperation.eq,
+            value: roleID
+          }]
+        }];
+        const roles = await super.read({ request: { filters } }, context);
         if (roles.total_count === 0) {
           logger.debug('Role does not exist for deleting:', { roleID });
-          throw new errors.NotFound(`Role with ${roleID} does not exist for deleting`);
+          return roles;
         }
       }
       // delete users
@@ -2617,11 +2707,16 @@ export class RoleService extends ServiceBase {
     // checking if user roles are valid
     for (let roleAssociation of roleAssociations) {
       const roleID = roleAssociation.role;
+      const filters = [{
+        filter: [{
+          field: 'id',
+          operation: FilterOperation.eq,
+          value: roleID
+        }]
+      }];
       const result = await super.read({
         request: {
-          filter: toStruct({
-            id: { $eq: roleID }
-          })
+          filters
         }
       }, {});
 
@@ -2664,18 +2759,21 @@ export class RoleService extends ServiceBase {
         resource.meta = {};
       }
       if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
+        const filters = [{
+          filter: [{
+            field: 'id',
+            operation: FilterOperation.eq,
+            value: resource.id
+          }]
+        }];
         let result = await super.read({
           request: {
-            filter: toStruct({
-              id: {
-                $eq: resource.id
-              }
-            })
+            filters
           }
         });
         // update owner info
         if (result.items.length === 1) {
-          let item = result.items[0];
+          let item = result.items[0].payload;
           resource.meta.owner = item.meta.owner;
         } else if (result.items.length === 0 && !resource.meta.owner) {
           let ownerAttributes = _.cloneDeep(orgOwnerAttributes);

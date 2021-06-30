@@ -1,4 +1,4 @@
-import { BaseDocument } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
+import { BaseDocument, FilterOp } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Subject, Decision, PolicySetRQ } from '@restorecommerce/acs-client';
 
 export type TUser = User | FindUser | ActivateUser;
@@ -29,6 +29,14 @@ export interface User extends BaseDocument {
   invited_by_user_last_name: string; // Last name of user inviting
 }
 
+export interface UserPayload {
+  payload?: User;
+  status?: {
+    code: number;
+    message: string;
+  };
+}
+
 export interface HierarchicalScope {
   id: string;
   role?: string;
@@ -46,7 +54,7 @@ export interface FindUser {
   email?: string;
   name?: string;
   subject?: Subject;
-  filter?: any;
+  filters?: FilterOp [];
 }
 
 export interface FindUserByToken {
@@ -150,7 +158,7 @@ export interface FilterType {
 
 export interface ReadPolicyResponse extends AccessResponse {
   policySet?: PolicySetRQ;
-  filter?: FilterType[];
+  filters?: FilterOp [];
   custom_query_args?: {
     custom_queries: any;
     custom_arguments: any;

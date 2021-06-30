@@ -46,7 +46,12 @@ async function connect(clientCfg: string, resourceName: string): Promise<any> { 
   await (events.start());
   topic = await events.topic(cfg.get(`events:kafka:topics:${resourceName}:topic`));
 
-  return new GrpcClient(cfg.get(clientCfg), logger);
+  const grpcClient = new GrpcClient(cfg.get(clientCfg), logger);
+  if (resourceName.startsWith('user')) {
+    return grpcClient.user;
+  } else if (resourceName.startsWith('role')) {
+    return grpcClient.role;
+  }
 }
 
 let meta = {
@@ -151,12 +156,11 @@ describe('testing identity-srv', () => {
     let role: any;
 
     before(async function connectRoleService(): Promise<void> {
-      role = await connect('client:service-role', 'role.resource');
-      roleService = await role.connect();
+      roleService = await connect('client:service-role', 'role.resource');
     });
 
     after(async function stopRoleService(): Promise<void> {
-      await role.end();
+      // service stopped using worker thread
     });
 
     describe('with test client', () => {
@@ -200,8 +204,7 @@ describe('testing identity-srv', () => {
   describe('testing User service with disabled email constraint', () => {
     let userService, testUserID, user, testUserName, userBaseService;
     before(async function connectUserService(): Promise<void> {
-      userBaseService = await connect('client:service-user', 'user.resource');
-      userService = await userBaseService.connect();
+      userService = await connect('client:service-user', 'user.resource');
       user = {
         name: 'test.user1', // this user is used in the next tests
         first_name: 'test',
@@ -212,7 +215,7 @@ describe('testing identity-srv', () => {
     });
 
     after(async function stopUserService(): Promise<void> {
-      await userBaseService.end();
+      // service stopped using worker thread
     });
 
     describe('with test client with disabled email constraint', () => {

@@ -6,11 +6,11 @@ import { UserService, RoleService } from './service';
 import { AuthenticationLogService } from './authlog_service';
 import { TokenService } from './token_service';
 import { createServiceConfig } from '@restorecommerce/service-config';
-import { Client } from '@restorecommerce/grpc-client';
+import { GrpcClient } from '@restorecommerce/grpc-client';
 import { createLogger } from '@restorecommerce/logger';
 import * as bcrypt from 'bcryptjs';
 import { AccessResponse, ReadPolicyResponse } from './interface';
-import { toStruct } from '@restorecommerce/resource-base-interface';
+import { FilterOperation, OperatorType } from '@restorecommerce/resource-base-interface';
 
 // Create a ids client instance
 let idsClientInstance;
@@ -21,8 +21,8 @@ const getUserServiceClient = async () => {
     const grpcIDSConfig = cfg.get('client:user');
     const logger = createLogger(cfg.get('logger'));
     if (grpcIDSConfig) {
-      const idsClient = new Client(grpcIDSConfig, logger);
-      idsClientInstance = await idsClient.connect();
+      const idsClient = new GrpcClient(grpcIDSConfig, logger);
+      idsClientInstance = idsClient.user;
     }
   }
   return idsClientInstance;
@@ -88,7 +88,7 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
   return {
     decision: Decision.PERMIT,
     policySet: result,
-    filter: data.args.filter,
+    filters: data.args.filters,
     custom_query_args: { custom_queries, custom_arguments }
   };
 }
@@ -114,27 +114,44 @@ export const marshallProtobufAny = (msg: any): any => {
 export const unmarshallProtobufAny = (msg: any): any => JSON.parse(msg.value.toString());
 
 export const getDefaultFilter = (identifier) => {
-  return toStruct({
-    $or: [
+  return [{
+    filter: [
       {
-        name: {
-          $eq: identifier
-        }
+        field: 'name',
+        operation: FilterOperation.eq,
+        value: identifier
       },
       {
-        email: {
-          $eq: identifier
-        }
-      }
-    ]
-  });
+        field: 'email',
+        operation: FilterOperation.eq,
+        value: identifier
+      }],
+    operator: OperatorType.or
+  }];
 };
 
 export const getNameFilter = (userName) => {
-  return toStruct({
-    name: {
-      $eq: userName
-    }
+  return [{
+    filter: [{
+      field: 'name',
+      operation: FilterOperation.eq,
+      value: userName
+    }]
+  }];
+};
+
+export const returnStatus = (code: number, message: string, id?: string) => {
+  if (!code) {
+    code = 500; // defaults to internal server error if no code is provided
   }
-  );
+  if (!id) {
+    id = '';
+  }
+  return {
+    status: {
+      id,
+      code,
+      message
+    }
+  };
 };
