@@ -132,14 +132,10 @@ export class UserService extends ServiceBase {
           value: email
         });
       }
-      if (filterStructure[0].filter.length > 1) {
+      if (filterStructure.filters[0].filter.length > 1) {
         filterStructure.filters[0].operator = OperatorType.or;
       }
-      // const filterObj: any = {
-      //   $or: [
-      //     filterStructure
-      //   ]
-      // };
+
       // add ACS filters if subject is not tech user
       let acsFilterObj, techUser;
       const techUsersCfg = this.cfg.get('techUsers');
@@ -149,15 +145,10 @@ export class UserService extends ServiceBase {
       if (!techUser && readRequest.filters) {
         acsFilterObj = readRequest.filters;
       }
-      console.log('Filter Structure is......', filterStructure);
-      console.log('Read Req filters modified by ACS req is....', readRequest.filters);
-      console.log('ACS Filter Obj is....', acsFilterObj);
       if (!_.isEmpty(acsFilterObj)) {
         _.merge(filterStructure, acsFilterObj);
       }
-      console.log('FINAL MERGED FILTER IS>...........', filterStructure);
-      // readRequest.filters = filterStructure;
-      // TODO check and modify Filter
+      readRequest.filters = filterStructure;
       const users = await super.read({ request: readRequest }, context);
       if (users.total_count > 0) {
         logger.silly('found user(s)', { users });
@@ -275,12 +266,12 @@ export class UserService extends ServiceBase {
                 return resolve({ payload: user, status: { code: 200, message: 'success' } });
               } else if (dbToken && dbToken.expires_in < Math.round(new Date().getTime() / 1000)) {
                 logger.debug('Token expired');
-                resolve({status: {code: 401, message: 'Token expired'}});
+                resolve({ status: { code: 401, message: 'Token expired' } });
               }
             }
           }
           logger.silly('multiple user found for request', call.request);
-          resolve({status: {code: 400, message: 'multiple users found for token'}});
+          resolve({ status: { code: 400, message: 'multiple users found for token' } });
         });
       });
     }
@@ -1925,7 +1916,7 @@ export class UserService extends ServiceBase {
 
       const users = userResult.items;
 
-      let usersWithRole = { items: [] };
+      let usersWithRole: any = { items: [], status: {} };
 
       for (let user of users) {
         let found = false;
@@ -1950,7 +1941,8 @@ export class UserService extends ServiceBase {
           }
         }
       }
-
+      usersWithRole.status.code = 200;
+      usersWithRole.status.message = 'success';
       return usersWithRole;
     }
   }

@@ -597,21 +597,23 @@ describe('testing identity-srv', () => {
           });
           // read the user and now the status should be true
           const userData = await userService.find({ id: 'testuser2' });
-          // userData.data.items[0].active.should.equal(true);
+          userData.items[0].payload.active.should.equal(true);
           // unregister
           await userService.unregister({ identifier: result.items[0].payload.name });
         });
       });
 
-     /* describe('calling find', function findUser(): void {
+     describe('calling find', function findUser(): void {
         it('should return a user', async function findUser(): Promise<void> {
           const result = await (userService.find({
             id: testUserID,
           }));
           should.exist(result);
-          should.not.exist(result.error);
-          should.exist(result.data);
-          should.exist(result.data.items);
+          should.exist(result.items[0].payload);
+          should.exist(result.status);
+          should.exist(result.items[0].status);
+          result.items[0].status.code.should.equal(200);
+          result.items[0].status.message.should.equal('success');
         });
       });
 
@@ -621,22 +623,23 @@ describe('testing identity-srv', () => {
             role: 'normal_user',
           }));
           should.exist(result);
-          should.not.exist(result.error);
-          should.exist(result.data);
-          should.exist(result.data.items);
+          should.exist(result.items[0].payload);
+          should.exist(result.status);
+          should.exist(result.items[0].status);
+          result.items[0].status.code.should.equal(200);
+          result.items[0].status.message.should.equal('success');
         });
         it('should not return a user for invalid role', async function findUser(): Promise<void> {
           const result = await (userService.findByRole({
             role: 'invalid_role',
           }));
-          should.exist(result);
-          should.exist(result.error);
-          should.exist(result.error.details);
-          should.not.exist(result.data);
-          result.error.details.should.equal('5 NOT_FOUND: Role invalid_role does not exist');
+          result.items.should.be.empty();
+          should.exist(result.status);
+          result.status.code.should.equal(404);
+          result.status.message.should.equal('Role invalid_role does not exist');
         });
       });
-
+      /*
       describe('login', function login(): void {
         it('should return an error for invalid user identifier', async function login(): Promise<void> {
           const result = await (userService.login({
@@ -778,7 +781,7 @@ describe('testing identity-srv', () => {
           result.error.details.should.containEql('password does not match');
         });
       });
-
+      /*
       describe('calling changePassword', function changePassword(): void {
         it('should change the password', async function changePassword(): Promise<void> {
           this.timeout(30000);
