@@ -603,7 +603,7 @@ describe('testing identity-srv', () => {
         });
       });
 
-     describe('calling find', function findUser(): void {
+      describe('calling find', function findUser(): void {
         it('should return a user', async function findUser(): Promise<void> {
           const result = await (userService.find({
             id: testUserID,
@@ -639,19 +639,16 @@ describe('testing identity-srv', () => {
           result.status.message.should.equal('Role invalid_role does not exist');
         });
       });
-      /*
+
       describe('login', function login(): void {
         it('should return an error for invalid user identifier', async function login(): Promise<void> {
           const result = await (userService.login({
             identifier: 'invalid_id',
             password: 'invalid_pw',
           }));
-          should.exist(result);
-          should.exist(result.error);
-          should.not.exist(result.data);
-          should.exist(result.error.message);
-          result.error.message.should.containEql('not found');
-          result.error.details.should.containEql('user not found');
+          should.not.exist(result.payload);
+          result.status.code.should.equal(404);
+          result.status.message.should.equal('user not found');
         });
 
         it('should return an obfuscated error for invalid user identifier', async function login(): Promise<void> {
@@ -660,13 +657,9 @@ describe('testing identity-srv', () => {
             identifier: 'invalid_id',
             password: 'invalid_pw',
           }));
-          should.exist(result);
-          should.not.exist(result.data);
-          should.exist(result.error);
-          should.exist(result.error.name);
-          result.error.name.should.equal('FailedPrecondition');
-          should.exist(result.error.details);
-          result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
+          should.not.exist(result.payload);
+          result.status.code.should.equal(412);
+          result.status.message.should.equal('Invalid credentials provided, user inactive or account does not exist');
           cfg.set('obfuscateAuthNErrorReason', false);
         });
 
@@ -676,13 +669,9 @@ describe('testing identity-srv', () => {
               identifier: user.name,
               password: user.password,
             }));
-            should.exist(result);
-            should.not.exist(result.data);
-            should.exist(result.error);
-            should.exist(result.error.name);
-            result.error.name.should.equal('FailedPrecondition');
-            should.exist(result.error.details);
-            result.error.details.should.equal('9 FAILED_PRECONDITION: user is inactive');
+            should.not.exist(result.payload);
+            result.status.code.should.equal(412);
+            result.status.message.should.equal('user is inactive');
           });
 
         it('without activation should throw an error that user not authenticated' +
@@ -692,31 +681,26 @@ describe('testing identity-srv', () => {
               identifier: user.name,
               password: user.password,
             }));
-            should.exist(result);
-            should.not.exist(result.data);
-            should.exist(result.error);
-            should.exist(result.error.name);
-            result.error.name.should.equal('FailedPrecondition');
-            should.exist(result.error.details);
-            result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
+            should.not.exist(result.payload);
+            result.status.code.should.equal(412);
+            result.status.message.should.equal('Invalid credentials provided, user inactive or account does not exist');
             cfg.set('obfuscateAuthNErrorReason', false);
           });
 
         it('should activate the user', async function activateUser(): Promise<void> {
           const offset = await topic.$offset(-1);
           const listener = function listener(message: any, context: any): void {
-            result.data.items[0].id.should.equal(message.id);
+            result.items[0].payload.id.should.equal(message.id);
           };
           await topic.on('activated', listener);
           let result = await (userService.find({
             id: testUserID,
           }));
           should.exist(result);
-          should.exist(result.data);
-          should.exist(result.data.items);
-          result.data.items.should.be.length(1);
+          should.exist(result.items[0].payload);
+          result.items.should.be.length(1);
 
-          const u = result.data.items[0];
+          const u = result.items[0].payload;
           await (userService.activate({
             identifier: u.name,
             activation_code: u.activation_code,
@@ -727,12 +711,12 @@ describe('testing identity-srv', () => {
             id: testUserID,
           }));
           should.exist(result);
-          should.exist(result.data);
-          should.exist(result.data.items);
-          result.data.items.should.be.length(1);
-          should.exist(result.data.items[0].active);
-          result.data.items[0].active.should.be.true();
-          result.data.items[0].activation_code.should.be.empty();
+          should.exist(result);
+          should.exist(result.items[0].payload);
+          result.items.should.be.length(1);
+          should.exist(result.items[0].payload.active);
+          result.items[0].payload.active.should.be.true();
+          result.items[0].payload.activation_code.should.be.empty();
           await topic.removeListener('activated', listener);
         });
 
@@ -742,14 +726,13 @@ describe('testing identity-srv', () => {
             password: user.password,
           }));
           should.exist(result);
-          should.not.exist(result.error);
-          should.exist(result.data);
+          should.exist(result.payload);
 
           const compareResult = await (userService.find({
             id: testUserID,
           }));
-          const userDBDoc = compareResult.data.items[0];
-          result.data.should.deepEqual(userDBDoc);
+          const userDBDoc = compareResult.items[0].payload;
+          result.payload.should.deepEqual(userDBDoc);
         });
 
         it('should return an obfuscated error in case the passwords don`t match', async function login(): Promise<void> {
@@ -758,13 +741,9 @@ describe('testing identity-srv', () => {
             identifier: user.name,
             password: 'invalid_pw',
           }));
-          should.exist(result);
-          should.not.exist(result.data);
-          should.exist(result.error);
-          should.exist(result.error.name);
-          result.error.name.should.equal('FailedPrecondition');
-          should.exist(result.error.details);
-          result.error.details.should.equal('9 FAILED_PRECONDITION: Invalid credentials provided, user inactive or account does not exist');
+          should.not.exist(result.payload);
+          result.status.code.should.equal(412);
+          result.status.message.should.equal('Invalid credentials provided, user inactive or account does not exist');
           cfg.set('obfuscateAuthNErrorReason', false);
         });
 
@@ -773,12 +752,9 @@ describe('testing identity-srv', () => {
             identifier: user.name,
             password: 'invalid_pw',
           }));
-          should.exist(result);
-          should.exist(result.error);
-          should.not.exist(result.data);
-          should.exist(result.error.message);
-          result.error.message.should.containEql('unauthenticated');
-          result.error.details.should.containEql('password does not match');
+          should.not.exist(result.payload);
+          result.status.code.should.equal(401);
+          result.status.message.should.equal('password does not match');
         });
       });
       /*
