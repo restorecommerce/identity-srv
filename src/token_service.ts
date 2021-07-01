@@ -159,17 +159,18 @@ export class TokenService {
       let data;
       let tokenData;
       const user = await this.userService.findByToken({ request: { token: id } });
-      if (user && user.tokens && user.tokens.length > 0) {
-        for (let token of user.tokens) {
+      if (user && user.payload && user.payload.tokens && user.payload.tokens.length > 0) {
+        let userTokens = user.payload.tokens;
+        for (let token of userTokens) {
           if (token.token === id) {
             tokenData = token;
             break;
           }
         }
       }
-      if (user && tokenData) {
+      if (user && user.payload && tokenData) {
         data = {
-          accountId: user.id,
+          accountId: user.payload.id,
           exp: tokenData.expires_in,
           claims: user,
           kind: tokenData.type,
@@ -400,7 +401,7 @@ export class TokenService {
       } else if (subject && subject.token) {
         // when no subjectID is provided find the subjectID using findByToken
         const user = await this.userService.findByToken({ request: { token: subject.token } });
-        if (user && user.id) {
+        if (user && user.payload && user.payload.id) {
           orgOwnerAttributes.push(
             {
               id: urns.ownerIndicatoryEntity,
@@ -408,7 +409,7 @@ export class TokenService {
             },
             {
               id: urns.ownerInstance,
-              value: user.id
+              value: user.payload.id
             });
         }
       }

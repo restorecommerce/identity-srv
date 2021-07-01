@@ -204,7 +204,7 @@ export class UserService extends ServiceBase {
    * @param {call} call request containing token
    * @return user found
    */
-  async findByToken(call: Call<FindUserByToken>, context?: any): Promise<any> {
+  async findByToken(call: Call<FindUserByToken>, context?: any): Promise<UserPayload> {
     const { token } = call.request;
     let userData;
     const logger = this.logger;
@@ -219,17 +219,17 @@ export class UserService extends ServiceBase {
             if (redisResp && redisResp.tokens) {
               const dbToken = _.find(redisResp.tokens, { token });
               if ((dbToken && dbToken.expires_in === 0) || (dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000))) {
-                return resolve(redisResp);
+                return resolve({ payload: redisResp, status: { code: 200, message: 'success' } });
               } else {
                 // delete token from redis and update user entity
                 this.tokenRedisClient.del(token, async (err, numberOfDeletedKeys) => {
                   if (err) {
                     this.logger.error('Error deleting cached findByTOken data from redis', { err });
-                    reject(err);
+                    resolve({ status: { code: 500, message: 'Error deleting cached findByTOken data from redis' } });
                   } else {
                     this.logger.info('Redis cached data for findByToken deleted successfully', { noOfKeys: numberOfDeletedKeys });
                   }
-                  resolve(numberOfDeletedKeys);
+                  resolve({ status: { code: 401, message: 'Redis cached data for findByToken deleted successfully' } });
                 });
               }
             }
@@ -246,7 +246,7 @@ export class UserService extends ServiceBase {
           let users = await super.read({ request: { filters } }, context);
           if (users.total_count === 0) {
             logger.debug('No user found for provided token value', { token });
-            return resolve();
+            return resolve({ status: { code: 401, message: 'No user found for provided token value' } });
           }
           if (users.total_count === 1) {
             logger.debug('found user from token', { users });
@@ -272,16 +272,15 @@ export class UserService extends ServiceBase {
                   }
                 }
                 await this.update({ request: { items: [user], subject: tokenTechUser } });
-                return resolve(user);
+                return resolve({ payload: user, status: { code: 200, message: 'success' } });
               } else if (dbToken && dbToken.expires_in < Math.round(new Date().getTime() / 1000)) {
                 logger.debug('Token expired');
-                reject(new errors.InvalidArgument('Token expired'));
-                return;
+                resolve({status: {code: 401, message: 'Token expired'}});
               }
             }
           }
           logger.silly('multiple user found for request', call.request);
-          reject(new errors.OutOfRange('multiple users found for token'));
+          resolve({status: {code: 400, message: 'multiple users found for token'}});
         });
       });
     }
@@ -344,7 +343,7 @@ export class UserService extends ServiceBase {
    * @return type is any since it can be guest or user type
    */
   async create(call: any, context?: any): Promise<any> {
-    const usersList: UserPayload[] = call.request.items;
+    const usersList: User[] = call.request.items;
     const insertedUsers = { items: [], status: { code: 0, message: '' } };
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
@@ -388,7 +387,7 @@ export class UserService extends ServiceBase {
         }
       }
       for (let i = 0; i < usersList.length; i++) {
-        let user: User = usersList[i].payload;
+        let user: User = usersList[i];
         user.activation_code = '';
         user.active = true;
         user.unauthenticated = false;
@@ -412,7 +411,7 @@ export class UserService extends ServiceBase {
     }
   }
 
-  private async verifyUserRoleAssociations(usersList: UserPayload[], subject: any): Promise<void> {
+  private async verifyUserRoleAssociations(usersList: User[], subject: any): Promise<void> {
     let validateRoleScope = false;
     let token, redisHRScopesKey, user;
     let hierarchical_scopes = [];
@@ -503,8 +502,7 @@ export class UserService extends ServiceBase {
     }
     // check if the assignable_by_roles contain createAccessRole
     for (let user of usersList) {
-      let payload = user.payload;
-      let userRoleAssocs = payload.role_associations ? payload.role_associations : [];
+      let userRoleAssocs = user.role_associations ? user.role_associations : [];
       let targetUserRoleIds = [];
       if (_.isEmpty(userRoleAssocs)) {
         continue;
@@ -538,7 +536,7 @@ export class UserService extends ServiceBase {
         dbTargetRoles.push(targetRole.id);
         if (!targetRole.assignable_by_roles ||
           !createAccessRole.some((role) => targetRole.assignable_by_roles.includes(role))) {
-          const userName = user.payload && user.payload.name ? user.payload.name : undefined;
+          const userName = user && user.name ? user.name : undefined;
           let message = `The target role ${targetRole.id} cannot be assigned to` +
             ` user ${userName} as user role ${createAccessRole} does not have permissions`;
           this.logger.verbose(message);
@@ -549,7 +547,7 @@ export class UserService extends ServiceBase {
       // validate target roles is a valid role in DB
       for (let targetUserRoleId of targetUserRoleIds) {
         if (!dbTargetRoles.includes(targetUserRoleId)) {
-          const userName = user.payload && user.payload.name ? user.payload.name : undefined;
+          const userName = user && user.name ? user.name : undefined;
           let message = `The target role ${targetUserRoleId} is invalid and cannot be assigned to` +
             ` user ${userName}`;
           this.logger.verbose(message);
@@ -585,16 +583,15 @@ export class UserService extends ServiceBase {
         throw new errors.InvalidArgument('No Hierarchical Scopes could be found');
       }
       for (let user of usersList) {
-        let payload = user.payload;
-        if (payload.role_associations && payload.role_associations.length > 0) {
-          this.validateUserRoleAssociations(payload.role_associations, hrScopes, payload.name, subject);
-          if (!_.isEmpty(payload.tokens)) {
-            for (let token of payload.tokens) {
+        if (user.role_associations && user.role_associations.length > 0) {
+          this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, subject);
+          if (!_.isEmpty(user.tokens)) {
+            for (let token of user.tokens) {
               if (!token.interactive && !_.isEmpty(token.scopes)) {
                 for (let scope of token.scopes) {
                   // if scope is not found in role assoc invalid scope assignemnt in token
-                  if (!_.find(payload.role_associations, { id: scope })) {
-                    let message = `Invalid token scope ${scope} found for Subject ${payload.id}`;
+                  if (!_.find(user.role_associations, { id: scope })) {
+                    let message = `Invalid token scope ${scope} found for Subject ${user.id}`;
                     this.logger.verbose(message);
                     throw new errors.InvalidArgument(message);
                   }
@@ -723,7 +720,7 @@ export class UserService extends ServiceBase {
       const errorMessage = `Error while validating username: ${user.name}, ` +
         `error: ${err.name}, message:${err.details}`;
       logger.error(errorMessage);
-      return returnStatus(err.code, err.message);
+      return returnStatus(400, errorMessage);
     }
 
     if (_.isEmpty(user.first_name) || _.isEmpty(user.last_name)) {
@@ -741,10 +738,10 @@ export class UserService extends ServiceBase {
           items: [user]
         }
       };
-      await super.create(serviceCall, context);
+      const createStatus = await super.create(serviceCall, context);
       logger.info('guest user registered', user);
       await (this.topics['user.resource'].emit('registered', user));
-      return { payload: user, status: { code: 200, message: 'success' } };
+      return createStatus.items[0];
     }
 
     logger.silly('register is checking id, name and email', { id: user.id, name: user.name, email: user.email });
@@ -808,7 +805,7 @@ export class UserService extends ServiceBase {
    * @param {context}
    * @return type is any since it can be guest or user type
    */
-  async register(call: any, context?: any): Promise<any> {
+  async register(call: any, context?: any): Promise<UserPayload> {
     const user: User = call.request || call;
     const register = this.cfg.get('service:register');
     if (!register) {
@@ -846,7 +843,7 @@ export class UserService extends ServiceBase {
       await this.topics.rendering.emit('renderRequest', renderRequest);
     }
 
-    return user;
+    return createdUser;
   }
 
   async confirmUserInvitation(call: any, context: any): Promise<any> {
@@ -1010,7 +1007,7 @@ export class UserService extends ServiceBase {
         logger.debug('activation request to an active user' +
           ' which still has the activation code', user);
         return returnStatus(412, 'activation request to an active user' +
-        ' which still has the activation code');
+          ' which still has the activation code');
       }
       if ((!user.activation_code) || user.activation_code !== activationCode) {
         logger.debug('wrong activation code', user);
@@ -1648,7 +1645,7 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {User} returns user details
    */
-  async login(call: any, context?: any): Promise<any> {
+  async login(call: any, context?: any): Promise<UserPayload> {
     if (_.isEmpty(call) || _.isEmpty(call.request) ||
       (_.isEmpty(call.request.identifier) || (_.isEmpty(call.request.password) &&
         _.isEmpty(call.request.token)))) {
@@ -1670,7 +1667,7 @@ export class UserService extends ServiceBase {
     } else if (users.total_count > 1) {
       return returnStatus(400, `Invalid identifier provided for login, multiple users found for identifier ${identifier}`);
     }
-    const user = users.items[0].payload;
+    const user: User = users.items[0].payload;
     if (!user.active) {
       if (obfuscateAuthNErrorReason) {
         return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist');
@@ -1683,7 +1680,7 @@ export class UserService extends ServiceBase {
       const tokens = user.tokens;
       for (let eachToken of tokens) {
         if (call.request.token === eachToken.token) {
-          return user;
+          return { payload: user, status: { code: 200, message: 'success' } };
         }
       }
       if (obfuscateAuthNErrorReason) {
@@ -1700,7 +1697,7 @@ export class UserService extends ServiceBase {
           return returnStatus(401, 'password does not match');
         }
       }
-      return user;
+      return { payload: user, status: { code: 200, message: 'success' } };
     } else {
       return returnStatus(404, 'user not found');
     }
