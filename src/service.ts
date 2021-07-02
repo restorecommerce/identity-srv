@@ -347,20 +347,10 @@ export class UserService extends ServiceBase {
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv', err);
-      return {
-        status: {
-          code: err.code,
-          message: err.message
-        }
-      };
+      return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return {
-        status: {
-          code: acsResponse.response.status.code,
-          message: acsResponse.response.status.message
-        }
-      };
+      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -369,12 +359,7 @@ export class UserService extends ServiceBase {
           await this.verifyUserRoleAssociations(usersList, subject);
         } catch (err) {
           // for unhandled promise rejection
-          return {
-            status: {
-              code: err.code,
-              message: err.message
-            }
-          };
+          return returnStatus(err.code, err.message);
         }
       }
       for (let i = 0; i < usersList.length; i++) {
@@ -823,15 +808,16 @@ export class UserService extends ServiceBase {
       user.role_associations = this.cfg.get('defaultRegisterUserRoles');
     }
     const createdUser = await this.createUser(user, context);
+    if (createdUser?.status?.message === 'success') {
+      this.logger.info('user registered', user);
+      await this.topics['user.resource'].emit('registered', user);
 
-    this.logger.info('user registered', user);
-    await this.topics['user.resource'].emit('registered', user);
-
-    // For guest user email should not be sent out
-    if (this.emailEnabled && !user.guest) {
-      await this.fetchHbsTemplates();
-      const renderRequest = this.makeActivationEmailData(user);
-      await this.topics.rendering.emit('renderRequest', renderRequest);
+      // For guest user email should not be sent out
+      if (this.emailEnabled && !user.guest) {
+        await this.fetchHbsTemplates();
+        const renderRequest = this.makeActivationEmailData(user);
+        await this.topics.rendering.emit('renderRequest', renderRequest);
+      }
     }
 
     return createdUser;
@@ -886,9 +872,9 @@ export class UserService extends ServiceBase {
           items: [user]
         }
       };
-      await super.update(serviceCall, context);
+      const updateStatus = await super.update(serviceCall, context);
       this.logger.info('password updated for invited user', { identifier });
-      return {};
+      return { status: updateStatus?.items[0]?.status };
     }
   }
 
@@ -1014,10 +1000,12 @@ export class UserService extends ServiceBase {
           items: [user]
         }
       };
-      await super.update(serviceCall, context);
-      logger.info('user activated', user);
-      await this.topics['user.resource'].emit('activated', { id: user.id });
-      return {};
+      const updateStatus = await super.update(serviceCall, context);
+      if (updateStatus?.items[0].status?.message === 'success') {
+        logger.info('user activated', user);
+        await this.topics['user.resource'].emit('activated', { id: user.id });
+      }
+      return { status: updateStatus?.items[0].payload?.status };
     }
   }
 
@@ -1071,10 +1059,12 @@ export class UserService extends ServiceBase {
           items: [user]
         }
       };
-      await super.update(serviceCall, context);
-      logger.info('password changed for user', { identifier });
-      await this.topics['user.resource'].emit('passwordChanged', user);
-      return {};
+      const updateStatus = await super.update(serviceCall, context);
+      if (updateStatus?.items[0]?.status?.message === 'success') {
+        logger.info('password changed for user', { identifier });
+        await this.topics['user.resource'].emit('passwordChanged', user);
+      }
+      return { status: updateStatus?.items[0]?.status };
     }
   }
 
@@ -1105,20 +1095,22 @@ export class UserService extends ServiceBase {
 
     // generating activation code
     user.activation_code = this.idGen();
-    await super.update({
+    const updateStatus = await super.update({
       request: {
         items: [user]
       }
     });
-    await this.topics['user.resource'].emit('passwordChangeRequested', user);
+    if (updateStatus?.items[0]?.status?.message === 'success') {
+      await this.topics['user.resource'].emit('passwordChangeRequested', user);
 
-    // sending activation code via email
-    if (this.emailEnabled) {
-      await this.fetchHbsTemplates();
-      const renderRequest = this.makeConfirmationData(user, true, identifier);
-      await this.topics.rendering.emit('renderRequest', renderRequest);
+      // sending activation code via email
+      if (this.emailEnabled) {
+        await this.fetchHbsTemplates();
+        const renderRequest = this.makeConfirmationData(user, true, identifier);
+        await this.topics.rendering.emit('renderRequest', renderRequest);
+      }
     }
-    return {};
+    return { status: updateStatus?.items[0]?.status };
   }
 
   /**
@@ -1166,14 +1158,16 @@ export class UserService extends ServiceBase {
 
       user.activation_code = '';
       user.password_hash = password.hash(newPassword);
-      await super.update({
+      const updateStatus = await super.update({
         request: {
           items: [user]
         }
       });
-      logger.info('password changed for user', user.id);
-      await this.topics['user.resource'].emit('passwordChanged', user);
-      return {};
+      if (updateStatus?.items[0]?.status?.message === 'success') {
+        logger.info('password changed for user', user.id);
+        await this.topics['user.resource'].emit('passwordChanged', user);
+      }
+      return { status: updateStatus?.items[0]?.status };
     }
   }
 
@@ -1220,16 +1214,18 @@ export class UserService extends ServiceBase {
           items: [user]
         }
       };
-      await super.update(serviceCall, context);
-      logger.info('Email change requested for user', { email: new_email });
-      await this.topics['user.resource'].emit('emailChangeRequested', user);
+      const updateStatus = await super.update(serviceCall, context);
+      if (updateStatus?.items[0]?.status?.message === 'success') {
+        logger.info('Email change requested for user', { email: new_email });
+        await this.topics['user.resource'].emit('emailChangeRequested', user);
 
-      if (this.emailEnabled) {
-        await this.fetchHbsTemplates();
-        const renderRequest = this.makeConfirmationData(user, false, identifier, new_email);
-        await this.topics.rendering.emit('renderRequest', renderRequest);
+        if (this.emailEnabled) {
+          await this.fetchHbsTemplates();
+          const renderRequest = this.makeConfirmationData(user, false, identifier, new_email);
+          await this.topics.rendering.emit('renderRequest', renderRequest);
+        }
       }
-      return {};
+      return { status: updateStatus?.items[0]?.status };
     }
   }
 
@@ -1284,10 +1280,12 @@ export class UserService extends ServiceBase {
           items: [user]
         }
       };
-      await super.update(serviceCall, context);
-      logger.info('Email address changed for user', user.id);
-      await this.topics['user.resource'].emit('emailChangeConfirmed', user);
-      return {};
+      const updateStatus = await super.update(serviceCall, context);
+      if (updateStatus?.items[0]?.status?.message === 'success') {
+        logger.info('Email address changed for user', user.id);
+        await this.topics['user.resource'].emit('emailChangeConfirmed', user);
+      }
+      return { status: updateStatus?.items[0]?.status };
     }
   }
 
@@ -1302,7 +1300,7 @@ export class UserService extends ServiceBase {
       || _.isEmpty(call.request.items)) {
       return returnStatus(400, 'No items were provided for update');
     }
-    const items = call.request.items;
+    let items = call.request.items;
     let subject = call.request.subject;
     // update meta data for owner information
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
@@ -1327,15 +1325,20 @@ export class UserService extends ServiceBase {
           }
         } catch (err) {
           // for unhandled promise rejection
-          return returnStatus(err.code, err.message);
+          return returnStatus(400, err.message);
         }
       }
+      // each item includes payload and status in turn
+      let updateWithStatus = { items: [], status: {} };
       for (let i = 0; i < items.length; i += 1) {
         // read the user from DB and update the special fields from DB
         // for user modification
         const user = items[i].payload;
         if (!user.id) {
-          return returnStatus(400, 'Subject identifier missing for update operation');
+          // return returnStatus(400, 'Subject identifier missing for update operation');
+          updateWithStatus.items.push(returnStatus(400, 'Subject identifier missing for update operation'));
+          items = _.filter(items, (item) => item.payload.id);
+          continue;
         }
         const filters = [{
           filter: [{
@@ -1346,11 +1349,17 @@ export class UserService extends ServiceBase {
         }];
         const users = await super.read({ request: { filters } }, context);
         if (users.total_count === 0) {
-          return returnStatus(404, 'user not found');
+          // return returnStatus(404, 'user not found');
+          updateWithStatus.items.push(returnStatus(404, 'user not found for update', user.id));
+          items = _.filter(items, (item) => item.payload.id !== user.id);
+          continue;
         }
         let dbUser = users.items[0].payload;
         if (dbUser.name != user.name) {
-          return returnStatus(400, 'User name field cannot be updated');
+          // return returnStatus(400, 'User name field cannot be updated');
+          updateWithStatus.items.push(returnStatus(400, 'User name field cannot be updated', user.id));
+          items = _.filter(items, (item) => item.payload.name !== dbUser.name);
+          continue;
         }
         // update meta information from existing Object in case if its
         // not provided in request
@@ -1367,10 +1376,16 @@ export class UserService extends ServiceBase {
               'user', this, undefined, false);
           } catch (err) {
             this.logger.error('Error occurred requesting access-control-srv:', err);
-            return returnStatus(err.code, err.message);
+            // return returnStatus(err.code, err.message);
+            updateWithStatus.items.push(returnStatus(err.code, err.message, user.id));
+            items = _.filter(items, (item) => item.payload.id !== user.id);
+            continue;
           }
           if (acsResponse.decision != Decision.PERMIT) {
-            return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+            // return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+            updateWithStatus.items.push(returnStatus(acsResponse.response.status.code, acsResponse.response.status.message, user.id));
+            items = _.filter(items, (item) => item.payload.id !== user.id);
+            continue;
           }
         }
 
@@ -1483,7 +1498,12 @@ export class UserService extends ServiceBase {
           }
         }
       }
-      return await super.update(call, context);
+      console.log('Update with Status is....', updateWithStatus);
+      let updateStatus = await super.update(call, context);
+      console.log('Update Status is......', updateStatus);
+      const updateStatusObj = _.merge(updateWithStatus, updateStatus);
+      console.log('Update Status Obj....', updateStatusObj);
+      return updateStatusObj;
     }
   }
 
@@ -1739,10 +1759,12 @@ export class UserService extends ServiceBase {
           ids: [userID]
         }
       };
-      await super.delete(serviceCall, context);
-      logger.info('user with identifier deleted', { identifier });
-      await this.topics['user.resource'].emit('unregistered', userID);
-      return {};
+      const unregisterStatus = await super.delete(serviceCall, context);
+      if (unregisterStatus[0]?.status?.message === 'success') {
+        logger.info('user with identifier deleted', { identifier });
+        await this.topics['user.resource'].emit('unregistered', userID);
+      }
+      return { status: unregisterStatus[0]?.status };
     }
   }
 
@@ -1782,10 +1804,10 @@ export class UserService extends ServiceBase {
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return [returnStatus(err.code, err.message)];
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return [returnStatus(acsResponse.response.status.code, acsResponse.response.status.message)];
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1796,9 +1818,9 @@ export class UserService extends ServiceBase {
             collection: request.collection
           }
         };
-        await super.delete(serviceCall, context);
+        const deleteStatusArr = await super.delete(serviceCall, context);
         logger.info('Users collection deleted:');
-        return {};
+        return deleteStatusArr;
       }
       if (!_.isArray(userIDs)) {
         userIDs = [userIDs];
@@ -1816,7 +1838,7 @@ export class UserService extends ServiceBase {
         const users = await super.read({ request: { filters } }, context);
         if (users.total_count === 0) {
           logger.debug('User does not exist for deleting:', { userID });
-          return returnStatus(404, `User with ${userID} does not exist for deleting`);
+          return [returnStatus(404, `User with ${userID} does not exist for deleting`)];
         }
       }
 
@@ -1826,9 +1848,9 @@ export class UserService extends ServiceBase {
           ids: userIDs
         }
       };
-      await super.delete(serviceCall, context);
+      const deleteStatusArr = await super.delete(serviceCall, context);
       logger.info('Users deleted:', userIDs);
-      return {};
+      return deleteStatusArr;
     }
   }
 
@@ -2381,13 +2403,12 @@ export class UserService extends ServiceBase {
       if (user.active) {
         return returnStatus(412, `activation request to an active user ${identifier}`);
       }
-
       if (this.emailEnabled && !user.guest) {
         await this.fetchHbsTemplates();
         const renderRequest = this.makeActivationEmailData(user);
         await this.topics.rendering.emit('renderRequest', renderRequest);
       }
-      return {};
+      return returnStatus(200, 'success', user.id);
     } else if (users.total_count === 0) {
       return returnStatus(404, `user with identifier ${identifier} not found`);
     } else if (users.total_count > 1) {
@@ -2431,7 +2452,7 @@ export class UserService extends ServiceBase {
       } else {
         this.logger.info('User invite not enabled for identifier', { identifier });
       }
-      return {};
+      return returnStatus(200, 'success', user.id);
     }
   }
 }

@@ -7,6 +7,7 @@ import { createServiceConfig } from '@restorecommerce/service-config';
 import { createMockServer } from 'grpc-mock';
 import { updateConfig } from '@restorecommerce/acs-client';
 import { FilterOperation } from '@restorecommerce/resource-base-interface';
+import { User } from '../src/interface';
 
 /*
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
@@ -272,9 +273,10 @@ describe('testing identity-srv', () => {
           const offset = await renderingTopic.$offset(-1);
           await renderingTopic.on('renderRequest', listener);
           const result = await userService.sendActivationEmail({ identifier: user.name });
-
           should.exist(result);
-          result.should.be.empty();
+          should.exist(result.status);
+          result.status.code.should.equal(200);
+          result.status.message.should.equal('success');
           await renderingTopic.$wait(offset);
           await renderingTopic.removeListener('renderRequest', listener);
         });
@@ -591,7 +593,7 @@ describe('testing identity-srv', () => {
           const userStatus = result.items[0].payload.active;
           userStatus.should.equal(false);
           // confirm Invitation
-          await userService.confirmUserInvitation({
+          const confirmUserInvtStatus = await userService.confirmUserInvitation({
             identifier: testuser2.name,
             password: testuser2.password, activation_code: result.items[0].payload.activation_code
           });
@@ -757,7 +759,7 @@ describe('testing identity-srv', () => {
           result.status.message.should.equal('password does not match');
         });
       });
-      /*
+
       describe('calling changePassword', function changePassword(): void {
         it('should change the password', async function changePassword(): Promise<void> {
           this.timeout(30000);
@@ -769,22 +771,23 @@ describe('testing identity-srv', () => {
           let result = await userService.find({
             id: testUserID,
           });
-          should.exist(result.data);
-          should.exist(result.data.items);
-          const pwHashA = result.data.items[0].password_hash;
+          should.exist(result.items);
+          const pwHashA = result.items[0].payload.password_hash;
           result = await (userService.changePassword({
             identifier: testUserName,
             password: 'notsecure',
             new_password: 'newPassword'
           }));
           should.exist(result);
-          should.not.exist(result.error);
+          should.exist(result.status);
+          result.status.code.should.equal(200);
+          result.status.message.should.equal('success');
           await topic.$wait(offset);
 
           result = await (userService.find({
             id: testUserID,
           }));
-          const pwHashB = result.data.items[0].password_hash;
+          const pwHashB = result.items[0].payload.password_hash;
           pwHashB.should.not.be.null();
           pwHashA.should.not.equal(pwHashB);
           await topic.removeListener('passwordChanged', listener);
@@ -794,21 +797,23 @@ describe('testing identity-srv', () => {
           let result = await userService.find({
             id: testUserID,
           });
-          should.exist(result.data);
-          should.exist(result.data.items);
-          const activationCode = result.data.items[0].activation_code;
+          should.exist(result);
+          should.exist(result.items);
+          const activationCode = result.items[0].payload.activation_code;
           activationCode.should.be.length(0);
 
           result = await userService.requestPasswordChange({
             identifier: user.name
           });
           should.exist(result);
-          should.not.exist(result.error);
+          should.exist(result.status);
+          result.status.code.should.equal(200);
+          result.status.message.should.equal('success');
 
           result = await (userService.find({
             id: testUserID,
           }));
-          const upUser = result.data.items[0];
+          const upUser = result.items[0].payload;
           upUser.activation_code.should.not.be.empty();
         });
 
@@ -816,11 +821,11 @@ describe('testing identity-srv', () => {
           let result = await userService.find({
             id: testUserID,
           });
-          should.exist(result.data);
-          should.exist(result.data.items);
-          const activationCode = result.data.items[0].activation_code;
+          should.exist(result);
+          should.exist(result.items);
+          const activationCode = result.items[0].payload.activation_code;
           activationCode.should.not.be.null();
-          const pwHashA = result.data.items[0].password_hash;
+          const pwHashA = result.items[0].password_hash;
 
           result = await userService.confirmPasswordChange({
             identifier: user.name,
@@ -829,12 +834,14 @@ describe('testing identity-srv', () => {
           });
 
           should.exist(result);
-          should.not.exist(result.error);
+          should.exist(result.status);
+          result.status.code.should.equal(200);
+          result.status.message.should.equal('success');
 
           result = await (userService.find({
             id: testUserID,
           }));
-          const upUser = result.data.items[0];
+          const upUser = result.items[0].payload;
           upUser.activation_code.should.be.empty();
           upUser.password_hash.should.not.equal(pwHashA);
         });
@@ -863,15 +870,17 @@ describe('testing identity-srv', () => {
           let result = await userService.find({
             id: testUserID,
           });
-          should.exist(result.data);
-          should.exist(result.data.items);
-          const email_old = result.data.items[0].email;
+          should.exist(result);
+          should.exist(result.items);
+          const email_old = result.items[0].payload.email;
           result = await (userService.requestEmailChange({
             identifier: testUserName,
             new_email: 'newmail@newmail.com',
           }));
           should.exist(result);
-          should.not.exist(result.error);
+          should.exist(result.status);
+          result.status.code.should.equal(200);
+          result.status.message.should.equal('success');
 
           await topic.$wait(offset);
           const filters = [{
@@ -883,7 +892,7 @@ describe('testing identity-srv', () => {
           }];
           result = await (userService.read({ filters }));
 
-          const dbUser: User = result.data.items[0];
+          const dbUser: User = result.items[0].payload;
           validate(dbUser);
           await topic.removeListener('emailChangeRequested', listener);
         });
@@ -903,15 +912,17 @@ describe('testing identity-srv', () => {
           let result = await userService.find({
             id: testUserID,
           });
-          should.exist(result.data);
-          should.exist(result.data.items);
-          const activationCode = result.data.items[0].activation_code;
+          should.exist(result);
+          should.exist(result.items);
+          const activationCode = result.items[0].payload.activation_code;
           result = await (userService.confirmEmailChange({
             activation_code: activationCode,
             identifier: user.name
           }));
           should.exist(result);
-          should.not.exist(result.error);
+          should.exist(result.status);
+          result.status.code.should.equal(200);
+          result.status.message.should.equal('success');
 
           await topic.$wait(offset);
           const filters = [{
@@ -922,355 +933,355 @@ describe('testing identity-srv', () => {
             }]
           }];
           result = await (userService.read({ filters }));
-          const dbUser: User = result.data.items[0];
+          const dbUser: User = result.items[0].payload;
           validate(dbUser);
           dbUser.new_email.should.be.empty();
           dbUser.activation_code.should.be.empty();
           await topic.removeListener('emailChangeConfirmed', listener);
         });
       });
-
-      describe('calling update', function changeEmailId(): void {
-        it('should update generic fields', async function changeEmailId(): Promise<void> {
-          this.timeout(3000);
-          const listener = function listener(message: any, context: any): void {
-            should.exist(message);
-
-            const newUser = message;
-            newUser.first_name.should.equal('John');
-            newUser.first_name.should.not.equal(user.first_name);
-          };
-          await topic.on('userModified', listener);
-
-          const offset = await topic.$offset(-1);
-          const result = await userService.update([{
-            id: testUserID,
-            name: 'test.user1', // existing user
-            first_name: 'John',
-            meta
-          }]);
-          await topic.$wait(offset);
-          should.exist(result);
-          should.not.exist(result.error);
-          await topic.removeListener('userModified', listener);
-        });
-
-        it(`should allow to update special fields such as 'email' and 'password`, async function changeEmailId(): Promise<void> {
-          this.timeout(3000);
-
-          let result = await userService.update([{
-            id: testUserID,
-            name: 'test.user1', // existing user
-            email: 'update@restorecommerce.io',
-            password: 'notsecure2',
-            first_name: 'John'
-          }]);
-          should.exist(result.data);
-          should.not.exist(result.error);
-          should.exist(result.data.items);
-          result.data.items[0].email.should.equal('update@restorecommerce.io');
-          result.data.items[0].password.should.equal('');
-        });
-
-        it(`should not allow to update 'name' field`,
-          async function changeEmailId(): Promise<void> {
-            this.timeout(3000);
-
-            let result = await userService.update([{
-              id: testUserID,
-              name: 'new_name'
-            }]);
-            should.not.exist(result.data);
-            should.exist(result.error);
-            result.error.name.should.equal('InvalidArgument');
-            result.error.details.should.equal('3 INVALID_ARGUMENT: User name field cannot be updated');
-          });
-      });
-
-      describe('calling unregister', function unregister(): void {
-        it('should remove the user', async function unregister(): Promise<void> {
-          await userService.unregister({
-            identifier: testUserName,
-          });
-
-          // this would throw an error since user does not exist
-          await userService.delete({
-            ids: testUserID
-          });
-
-          const result = await userService.find({
-            id: testUserID,
-          });
-          should.not.exist(result.data);
-          should.exist(result.error);
-          should.equal(result.error.message, 'not found');
-        });
-      });
-
-      describe('calling sendInvitationEmail', function sendInvitationEmail(): void {
-        let sampleUser, invitingUser;
-        before(async () => {
-          sampleUser = {
-            id: '345testuser2id',
-            name: 'sampleuser1',
-            first_name: 'sampleUser7_first',
-            last_name: 'user',
-            password: 'notsecure3443',
-            email: 'sampleUser3@ms.restorecommerce.io',
-            role_associations: [{
-              role: 'user-r-id',
-              attributes: []
-            }]
-          };
-          invitingUser = {
-            id: '123invitingUserId',
-            name: 'invitinguser',
-            first_name: 'invitingUser_first',
-            last_name: 'invitingUser_last',
-            password: 'notsecure',
-            email: 'invitingUser@ms.restorecommerce.io',
-            role_associations: [{
-              role: 'user-r-id',
-              attributes: []
-            }]
-          };
-          await userService.create({ items: [sampleUser, invitingUser] });
-        });
-
-        it('should emit a renderRequest for sending the email', async function sendInvitationEmail(): Promise<void> {
-
-          const listener = function listener(message: any, context: any): void {
-            message.id.should.equal(`identity#${sampleUser.email}`);
-          };
-          await topic.on('renderRequest', listener);
-          const result = await (userService.sendInvitationEmail({ identifier: sampleUser.name, invited_by_user_identifier: invitingUser.name }));
-          should.exist(result);
-          should.not.exist(result.error);
-          await topic.removeListener('renderRequest', listener);
-        });
-      });
-
-      describe('calling upsert', function upsert(): void {
-        it('should upsert (create) user', async function upsert(): Promise<void> {
-          let result = await userService.upsert([{
-            name: 'upsertuser',
-            email: 'upsert@restorecommerce.io',
-            password: 'testUpsert',
-            first_name: 'John',
-            last_name: 'upsert'
-          }]);
-          upserUserID = result.data.items[0].id;
-          should.exist(result.data);
-          should.not.exist(result.error);
-          should.exist(result.data.items);
-          result.data.items[0].email.should.equal('upsert@restorecommerce.io');
-          result.data.items[0].password.should.equal('');
-        });
-
-        it('should upsert (update) user and delete user collection', async function upsert(): Promise<void> {
-          let result = await userService.upsert([{
-            id: upserUserID,
-            name: 'upsertuser',
-            email: 'upsert2@restorecommerce.io',
-            password: 'testUpsert2',
-            first_name: 'John',
-            last_name: 'upsert2'
-          }]);
-          should.exist(result.data);
-          should.not.exist(result.error);
-          should.exist(result.data.items);
-          result.data.items[0].email.should.equal('upsert2@restorecommerce.io');
-          result.data.items[0].password.should.equal('');
-          // delete user collection
-          await userService.delete({
-            collection: true
-          });
-        });
-      });
-
-      // HR scoping tests
-      describe('testing hierarchical scopes with authroization enabled', function registerUser(): void {
-        // mainOrg -> orgA -> orgB -> orgC
-        const testUser: any = {
-          id: 'testuser',
-          name: 'test.user',
-          first_name: 'test',
-          last_name: 'user',
-          password: 'password',
-          email: 'test@restorecommerce.io',
-          role_associations: [{
-            role: 'user-r-id',
-            attributes: [{
-              id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-              value: 'urn:restorecommerce:acs:model:organization.Organization'
-            },
-            {
-              id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-              value: 'orgC'
-            }]
-          }]
-        };
-
-        let subject = {
-          id: 'admin_user_id',
-          scope: 'orgA',
-          role_associations: [
-            {
-              role: 'admin-r-id',
-              attributes: [{
-                id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-                value: 'urn:restorecommerce:acs:model:organization.Organization'
-              },
-              {
-                id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-                value: 'mainOrg'
-              }]
-            }
-          ],
-          hierarchical_scopes: [
-            {
-              id: 'mainOrg',
-              role: 'admin-r-id',
-              children: [{
-                id: 'orgA',
-                children: [{
-                  id: 'orgB',
-                  children: [{
-                    id: 'orgC'
+      /*
+            describe('calling update', function changeEmailId(): void {
+              it('should update generic fields', async function changeEmailId(): Promise<void> {
+                this.timeout(3000);
+                const listener = function listener(message: any, context: any): void {
+                  should.exist(message);
+      
+                  const newUser = message;
+                  newUser.first_name.should.equal('John');
+                  newUser.first_name.should.not.equal(user.first_name);
+                };
+                await topic.on('userModified', listener);
+      
+                const offset = await topic.$offset(-1);
+                const result = await userService.update([{
+                  id: testUserID,
+                  name: 'test.user1', // existing user
+                  first_name: 'John',
+                  meta
+                }]);
+                await topic.$wait(offset);
+                should.exist(result);
+                should.not.exist(result.error);
+                await topic.removeListener('userModified', listener);
+              });
+      
+              it(`should allow to update special fields such as 'email' and 'password`, async function changeEmailId(): Promise<void> {
+                this.timeout(3000);
+      
+                let result = await userService.update([{
+                  id: testUserID,
+                  name: 'test.user1', // existing user
+                  email: 'update@restorecommerce.io',
+                  password: 'notsecure2',
+                  first_name: 'John'
+                }]);
+                should.exist(result.data);
+                should.not.exist(result.error);
+                should.exist(result.data.items);
+                result.data.items[0].email.should.equal('update@restorecommerce.io');
+                result.data.items[0].password.should.equal('');
+              });
+      
+              it(`should not allow to update 'name' field`,
+                async function changeEmailId(): Promise<void> {
+                  this.timeout(3000);
+      
+                  let result = await userService.update([{
+                    id: testUserID,
+                    name: 'new_name'
+                  }]);
+                  should.not.exist(result.data);
+                  should.exist(result.error);
+                  result.error.name.should.equal('InvalidArgument');
+                  result.error.details.should.equal('3 INVALID_ARGUMENT: User name field cannot be updated');
+                });
+            });
+      
+            describe('calling unregister', function unregister(): void {
+              it('should remove the user', async function unregister(): Promise<void> {
+                await userService.unregister({
+                  identifier: testUserName,
+                });
+      
+                // this would throw an error since user does not exist
+                await userService.delete({
+                  ids: testUserID
+                });
+      
+                const result = await userService.find({
+                  id: testUserID,
+                });
+                should.not.exist(result.data);
+                should.exist(result.error);
+                should.equal(result.error.message, 'not found');
+              });
+            });
+      
+            describe('calling sendInvitationEmail', function sendInvitationEmail(): void {
+              let sampleUser, invitingUser;
+              before(async () => {
+                sampleUser = {
+                  id: '345testuser2id',
+                  name: 'sampleuser1',
+                  first_name: 'sampleUser7_first',
+                  last_name: 'user',
+                  password: 'notsecure3443',
+                  email: 'sampleUser3@ms.restorecommerce.io',
+                  role_associations: [{
+                    role: 'user-r-id',
+                    attributes: []
+                  }]
+                };
+                invitingUser = {
+                  id: '123invitingUserId',
+                  name: 'invitinguser',
+                  first_name: 'invitingUser_first',
+                  last_name: 'invitingUser_last',
+                  password: 'notsecure',
+                  email: 'invitingUser@ms.restorecommerce.io',
+                  role_associations: [{
+                    role: 'user-r-id',
+                    attributes: []
+                  }]
+                };
+                await userService.create({ items: [sampleUser, invitingUser] });
+              });
+      
+              it('should emit a renderRequest for sending the email', async function sendInvitationEmail(): Promise<void> {
+      
+                const listener = function listener(message: any, context: any): void {
+                  message.id.should.equal(`identity#${sampleUser.email}`);
+                };
+                await topic.on('renderRequest', listener);
+                const result = await (userService.sendInvitationEmail({ identifier: sampleUser.name, invited_by_user_identifier: invitingUser.name }));
+                should.exist(result);
+                should.not.exist(result.error);
+                await topic.removeListener('renderRequest', listener);
+              });
+            });
+      
+            describe('calling upsert', function upsert(): void {
+              it('should upsert (create) user', async function upsert(): Promise<void> {
+                let result = await userService.upsert([{
+                  name: 'upsertuser',
+                  email: 'upsert@restorecommerce.io',
+                  password: 'testUpsert',
+                  first_name: 'John',
+                  last_name: 'upsert'
+                }]);
+                upserUserID = result.data.items[0].id;
+                should.exist(result.data);
+                should.not.exist(result.error);
+                should.exist(result.data.items);
+                result.data.items[0].email.should.equal('upsert@restorecommerce.io');
+                result.data.items[0].password.should.equal('');
+              });
+      
+              it('should upsert (update) user and delete user collection', async function upsert(): Promise<void> {
+                let result = await userService.upsert([{
+                  id: upserUserID,
+                  name: 'upsertuser',
+                  email: 'upsert2@restorecommerce.io',
+                  password: 'testUpsert2',
+                  first_name: 'John',
+                  last_name: 'upsert2'
+                }]);
+                should.exist(result.data);
+                should.not.exist(result.error);
+                should.exist(result.data.items);
+                result.data.items[0].email.should.equal('upsert2@restorecommerce.io');
+                result.data.items[0].password.should.equal('');
+                // delete user collection
+                await userService.delete({
+                  collection: true
+                });
+              });
+            });
+      
+            // HR scoping tests
+            describe('testing hierarchical scopes with authroization enabled', function registerUser(): void {
+              // mainOrg -> orgA -> orgB -> orgC
+              const testUser: any = {
+                id: 'testuser',
+                name: 'test.user',
+                first_name: 'test',
+                last_name: 'user',
+                password: 'password',
+                email: 'test@restorecommerce.io',
+                role_associations: [{
+                  role: 'user-r-id',
+                  attributes: [{
+                    id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+                    value: 'urn:restorecommerce:acs:model:organization.Organization'
+                  },
+                  {
+                    id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                    value: 'orgC'
                   }]
                 }]
-              }]
-            }
-          ]
-        };
-
-        it('should allow to create a User with valid role and valid valid HR scope', async () => {
-          // enable and enforce authorization
-          cfg.set('authorization:enabled', true);
-          cfg.set('authorization:enforce', true);
-          updateConfig(cfg);
-          const result = await userService.create({ items: testUser, subject });
-          should.exist(result);
-          should.exist(result.data);
-          should.exist(result.data.items);
-          result.data.items[0].id.should.equal('testuser');
-        });
-        it('should allow to update a User role_associations, first and last name with valid role and valid HR scope', async () => {
-          testUser.first_name = 'testFirstName';
-          testUser.last_name = 'testLastName';
-          // Add OrgB user scope as well
-          testUser.role_associations.push({
-            role: 'user-r-id',
-            attributes: [{
-              id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-              value: 'urn:restorecommerce:acs:model:organization.Organization'
-            },
-            {
-              id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-              value: 'orgB'
-            }]
-          });
-          const result = await userService.update({ items: testUser, subject });
-          should.exist(result);
-          should.exist(result.data);
-          should.exist(result.data.items);
-          result.data.items[0].id.should.equal('testuser');
-          result.data.items[0].first_name.should.equal('testFirstName');
-          result.data.items[0].last_name.should.equal('testLastName');
-          result.data.items[0].role_associations[0].attributes[1].value.should.equal('orgC');
-          result.data.items[0].role_associations[1].attributes[1].value.should.equal('orgB');
-          await userService.unregister({ identifier: result.data.items[0].name });
-        });
-
-        it('should not allow to create a User with invalid role existing in system', async () => {
-          testUser.role_associations[0].role = 'invalid_role';
-          const result = await userService.create({ items: testUser, subject });
-          should.not.exist(result.data);
-          should.exist(result.error);
-          should.exist(result.error.name);
-          result.error.name.should.equal('InvalidArgument');
-          should.exist(result.error.details);
-          result.error.details.should.equal('3 INVALID_ARGUMENT: The target role invalid_role is invalid and cannot be assigned to user test.user');
-        });
-
-        it('should not allow to create a User with role assocation which is not assignable', async () => {
-          testUser.role_associations[0].role = 'super-admin-r-id';
-          const result = await userService.create({ items: testUser, subject });
-          should.not.exist(result.data);
-          should.exist(result.error);
-          should.exist(result.error.name);
-          result.error.name.should.equal('InvalidArgument');
-          should.exist(result.error.details);
-          result.error.details.should.equal('3 INVALID_ARGUMENT: The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id does not have permissions');
-        });
-
-        it('should throw an error when hierarchical do not match creator role', async () => {
-          testUser.role_associations[0].role = 'user-r-id';
-          // auth_context not containing valid creator role (admin-r-id)
-          subject.hierarchical_scopes = [
-            {
-              id: 'mainOrg',
-              role: 'user-r-id',
-              children: [{
-                id: 'orgA',
-                children: [{
-                  id: 'orgB',
-                  children: [{
-                    id: 'orgC'
+              };
+      
+              let subject = {
+                id: 'admin_user_id',
+                scope: 'orgA',
+                role_associations: [
+                  {
+                    role: 'admin-r-id',
+                    attributes: [{
+                      id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+                      value: 'urn:restorecommerce:acs:model:organization.Organization'
+                    },
+                    {
+                      id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                      value: 'mainOrg'
+                    }]
+                  }
+                ],
+                hierarchical_scopes: [
+                  {
+                    id: 'mainOrg',
+                    role: 'admin-r-id',
+                    children: [{
+                      id: 'orgA',
+                      children: [{
+                        id: 'orgB',
+                        children: [{
+                          id: 'orgC'
+                        }]
+                      }]
+                    }]
+                  }
+                ]
+              };
+      
+              it('should allow to create a User with valid role and valid valid HR scope', async () => {
+                // enable and enforce authorization
+                cfg.set('authorization:enabled', true);
+                cfg.set('authorization:enforce', true);
+                updateConfig(cfg);
+                const result = await userService.create({ items: testUser, subject });
+                should.exist(result);
+                should.exist(result.data);
+                should.exist(result.data.items);
+                result.data.items[0].id.should.equal('testuser');
+              });
+              it('should allow to update a User role_associations, first and last name with valid role and valid HR scope', async () => {
+                testUser.first_name = 'testFirstName';
+                testUser.last_name = 'testLastName';
+                // Add OrgB user scope as well
+                testUser.role_associations.push({
+                  role: 'user-r-id',
+                  attributes: [{
+                    id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+                    value: 'urn:restorecommerce:acs:model:organization.Organization'
+                  },
+                  {
+                    id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                    value: 'orgB'
                   }]
-                }]
-              }]
-            }
-          ];
-          const result = await userService.create({ items: testUser, subject });
-          should.not.exist(result.data);
-          should.exist(result.error);
-          should.exist(result.error.name);
-          result.error.name.should.equal('InvalidArgument');
-          should.exist(result.error.details);
-          result.error.details.should.equal('3 INVALID_ARGUMENT: No Hierarchical Scopes could be found');
-        });
-
-        it('should not allow to create a User with role assocation with invalid hierarchical_scope', async () => {
-          testUser.role_associations[0].role = 'user-r-id';
-          // auth_context missing orgC in HR scope
-          subject.hierarchical_scopes = [
-            {
-              id: 'mainOrg',
-              role: 'admin-r-id',
-              children: [{
-                id: 'orgA',
-                children: [{
-                  id: 'orgB',
-                  children: [] // orgC is missing in HR scope
-                }]
-              }]
-            }
-          ];
-          const result = await userService.create({ items: testUser, subject });
-          should.not.exist(result.data);
-          should.exist(result.error);
-          should.exist(result.error.name);
-          result.error.name.should.equal('InvalidArgument');
-          should.exist(result.error.details);
-          result.error.details.should.equal('3 INVALID_ARGUMENT: the role user-r-id cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
-
-          // disable authorization
-          cfg.set('authorization:enabled', false);
-          cfg.set('authorization:enforce', false);
-          updateConfig(cfg);
-
-          // delete user and roles collection
-          await userService.delete({
-            collection: true
-          });
-          await roleService.delete({
-            collection: true
-          });
-          // stop mock acs-srv
-          stopGrpcMockServer();
-        });
-      });*/
+                });
+                const result = await userService.update({ items: testUser, subject });
+                should.exist(result);
+                should.exist(result.data);
+                should.exist(result.data.items);
+                result.data.items[0].id.should.equal('testuser');
+                result.data.items[0].first_name.should.equal('testFirstName');
+                result.data.items[0].last_name.should.equal('testLastName');
+                result.data.items[0].role_associations[0].attributes[1].value.should.equal('orgC');
+                result.data.items[0].role_associations[1].attributes[1].value.should.equal('orgB');
+                await userService.unregister({ identifier: result.data.items[0].name });
+              });
+      
+              it('should not allow to create a User with invalid role existing in system', async () => {
+                testUser.role_associations[0].role = 'invalid_role';
+                const result = await userService.create({ items: testUser, subject });
+                should.not.exist(result.data);
+                should.exist(result.error);
+                should.exist(result.error.name);
+                result.error.name.should.equal('InvalidArgument');
+                should.exist(result.error.details);
+                result.error.details.should.equal('3 INVALID_ARGUMENT: The target role invalid_role is invalid and cannot be assigned to user test.user');
+              });
+      
+              it('should not allow to create a User with role assocation which is not assignable', async () => {
+                testUser.role_associations[0].role = 'super-admin-r-id';
+                const result = await userService.create({ items: testUser, subject });
+                should.not.exist(result.data);
+                should.exist(result.error);
+                should.exist(result.error.name);
+                result.error.name.should.equal('InvalidArgument');
+                should.exist(result.error.details);
+                result.error.details.should.equal('3 INVALID_ARGUMENT: The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id does not have permissions');
+              });
+      
+              it('should throw an error when hierarchical do not match creator role', async () => {
+                testUser.role_associations[0].role = 'user-r-id';
+                // auth_context not containing valid creator role (admin-r-id)
+                subject.hierarchical_scopes = [
+                  {
+                    id: 'mainOrg',
+                    role: 'user-r-id',
+                    children: [{
+                      id: 'orgA',
+                      children: [{
+                        id: 'orgB',
+                        children: [{
+                          id: 'orgC'
+                        }]
+                      }]
+                    }]
+                  }
+                ];
+                const result = await userService.create({ items: testUser, subject });
+                should.not.exist(result.data);
+                should.exist(result.error);
+                should.exist(result.error.name);
+                result.error.name.should.equal('InvalidArgument');
+                should.exist(result.error.details);
+                result.error.details.should.equal('3 INVALID_ARGUMENT: No Hierarchical Scopes could be found');
+              });
+      
+              it('should not allow to create a User with role assocation with invalid hierarchical_scope', async () => {
+                testUser.role_associations[0].role = 'user-r-id';
+                // auth_context missing orgC in HR scope
+                subject.hierarchical_scopes = [
+                  {
+                    id: 'mainOrg',
+                    role: 'admin-r-id',
+                    children: [{
+                      id: 'orgA',
+                      children: [{
+                        id: 'orgB',
+                        children: [] // orgC is missing in HR scope
+                      }]
+                    }]
+                  }
+                ];
+                const result = await userService.create({ items: testUser, subject });
+                should.not.exist(result.data);
+                should.exist(result.error);
+                should.exist(result.error.name);
+                result.error.name.should.equal('InvalidArgument');
+                should.exist(result.error.details);
+                result.error.details.should.equal('3 INVALID_ARGUMENT: the role user-r-id cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
+      
+                // disable authorization
+                cfg.set('authorization:enabled', false);
+                cfg.set('authorization:enforce', false);
+                updateConfig(cfg);
+      
+                // delete user and roles collection
+                await userService.delete({
+                  collection: true
+                });
+                await roleService.delete({
+                  collection: true
+                });
+                // stop mock acs-srv
+                stopGrpcMockServer();
+              });
+            });*/
     });
   });
 });
