@@ -155,3 +155,17 @@ export const returnStatus = (code: number, message: string, id?: string) => {
     }
   };
 };
+
+interface CodeIdMsgObj {
+  code: number;
+  message: string;
+  id?: string;
+}
+
+export const returnStatusArray = (codeIdMsgObj: CodeIdMsgObj[]) => {
+  let statusArray = { status: [] };
+  for (let codeMsgObj of codeIdMsgObj) {
+    statusArray.status.push(codeMsgObj);
+  }
+  return statusArray;
+};

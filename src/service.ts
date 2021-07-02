@@ -10,7 +10,7 @@ import {
   PolicySetRQ, HierarchicalScope, RoleAssociation
 } from '@restorecommerce/acs-client';
 import Redis from 'ioredis';
-import { checkAccessRequest, password, unmarshallProtobufAny, marshallProtobufAny, getDefaultFilter, getNameFilter, returnStatus } from './utils';
+import { checkAccessRequest, password, unmarshallProtobufAny, marshallProtobufAny, getDefaultFilter, getNameFilter, returnStatus, returnStatusArray } from './utils';
 import { errors } from '@restorecommerce/chassis-srv';
 import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common';
 import {
@@ -1333,11 +1333,11 @@ export class UserService extends ServiceBase {
       for (let i = 0; i < items.length; i += 1) {
         // read the user from DB and update the special fields from DB
         // for user modification
-        const user = items[i].payload;
+        const user = items[i];
         if (!user.id) {
           // return returnStatus(400, 'Subject identifier missing for update operation');
           updateWithStatus.items.push(returnStatus(400, 'Subject identifier missing for update operation'));
-          items = _.filter(items, (item) => item.payload.id);
+          items = _.filter(items, (item) => item.id);
           continue;
         }
         const filters = [{
@@ -1351,14 +1351,14 @@ export class UserService extends ServiceBase {
         if (users.total_count === 0) {
           // return returnStatus(404, 'user not found');
           updateWithStatus.items.push(returnStatus(404, 'user not found for update', user.id));
-          items = _.filter(items, (item) => item.payload.id !== user.id);
+          items = _.filter(items, (item) => item.id !== user.id);
           continue;
         }
         let dbUser = users.items[0].payload;
         if (dbUser.name != user.name) {
           // return returnStatus(400, 'User name field cannot be updated');
           updateWithStatus.items.push(returnStatus(400, 'User name field cannot be updated', user.id));
-          items = _.filter(items, (item) => item.payload.name !== dbUser.name);
+          call.request.items = _.filter(items, (item) => item.name !== user.name);
           continue;
         }
         // update meta information from existing Object in case if its
@@ -1378,13 +1378,13 @@ export class UserService extends ServiceBase {
             this.logger.error('Error occurred requesting access-control-srv:', err);
             // return returnStatus(err.code, err.message);
             updateWithStatus.items.push(returnStatus(err.code, err.message, user.id));
-            items = _.filter(items, (item) => item.payload.id !== user.id);
+            items = _.filter(items, (item) => item.id !== user.id);
             continue;
           }
           if (acsResponse.decision != Decision.PERMIT) {
             // return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
             updateWithStatus.items.push(returnStatus(acsResponse.response.status.code, acsResponse.response.status.message, user.id));
-            items = _.filter(items, (item) => item.payload.id !== user.id);
+            items = _.filter(items, (item) => item.id !== user.id);
             continue;
           }
         }
@@ -1498,11 +1498,8 @@ export class UserService extends ServiceBase {
           }
         }
       }
-      console.log('Update with Status is....', updateWithStatus);
       let updateStatus = await super.update(call, context);
-      console.log('Update Status is......', updateStatus);
       const updateStatusObj = _.merge(updateWithStatus, updateStatus);
-      console.log('Update Status Obj....', updateStatusObj);
       return updateStatusObj;
     }
   }
@@ -1804,10 +1801,10 @@ export class UserService extends ServiceBase {
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return [returnStatus(err.code, err.message)];
+      return returnStatusArray([{ code: err.code, message: err.message }]);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return [returnStatus(acsResponse.response.status.code, acsResponse.response.status.message)];
+      return returnStatusArray([{ code: acsResponse.response.status.code, message: acsResponse.response.status.message }]);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1819,13 +1816,13 @@ export class UserService extends ServiceBase {
           }
         };
         const deleteStatusArr = await super.delete(serviceCall, context);
-        logger.info('Users collection deleted:');
+        logger.info('Users collection deleted');
         return deleteStatusArr;
       }
       if (!_.isArray(userIDs)) {
         userIDs = [userIDs];
       }
-      logger.silly('Deleting User IDs:', { userIDs });
+      logger.silly('Deleting User IDs', { userIDs });
       // Check each user exist if one of the user does not exist throw an error
       for (let userID of userIDs) {
         const filters = [{
@@ -1837,8 +1834,8 @@ export class UserService extends ServiceBase {
         }];
         const users = await super.read({ request: { filters } }, context);
         if (users.total_count === 0) {
-          logger.debug('User does not exist for deleting:', { userID });
-          return [returnStatus(404, `User with ${userID} does not exist for deleting`)];
+          logger.debug('User does not exist for deleting', { userID });
+          return returnStatusArray([{code: 404, message: 'User does not exist for deleting', id: userID}]);
         }
       }
 
@@ -1862,7 +1859,7 @@ export class UserService extends ServiceBase {
       acsResponse = await checkAccessRequest(subject, { id: orgIDs }, AuthZAction.DELETE,
         'user', this);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv', err);
       return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
