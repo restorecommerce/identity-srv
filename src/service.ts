@@ -1007,7 +1007,7 @@ export class UserService extends ServiceBase {
         logger.info('user activated', user);
         await this.topics['user.resource'].emit('activated', { id: user.id });
       }
-      return { status: updateStatus?.items[0].payload?.status };
+      return { status: updateStatus?.items[0]?.status };
     }
   }
 
@@ -1761,11 +1761,11 @@ export class UserService extends ServiceBase {
         }
       };
       const unregisterStatus = await super.delete(serviceCall, context);
-      if (unregisterStatus[0]?.status?.message === 'success') {
+      if (unregisterStatus?.status[0]?.message === 'success') {
         logger.info('user with identifier deleted', { identifier });
         await this.topics['user.resource'].emit('unregistered', userID);
       }
-      return { status: unregisterStatus[0]?.status };
+      return { status: unregisterStatus?.status[0] };
     }
   }
 
