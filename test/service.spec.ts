@@ -1038,271 +1038,285 @@ describe('testing identity-srv', () => {
           result.status.message.should.equal('user not found');
         });
       });
-      /*
-          describe('calling sendInvitationEmail', function sendInvitationEmail(): void {
-            let sampleUser, invitingUser;
-            before(async () => {
-              sampleUser = {
-                id: '345testuser2id',
-                name: 'sampleuser1',
-                first_name: 'sampleUser7_first',
-                last_name: 'user',
-                password: 'notsecure3443',
-                email: 'sampleUser3@ms.restorecommerce.io',
-                role_associations: [{
-                  role: 'user-r-id',
-                  attributes: []
-                }]
-              };
-              invitingUser = {
-                id: '123invitingUserId',
-                name: 'invitinguser',
-                first_name: 'invitingUser_first',
-                last_name: 'invitingUser_last',
-                password: 'notsecure',
-                email: 'invitingUser@ms.restorecommerce.io',
-                role_associations: [{
-                  role: 'user-r-id',
-                  attributes: []
-                }]
-              };
-              await userService.create({ items: [sampleUser, invitingUser] });
-            });
-    
-            it('should emit a renderRequest for sending the email', async function sendInvitationEmail(): Promise<void> {
-    
-              const listener = function listener(message: any, context: any): void {
-                message.id.should.equal(`identity#${sampleUser.email}`);
-              };
-              await topic.on('renderRequest', listener);
-              const result = await (userService.sendInvitationEmail({ identifier: sampleUser.name, invited_by_user_identifier: invitingUser.name }));
-              should.exist(result);
-              should.not.exist(result.error);
-              await topic.removeListener('renderRequest', listener);
-            });
+
+      describe('calling sendInvitationEmail', function sendInvitationEmail(): void {
+        let sampleUser, invitingUser;
+        before(async () => {
+          sampleUser = {
+            id: '345testuser2id',
+            name: 'sampleuser1',
+            first_name: 'sampleUser7_first',
+            last_name: 'user',
+            password: 'notsecure3443',
+            email: 'sampleUser3@ms.restorecommerce.io',
+            role_associations: [{
+              role: 'user-r-id',
+              attributes: []
+            }]
+          };
+          invitingUser = {
+            id: '123invitingUserId',
+            name: 'invitinguser',
+            first_name: 'invitingUser_first',
+            last_name: 'invitingUser_last',
+            password: 'notsecure',
+            email: 'invitingUser@ms.restorecommerce.io',
+            role_associations: [{
+              role: 'user-r-id',
+              attributes: []
+            }]
+          };
+          await userService.create({ items: [sampleUser, invitingUser] });
+        });
+
+        it('should emit a renderRequest for sending the email', async function sendInvitationEmail(): Promise<void> {
+
+          const listener = function listener(message: any, context: any): void {
+            message.id.should.equal(`identity#${sampleUser.email}`);
+          };
+          await topic.on('renderRequest', listener);
+          const result = await (userService.sendInvitationEmail({ identifier: sampleUser.name, invited_by_user_identifier: invitingUser.name }));
+          should.exist(result);
+          result.status.code.should.equal(200);
+          result.status.message.should.equal('success');
+          await topic.removeListener('renderRequest', listener);
+        });
+      });
+
+      describe('calling upsert', function upsert(): void {
+        it('should upsert (create) user', async function upsert(): Promise<void> {
+          let result = await userService.upsert({
+            items: [{
+              name: 'upsertuser',
+              email: 'upsert@restorecommerce.io',
+              password: 'testUpsert',
+              first_name: 'John',
+              last_name: 'upsert'
+            }]
           });
-    
-          describe('calling upsert', function upsert(): void {
-            it('should upsert (create) user', async function upsert(): Promise<void> {
-              let result = await userService.upsert([{
-                name: 'upsertuser',
-                email: 'upsert@restorecommerce.io',
-                password: 'testUpsert',
-                first_name: 'John',
-                last_name: 'upsert'
-              }]);
-              upserUserID = result.data.items[0].id;
-              should.exist(result.data);
-              should.not.exist(result.error);
-              should.exist(result.data.items);
-              result.data.items[0].email.should.equal('upsert@restorecommerce.io');
-              result.data.items[0].password.should.equal('');
-            });
-    
-            it('should upsert (update) user and delete user collection', async function upsert(): Promise<void> {
-              let result = await userService.upsert([{
-                id: upserUserID,
-                name: 'upsertuser',
-                email: 'upsert2@restorecommerce.io',
-                password: 'testUpsert2',
-                first_name: 'John',
-                last_name: 'upsert2'
-              }]);
-              should.exist(result.data);
-              should.not.exist(result.error);
-              should.exist(result.data.items);
-              result.data.items[0].email.should.equal('upsert2@restorecommerce.io');
-              result.data.items[0].password.should.equal('');
-              // delete user collection
-              await userService.delete({
-                collection: true
-              });
-            });
+          upserUserID = result.items[0].payload.id;
+          should.exist(result);
+          should.exist(result.items);
+          result.items[0].payload.email.should.equal('upsert@restorecommerce.io');
+          result.items[0].payload.password.should.equal('');
+          // validate item status and overall status
+          result.items[0].status.code.should.equal(200);
+          result.items[0].status.message.should.equal('success');
+          result.status.code.should.equal(200);
+          result.status.message.should.equal('success');
+        });
+
+        it('should upsert (update) user and delete user collection', async function upsert(): Promise<void> {
+          let result = await userService.upsert({
+            items: [{
+              id: upserUserID,
+              name: 'upsertuser',
+              email: 'upsert2@restorecommerce.io',
+              password: 'testUpsert2',
+              first_name: 'John',
+              last_name: 'upsert2'
+            }]
           });
-    
-          // HR scoping tests
-          describe('testing hierarchical scopes with authroization enabled', function registerUser(): void {
-            // mainOrg -> orgA -> orgB -> orgC
-            const testUser: any = {
-              id: 'testuser',
-              name: 'test.user',
-              first_name: 'test',
-              last_name: 'user',
-              password: 'password',
-              email: 'test@restorecommerce.io',
-              role_associations: [{
-                role: 'user-r-id',
-                attributes: [{
-                  id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-                  value: 'urn:restorecommerce:acs:model:organization.Organization'
-                },
-                {
-                  id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-                  value: 'orgC'
+          should.exist(result);
+          should.exist(result.items);
+          result.items[0].payload.email.should.equal('upsert2@restorecommerce.io');
+          result.items[0].payload.password.should.equal('');
+          // validate item status and overall status
+          result.items[0].status.code.should.equal(200);
+          result.items[0].status.message.should.equal('success');
+          result.status.code.should.equal(200);
+          result.status.message.should.equal('success');
+          // delete user collection
+          const deleteResult = await userService.delete({
+            collection: true
+          });
+          should.exist(deleteResult.status);
+          _.forEach(deleteResult.status, (eachResult) => {
+            eachResult.code.should.equal(200);
+            eachResult.message.should.equal('success');
+          });
+        });
+      });
+
+      // HR scoping tests
+      describe('testing hierarchical scopes with authroization enabled', function registerUser(): void {
+        // mainOrg -> orgA -> orgB -> orgC
+        const testUser: any = {
+          id: 'testuser',
+          name: 'test.user',
+          first_name: 'test',
+          last_name: 'user',
+          password: 'password',
+          email: 'test@restorecommerce.io',
+          role_associations: [{
+            role: 'user-r-id',
+            attributes: [{
+              id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+              value: 'urn:restorecommerce:acs:model:organization.Organization'
+            },
+            {
+              id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+              value: 'orgC'
+            }]
+          }]
+        };
+
+        let subject = {
+          id: 'admin_user_id',
+          scope: 'orgA',
+          role_associations: [
+            {
+              role: 'admin-r-id',
+              attributes: [{
+                id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+                value: 'urn:restorecommerce:acs:model:organization.Organization'
+              },
+              {
+                id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                value: 'mainOrg'
+              }]
+            }
+          ],
+          hierarchical_scopes: [
+            {
+              id: 'mainOrg',
+              role: 'admin-r-id',
+              children: [{
+                id: 'orgA',
+                children: [{
+                  id: 'orgB',
+                  children: [{
+                    id: 'orgC'
+                  }]
                 }]
               }]
-            };
-    
-            let subject = {
-              id: 'admin_user_id',
-              scope: 'orgA',
-              role_associations: [
-                {
-                  role: 'admin-r-id',
-                  attributes: [{
-                    id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-                    value: 'urn:restorecommerce:acs:model:organization.Organization'
-                  },
-                  {
-                    id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-                    value: 'mainOrg'
-                  }]
-                }
-              ],
-              hierarchical_scopes: [
-                {
-                  id: 'mainOrg',
-                  role: 'admin-r-id',
+            }
+          ]
+        };
+
+        it('should allow to create a User with valid role and valid valid HR scope', async () => {
+          // enable and enforce authorization
+          cfg.set('authorization:enabled', true);
+          cfg.set('authorization:enforce', true);
+          updateConfig(cfg);
+          const result = await userService.create({ items: [testUser], subject });
+          should.exist(result);
+          should.exist(result.items);
+          result.items[0].payload.id.should.equal('testuser');
+          // validate item status and overall status
+          result.items[0].status.code.should.equal(200);
+          result.items[0].status.message.should.equal('success');
+          result.status.code.should.equal(200);
+          result.status.message.should.equal('success');
+        });
+        it('should allow to update a User role_associations, first and last name with valid role and valid HR scope', async () => {
+          testUser.first_name = 'testFirstName';
+          testUser.last_name = 'testLastName';
+          // Add OrgB user scope as well
+          testUser.role_associations.push({
+            role: 'user-r-id',
+            attributes: [{
+              id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+              value: 'urn:restorecommerce:acs:model:organization.Organization'
+            },
+            {
+              id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+              value: 'orgB'
+            }]
+          });
+          const result = await userService.update({ items: [testUser], subject });
+          should.exist(result);
+          should.exist(result.items);
+          result.items[0].payload.id.should.equal('testuser');
+          result.items[0].payload.first_name.should.equal('testFirstName');
+          result.items[0].payload.last_name.should.equal('testLastName');
+          result.items[0].payload.role_associations[0].attributes[1].value.should.equal('orgC');
+          result.items[0].payload.role_associations[1].attributes[1].value.should.equal('orgB');
+          // validate item status and overall status
+          result.items[0].status.code.should.equal(200);
+          result.items[0].status.message.should.equal('success');
+          result.status.code.should.equal(200);
+          result.status.message.should.equal('success');
+          await userService.unregister({ identifier: result.items[0].payload.name });
+        });
+
+        it('should not allow to create a User with invalid role existing in system', async () => {
+          testUser.role_associations[0].role = 'invalid_role';
+          const result = await userService.create({ items: [testUser], subject });
+          result.items.should.be.empty();
+          result.status.code.should.equal(400);
+          result.status.message.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
+        });
+
+        it('should not allow to create a User with role assocation which is not assignable', async () => {
+          testUser.role_associations[0].role = 'super-admin-r-id';
+          const result = await userService.create({ items: [testUser], subject });
+          result.items.should.be.empty();
+          result.status.code.should.equal(400);
+          result.status.message.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id does not have permissions');
+        });
+
+        it('should throw an error when hierarchical do not match creator role', async () => {
+          testUser.role_associations[0].role = 'user-r-id';
+          // auth_context not containing valid creator role (admin-r-id)
+          subject.hierarchical_scopes = [
+            {
+              id: 'mainOrg',
+              role: 'user-r-id',
+              children: [{
+                id: 'orgA',
+                children: [{
+                  id: 'orgB',
                   children: [{
-                    id: 'orgA',
-                    children: [{
-                      id: 'orgB',
-                      children: [{
-                        id: 'orgC'
-                      }]
-                    }]
+                    id: 'orgC'
                   }]
-                }
-              ]
-            };
-    
-            it('should allow to create a User with valid role and valid valid HR scope', async () => {
-              // enable and enforce authorization
-              cfg.set('authorization:enabled', true);
-              cfg.set('authorization:enforce', true);
-              updateConfig(cfg);
-              const result = await userService.create({ items: testUser, subject });
-              should.exist(result);
-              should.exist(result.data);
-              should.exist(result.data.items);
-              result.data.items[0].id.should.equal('testuser');
-            });
-            it('should allow to update a User role_associations, first and last name with valid role and valid HR scope', async () => {
-              testUser.first_name = 'testFirstName';
-              testUser.last_name = 'testLastName';
-              // Add OrgB user scope as well
-              testUser.role_associations.push({
-                role: 'user-r-id',
-                attributes: [{
-                  id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-                  value: 'urn:restorecommerce:acs:model:organization.Organization'
-                },
-                {
-                  id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-                  value: 'orgB'
                 }]
-              });
-              const result = await userService.update({ items: testUser, subject });
-              should.exist(result);
-              should.exist(result.data);
-              should.exist(result.data.items);
-              result.data.items[0].id.should.equal('testuser');
-              result.data.items[0].first_name.should.equal('testFirstName');
-              result.data.items[0].last_name.should.equal('testLastName');
-              result.data.items[0].role_associations[0].attributes[1].value.should.equal('orgC');
-              result.data.items[0].role_associations[1].attributes[1].value.should.equal('orgB');
-              await userService.unregister({ identifier: result.data.items[0].name });
-            });
-    
-            it('should not allow to create a User with invalid role existing in system', async () => {
-              testUser.role_associations[0].role = 'invalid_role';
-              const result = await userService.create({ items: testUser, subject });
-              should.not.exist(result.data);
-              should.exist(result.error);
-              should.exist(result.error.name);
-              result.error.name.should.equal('InvalidArgument');
-              should.exist(result.error.details);
-              result.error.details.should.equal('3 INVALID_ARGUMENT: The target role invalid_role is invalid and cannot be assigned to user test.user');
-            });
-    
-            it('should not allow to create a User with role assocation which is not assignable', async () => {
-              testUser.role_associations[0].role = 'super-admin-r-id';
-              const result = await userService.create({ items: testUser, subject });
-              should.not.exist(result.data);
-              should.exist(result.error);
-              should.exist(result.error.name);
-              result.error.name.should.equal('InvalidArgument');
-              should.exist(result.error.details);
-              result.error.details.should.equal('3 INVALID_ARGUMENT: The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id does not have permissions');
-            });
-    
-            it('should throw an error when hierarchical do not match creator role', async () => {
-              testUser.role_associations[0].role = 'user-r-id';
-              // auth_context not containing valid creator role (admin-r-id)
-              subject.hierarchical_scopes = [
-                {
-                  id: 'mainOrg',
-                  role: 'user-r-id',
-                  children: [{
-                    id: 'orgA',
-                    children: [{
-                      id: 'orgB',
-                      children: [{
-                        id: 'orgC'
-                      }]
-                    }]
-                  }]
-                }
-              ];
-              const result = await userService.create({ items: testUser, subject });
-              should.not.exist(result.data);
-              should.exist(result.error);
-              should.exist(result.error.name);
-              result.error.name.should.equal('InvalidArgument');
-              should.exist(result.error.details);
-              result.error.details.should.equal('3 INVALID_ARGUMENT: No Hierarchical Scopes could be found');
-            });
-    
-            it('should not allow to create a User with role assocation with invalid hierarchical_scope', async () => {
-              testUser.role_associations[0].role = 'user-r-id';
-              // auth_context missing orgC in HR scope
-              subject.hierarchical_scopes = [
-                {
-                  id: 'mainOrg',
-                  role: 'admin-r-id',
-                  children: [{
-                    id: 'orgA',
-                    children: [{
-                      id: 'orgB',
-                      children: [] // orgC is missing in HR scope
-                    }]
-                  }]
-                }
-              ];
-              const result = await userService.create({ items: testUser, subject });
-              should.not.exist(result.data);
-              should.exist(result.error);
-              should.exist(result.error.name);
-              result.error.name.should.equal('InvalidArgument');
-              should.exist(result.error.details);
-              result.error.details.should.equal('3 INVALID_ARGUMENT: the role user-r-id cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
-    
-              // disable authorization
-              cfg.set('authorization:enabled', false);
-              cfg.set('authorization:enforce', false);
-              updateConfig(cfg);
-    
-              // delete user and roles collection
-              await userService.delete({
-                collection: true
-              });
-              await roleService.delete({
-                collection: true
-              });
-              // stop mock acs-srv
-              stopGrpcMockServer();
-            });
-          }); */
+              }]
+            }
+          ];
+          const result = await userService.create({ items: [testUser], subject });
+          result.items.should.be.empty();
+          result.status.code.should.equal(400);
+          result.status.message.should.equal('No Hierarchical Scopes could be found');
+        });
+
+        it('should not allow to create a User with role assocation with invalid hierarchical_scope', async () => {
+          testUser.role_associations[0].role = 'user-r-id';
+          // auth_context missing orgC in HR scope
+          subject.hierarchical_scopes = [
+            {
+              id: 'mainOrg',
+              role: 'admin-r-id',
+              children: [{
+                id: 'orgA',
+                children: [{
+                  id: 'orgB',
+                  children: [] // orgC is missing in HR scope
+                }]
+              }]
+            }
+          ];
+          const result = await userService.create({ items: [testUser], subject });
+          result.items.should.be.empty();
+          result.status.code.should.equal(400);
+          result.status.message.should.equal('the role user-r-id cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
+
+          // disable authorization
+          cfg.set('authorization:enabled', false);
+          cfg.set('authorization:enforce', false);
+          updateConfig(cfg);
+
+          // delete user and roles collection
+          await userService.delete({
+            collection: true
+          });
+          await roleService.delete({
+            collection: true
+          });
+          // stop mock acs-srv
+          stopGrpcMockServer();
+        });
+      });
     });
   });
 });

@@ -352,14 +352,14 @@ export class UserService extends ServiceBase {
     if (acsResponse.decision != Decision.PERMIT) {
       return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
     }
-
     if (acsResponse.decision === Decision.PERMIT) {
       if (this.cfg.get('authorization:enabled')) {
         try {
           await this.verifyUserRoleAssociations(usersList, subject);
         } catch (err) {
+          const errMessage = err.details ? err.details : err.message;
           // for unhandled promise rejection
-          return returnStatus(err.code, err.message);
+          return returnStatus(400, errMessage);
         }
       }
       for (let i = 0; i < usersList.length; i++) {
@@ -509,14 +509,16 @@ export class UserService extends ServiceBase {
       }
       let dbTargetRoles = [];
       for (let targetRole of rolesData.items) {
-        dbTargetRoles.push(targetRole.id);
-        if (!targetRole.assignable_by_roles ||
-          !createAccessRole.some((role) => targetRole.assignable_by_roles.includes(role))) {
-          const userName = user && user.name ? user.name : undefined;
-          let message = `The target role ${targetRole.id} cannot be assigned to` +
-            ` user ${userName} as user role ${createAccessRole} does not have permissions`;
-          this.logger.verbose(message);
-          throw new errors.InvalidArgument(message);
+        if (targetRole.payload) {
+          dbTargetRoles.push(targetRole.payload.id);
+          if (!targetRole.payload.assignable_by_roles ||
+            !createAccessRole.some((role) => targetRole.payload.assignable_by_roles.includes(role))) {
+            const userName = user && user.name ? user.name : undefined;
+            let message = `The target role ${targetRole.payload.id} cannot be assigned to` +
+              ` user ${userName} as user role ${createAccessRole} does not have permissions`;
+            this.logger.verbose(message);
+            throw new errors.InvalidArgument(message);
+          }
         }
       }
 
@@ -1324,8 +1326,9 @@ export class UserService extends ServiceBase {
             await this.verifyUserRoleAssociations(items, subject);
           }
         } catch (err) {
+          const errMessage = err.details ? err.details : err.message;
           // for unhandled promise rejection
-          return returnStatus(400, err.message);
+          return returnStatus(400, errMessage);
         }
       }
       // each item includes payload and status in turn
@@ -1600,8 +1603,9 @@ export class UserService extends ServiceBase {
             await this.verifyUserRoleAssociations(usersList, subject);
           }
         } catch (err) {
+          const errMessage = err.details ? err.details : err.message;
           // for unhandled promise rejection
-          return returnStatus(err.code, err.message);
+          return returnStatus(400, errMessage);
         }
       }
       let result = [];
@@ -1835,7 +1839,7 @@ export class UserService extends ServiceBase {
         const users = await super.read({ request: { filters } }, context);
         if (users.total_count === 0) {
           logger.debug('User does not exist for deleting', { userID });
-          return returnStatusArray([{code: 404, message: 'User does not exist for deleting', id: userID}]);
+          return returnStatusArray([{ code: 404, message: 'User does not exist for deleting', id: userID }]);
         }
       }
 
