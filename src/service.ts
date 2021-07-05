@@ -1534,11 +1534,18 @@ export class UserService extends ServiceBase {
             for (let dbRoleAssoc of dbRoleAssocs) {
               if (dbRoleAssoc.role === userRoleAssoc.role) {
                 let i = 0;
-                const attrLength = userRoleAssoc.attributes.length;
-                for (let dbAttribute of dbRoleAssoc.attributes) {
-                  for (let userAttribute of userRoleAssoc.attributes) {
-                    if (userAttribute.id === dbAttribute.id && userAttribute.value === dbAttribute.value) {
-                      i++;
+                let attrLength;
+                if (userRoleAssoc.attributes) {
+                  attrLength = userRoleAssoc.attributes.length;
+                } else {
+                  attrLength = 0;
+                }
+                if (dbRoleAssoc.attributes && dbRoleAssoc.attributes.length > 0) {
+                  for (let dbAttribute of dbRoleAssoc.attributes) {
+                    for (let userAttribute of userRoleAssoc.attributes) {
+                      if (userAttribute.id === dbAttribute.id && userAttribute.value === dbAttribute.value) {
+                        i++;
+                      }
                     }
                   }
                 }
