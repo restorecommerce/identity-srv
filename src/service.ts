@@ -675,16 +675,16 @@ export class UserService extends ServiceBase {
 
     this.setUserDefaults(user);
     if ((!user.password && !user.invite && (user.user_type != TECHNICAL_USER))) {
-      return returnStatus(400, 'argument password is empty');
+      return returnStatus(400, 'argument password is empty', user.id);
     }
     if (!user.email) {
-      return returnStatus(400, 'argument email is empty');
+      return returnStatus(400, 'argument email is empty', user.id);
     }
     if (!user.name) {
-      return returnStatus(400, 'argument name is empty');
+      return returnStatus(400, 'argument name is empty', user.id);
     }
     if (user.user_type && user.user_type === TECHNICAL_USER && user.password) {
-      return returnStatus(400, 'argument password should be empty for technical user');
+      return returnStatus(400, 'argument password should be empty for technical user', user.id);
     }
 
     const serviceCfg = this.cfg.get('service');
@@ -698,11 +698,11 @@ export class UserService extends ServiceBase {
       const errorMessage = `Error while validating username: ${user.name}, ` +
         `error: ${err.name}, message:${err.details}`;
       logger.error(errorMessage);
-      return returnStatus(400, errorMessage);
+      return returnStatus(400, errorMessage, user.id);
     }
 
     if (_.isEmpty(user.first_name) || _.isEmpty(user.last_name)) {
-      return returnStatus(400, 'User register requires both first and last name');
+      return returnStatus(400, 'User register requires both first and last name', user.id);
     }
 
     // Since for guestUser he should be able to register with same email ID multiple times
@@ -751,7 +751,7 @@ export class UserService extends ServiceBase {
           logger.debug('Guest user', { name: user.name });
         } else {
           logger.debug('user does already exist', users);
-          return returnStatus(409, 'user does already exist');
+          return returnStatus(409, 'user does already exist', user.id);
         }
       }
     }
@@ -764,7 +764,7 @@ export class UserService extends ServiceBase {
     }
 
     if (!this.roleService.verifyRoles(user.role_associations)) {
-      return returnStatus(400, 'Invalid role ID in role associations');
+      return returnStatus(400, 'Invalid role ID in role associations', user.id);
     }
 
     const serviceCall = {
@@ -854,14 +854,14 @@ export class UserService extends ServiceBase {
       if (users && users.total_count === 1) {
         user = users.items[0].payload;
       } else if (users.total_count === 0) {
-        return returnStatus(404, 'user not found');
+        return returnStatus(404, 'user not found', user.id);
       } else if (users.total_count > 1) {
         return returnStatus(400, `Invalid identifier provided for user invitation confirmation, multiple users found for identifier ${identifier}`);
       }
 
       if ((!userInviteReq.activation_code) || userInviteReq.activation_code !== user.activation_code) {
         this.logger.debug('wrong activation code', { user });
-        return returnStatus(412, 'wrong activation code');
+        return returnStatus(412, 'wrong activation code', user.id);
       }
       user.active = true;
       user.unauthenticated = false;
@@ -986,11 +986,11 @@ export class UserService extends ServiceBase {
         logger.debug('activation request to an active user' +
           ' which still has the activation code', user);
         return returnStatus(412, 'activation request to an active user' +
-          ' which still has the activation code');
+          ' which still has the activation code', user.id);
       }
       if ((!user.activation_code) || user.activation_code !== activationCode) {
         logger.debug('wrong activation code', user);
-        return returnStatus(412, 'wrong activation code');
+        return returnStatus(412, 'wrong activation code', user.id);
       }
 
       user.active = true;
@@ -1051,7 +1051,7 @@ export class UserService extends ServiceBase {
     if (acsResponse.decision === Decision.PERMIT) {
       const userPWhash = user.password_hash;
       if (!password.verify(userPWhash, pw)) {
-        return returnStatus(401, 'password does not match');
+        return returnStatus(401, 'password does not match', user.id);
       }
 
       const password_hash = password.hash(newPw);
@@ -1155,7 +1155,7 @@ export class UserService extends ServiceBase {
 
       if (!user.activation_code || user.activation_code !== activation_code) {
         logger.debug('wrong activation code upon password change confirmation for user', user.name);
-        return returnStatus(412, 'wrong activation code');
+        return returnStatus(412, 'wrong activation code', user.id);
       }
 
       user.activation_code = '';
@@ -1272,7 +1272,7 @@ export class UserService extends ServiceBase {
     if (acsResponse.decision === Decision.PERMIT) {
       if (user.activation_code !== activationCode) {
         logger.debug('wrong activation code upon email confirmation for user', user);
-        return returnStatus(412, 'wrong activation code');
+        return returnStatus(412, 'wrong activation code', user.id);
       }
       user.email = user.new_email;
       user.new_email = '';
@@ -1682,9 +1682,9 @@ export class UserService extends ServiceBase {
     const user: User = users.items[0].payload;
     if (!user.active) {
       if (obfuscateAuthNErrorReason) {
-        return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist');
+        return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist', user.id);
       } else {
-        return returnStatus(412, 'user is inactive');
+        return returnStatus(412, 'user is inactive', user.id);
       }
     }
 
@@ -1696,17 +1696,17 @@ export class UserService extends ServiceBase {
         }
       }
       if (obfuscateAuthNErrorReason) {
-        return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist');
+        return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist', user.id);
       } else {
-        return returnStatus(401, 'password does not match');
+        return returnStatus(401, 'password does not match', user.id);
       }
     } else if (!user.user_type || user.user_type != TECHNICAL_USER) {
       const match = password.verify(user.password_hash, call.request.password);
       if (!match) {
         if (obfuscateAuthNErrorReason) {
-          return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist');
+          return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist', user.id);
         } else {
-          return returnStatus(401, 'password does not match');
+          return returnStatus(401, 'password does not match', user.id);
         }
       }
       return { payload: user, status: { code: 200, message: 'success' } };
@@ -2378,7 +2378,7 @@ export class UserService extends ServiceBase {
     if (invitedByUsers.total_count === 1) {
       invitedByUser = invitedByUsers.items[0];
     } else {
-      return returnStatus(404, `user with identifier ${invited_by_user_identifier} not found`);
+      return returnStatus(404, `user with identifier ${invited_by_user_identifier} not found`, invited_by_user_identifier);
     }
 
     return {
@@ -2411,9 +2411,9 @@ export class UserService extends ServiceBase {
       }
       return returnStatus(200, 'success', user.id);
     } else if (users.total_count === 0) {
-      return returnStatus(404, `user with identifier ${identifier} not found`);
+      return returnStatus(404, `user with identifier ${identifier} not found`, identifier);
     } else if (users.total_count > 1) {
-      return returnStatus(400, `Invalid identifier provided for send activation email, multiple users found for identifier ${identifier}`);
+      return returnStatus(400, `Invalid identifier provided for send activation email, multiple users found for identifier ${identifier}`, identifier);
     }
   }
 

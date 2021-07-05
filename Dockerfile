@@ -1,12 +1,12 @@
 # syntax = docker/dockerfile:experimental
 
 ### Base
-FROM node:14.15.5-alpine as base
+FROM node:16.3.0-alpine as base
 ENV NO_UPDATE_NOTIFIER=true
 RUN npm install -g npm
-RUN npm install -g typescript@3.4.1
 
 RUN apk add --no-cache git
+RUN apk add g++ make python3
 USER node
 ARG APP_HOME=/home/node/srv
 WORKDIR $APP_HOME
