@@ -751,7 +751,7 @@ export class UserService extends ServiceBase {
           logger.debug('Guest user', { name: user.name });
         } else {
           logger.debug('user does already exist', users);
-          return returnStatus(409, 'user does already exist', user.id);
+          return returnStatus(409, 'user does already exist', user?.payload?.id);
         }
       }
     }
