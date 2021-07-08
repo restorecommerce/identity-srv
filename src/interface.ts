@@ -146,7 +146,11 @@ export interface Response {
 
 export interface AccessResponse {
   decision: Decision;
-  response?: Response;
+  obligation?: string;
+  operation_status: {
+    code: number;
+    message: string;
+  };
 }
 
 export interface FilterType {
@@ -157,7 +161,7 @@ export interface FilterType {
 }
 
 export interface ReadPolicyResponse extends AccessResponse {
-  policySet?: PolicySetRQ;
+  policy_sets?: PolicySetRQ[];
   filters?: FilterOp [];
   custom_query_args?: {
     custom_queries: any;

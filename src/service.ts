@@ -7,10 +7,10 @@ import { DocumentMetadata, OperatorType } from '@restorecommerce/resource-base-i
 import { Logger } from 'winston';
 import {
   ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest,
-  PolicySetRQ, HierarchicalScope, RoleAssociation
+  HierarchicalScope, RoleAssociation, PolicySetRQResponse, DecisionResponse
 } from '@restorecommerce/acs-client';
 import Redis from 'ioredis';
-import { checkAccessRequest, password, unmarshallProtobufAny, marshallProtobufAny, getDefaultFilter, getNameFilter, returnStatus, returnStatusArray } from './utils';
+import { checkAccessRequest, password, unmarshallProtobufAny, marshallProtobufAny, getDefaultFilter, getNameFilter, returnOperationStatus, returnStatusArray, returnCodeMessage, returnStatus } from './utils';
 import { errors } from '@restorecommerce/chassis-srv';
 import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common';
 import {
@@ -90,16 +90,16 @@ export class UserService extends ServiceBase {
   async find(call: Call<FindUser>, context?: any): Promise<any> {
     let { id, name, email, subject } = call.request;
     const readRequest = call.request;
-    let acsResponse: AccessResponse;
+    let acsResponse: ReadPolicyResponse;
     try {
       acsResponse = await checkAccessRequest(subject, readRequest,
         AuthZAction.READ, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
     if (acsResponse.decision === Decision.PERMIT) {
       const logger = this.logger;
@@ -155,12 +155,7 @@ export class UserService extends ServiceBase {
         return users;
       }
       logger.silly('user(s) could not be found for request', call.request);
-      return {
-        status: {
-          code: 404,
-          message: 'user not found'
-        }
-      };
+      return returnOperationStatus(404, 'user not found');
     }
   }
 
@@ -210,17 +205,17 @@ export class UserService extends ServiceBase {
             if (redisResp && redisResp.tokens) {
               const dbToken = _.find(redisResp.tokens, { token });
               if ((dbToken && dbToken.expires_in === 0) || (dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000))) {
-                return resolve({ payload: redisResp, status: { code: 200, message: 'success' } });
+                return resolve({ payload: redisResp, status: returnCodeMessage(200, 'success') });
               } else {
                 // delete token from redis and update user entity
                 this.tokenRedisClient.del(token, async (err, numberOfDeletedKeys) => {
                   if (err) {
                     this.logger.error('Error deleting cached findByTOken data from redis', { err });
-                    resolve({ status: { code: 500, message: 'Error deleting cached findByTOken data from redis' } });
+                    resolve({ status: returnCodeMessage(500, 'Error deleting cached findByTOken data from redis') });
                   } else {
                     this.logger.info('Redis cached data for findByToken deleted successfully', { noOfKeys: numberOfDeletedKeys });
                   }
-                  resolve({ status: { code: 401, message: 'Redis cached data for findByToken deleted successfully' } });
+                  resolve({ status: returnCodeMessage(401, 'Redis cached data for findByToken deleted successfully') });
                 });
               }
             }
@@ -266,7 +261,7 @@ export class UserService extends ServiceBase {
                 return resolve({ payload: user, status: { code: 200, message: 'success' } });
               } else if (dbToken && dbToken.expires_in < Math.round(new Date().getTime() / 1000)) {
                 logger.debug('Token expired');
-                resolve({ status: { code: 401, message: 'Token expired' } });
+                resolve({ status: { code: 401, message: 'Token ${token} expired' } });
               }
             }
           }
@@ -307,19 +302,14 @@ export class UserService extends ServiceBase {
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return {
-        status: {
+        operation_status: {
           code: err.code,
           message: err.message
         }
       };
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return {
-        status: {
-          code: acsResponse.response.status.code,
-          message: acsResponse.response.status.message
-        }
-      };
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -335,31 +325,32 @@ export class UserService extends ServiceBase {
    */
   async create(call: any, context?: any): Promise<any> {
     const usersList: User[] = call.request.items;
-    const insertedUsers = { items: [], status: { code: 0, message: '' } };
+    const insertedUsers = { items: [], operation_status: { code: 0, message: '' } };
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
     let subject = call.request.subject;
     // update meta data for owner information
     const acsResources = await this.createMetadata(usersList, AuthZAction.CREATE, subject);
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.CREATE,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
     if (acsResponse.decision === Decision.PERMIT) {
       if (this.cfg.get('authorization:enabled')) {
         try {
           await this.verifyUserRoleAssociations(usersList, subject);
         } catch (err) {
+          this.logger.error('Error caught verifying user role associations', { message: err.message });
           const errMessage = err.details ? err.details : err.message;
           // for unhandled promise rejection
-          return returnStatus(400, errMessage);
+          return returnOperationStatus(400, errMessage);
         }
       }
       for (let i = 0; i < usersList.length; i++) {
@@ -381,8 +372,7 @@ export class UserService extends ServiceBase {
           await this.topics.rendering.emit('renderRequest', renderRequest);
         }
       }
-      insertedUsers.status.code = 200;
-      insertedUsers.status.message = 'success';
+      insertedUsers.operation_status = returnCodeMessage(200, 'success');
       return insertedUsers;
     }
   }
@@ -433,7 +423,7 @@ export class UserService extends ServiceBase {
       // Make whatIsAllowedACS request to retreive the set of applicable
       // policies and check for role scoping entity, if it exists then validate
       // the user role associations if not skip validation
-      let acsResponse: Decision | PolicySetRQ;
+      let acsResponse: DecisionResponse | PolicySetRQResponse;
       try {
         acsResponse = await accessRequest(subject, {
           entity: 'user',
@@ -443,29 +433,32 @@ export class UserService extends ServiceBase {
         this.logger.error('Error making wahtIsAllowedACS request for verifying role associations', { message: err.message });
         throw err;
       }
-      // decision is for apiKey
-      if ((acsResponse as Decision) === Decision.PERMIT) {
+      // for apiKey no need to verifyUserRoleAssociations
+      const configuredApiKey = this.cfg.get('authentication:apiKey');
+      if (acsResponse.decision === Decision.PERMIT && (configuredApiKey === subject.token)) {
         return;
       }
-      const policiesList = (acsResponse as PolicySetRQ).policies;
-      if (policiesList && policiesList.length > 0) {
-        for (let policy of policiesList) {
-          for (let rule of policy.rules) {
-            if (rule.effect === 'PERMIT' && rule.target && rule.target.subject) {
-              // check if the rule subject has any scoping Entity
-              const ruleSubjectAttrs = rule.target.subject;
-              for (let ruleAttr of ruleSubjectAttrs) {
-                if (ruleAttr.id === this.cfg.get('authorization:urns:role')) {
-                  // rule's role which give's user the acess to create User
-                  createAccessRole.push(ruleAttr.value);
-                  // check if there is no scoping then skip comparing / validating role scope instance
-                  // ex: superAdmin who does not have role scoping instance
-                  if (ruleSubjectAttrs.length === 1) {
-                    skipValidatingScopingInstance = true;
+      if (acsResponse && (acsResponse as PolicySetRQResponse).policy_sets && (acsResponse as PolicySetRQResponse).policy_sets.length > 0) {
+        const policiesList = (acsResponse as PolicySetRQResponse).policy_sets[0].policies;
+        if (policiesList && policiesList.length > 0) {
+          for (let policy of policiesList) {
+            for (let rule of policy.rules) {
+              if (rule.effect === 'PERMIT' && rule.target && rule.target.subject) {
+                // check if the rule subject has any scoping Entity
+                const ruleSubjectAttrs = rule.target.subject;
+                for (let ruleAttr of ruleSubjectAttrs) {
+                  if (ruleAttr.id === this.cfg.get('authorization:urns:role')) {
+                    // rule's role which give's user the acess to create User
+                    createAccessRole.push(ruleAttr.value);
+                    // check if there is no scoping then skip comparing / validating role scope instance
+                    // ex: superAdmin who does not have role scoping instance
+                    if (ruleSubjectAttrs.length === 1) {
+                      skipValidatingScopingInstance = true;
+                    }
                   }
-                }
-                if (ruleAttr.id === this.cfg.get('authorization:urns:roleScopingEntity')) {
-                  validateRoleScope = true;
+                  if (ruleAttr.id === this.cfg.get('authorization:urns:roleScopingEntity')) {
+                    validateRoleScope = true;
+                  }
                 }
               }
             }
@@ -828,7 +821,7 @@ export class UserService extends ServiceBase {
   async confirmUserInvitation(call: any, context: any): Promise<any> {
     const userInviteReq: UserInviationReq = call.request || call;
     let subject = call.request.subject;
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, {
         active: true,
@@ -838,10 +831,10 @@ export class UserService extends ServiceBase {
       }, AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -854,14 +847,14 @@ export class UserService extends ServiceBase {
       if (users && users.total_count === 1) {
         user = users.items[0].payload;
       } else if (users.total_count === 0) {
-        return returnStatus(404, 'user not found', user.id);
+        return returnOperationStatus(404, `user not found for identifier ${identifier}`);
       } else if (users.total_count > 1) {
-        return returnStatus(400, `Invalid identifier provided for user invitation confirmation, multiple users found for identifier ${identifier}`);
+        return returnOperationStatus(400, `Invalid identifier provided for user invitation confirmation, multiple users found for identifier ${identifier}`);
       }
 
       if ((!userInviteReq.activation_code) || userInviteReq.activation_code !== user.activation_code) {
         this.logger.debug('wrong activation code', { user });
-        return returnStatus(412, 'wrong activation code', user.id);
+        return returnOperationStatus(412, 'wrong activation code');
       }
       user.active = true;
       user.unauthenticated = false;
@@ -876,7 +869,7 @@ export class UserService extends ServiceBase {
       };
       const updateStatus = await super.update(serviceCall, context);
       this.logger.info('password updated for invited user', { identifier });
-      return { status: updateStatus?.items[0]?.status };
+      return { operation_status: updateStatus?.items[0]?.status };
     }
   }
 
@@ -953,44 +946,44 @@ export class UserService extends ServiceBase {
     const identifier = request.identifier;
     const activationCode = request.activation_code;
     let subject = call.request.subject;
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { active: true, activation_code: activationCode },
         AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
       if (!identifier) {
-        return returnStatus(400, 'argument id is empty');
+        return returnOperationStatus(400, 'argument id is empty');
       }
       if (!activationCode) {
-        return returnStatus(400, 'argument activation_code is empty');
+        return returnOperationStatus(400, 'argument activation_code is empty');
       }
       // check for the identifier against name or email in DB
       const filters = getDefaultFilter(identifier);
       const users = await super.read({ request: { filters } }, context);
       if (!users || users.total_count === 0) {
-        return returnStatus(404, 'user not found');
+        return returnOperationStatus(404, 'user not found');
       } else if (users.total_count > 1) {
-        return returnStatus(400, `Invalid identifier provided for user activation, multiple users found for identifier ${identifier}`);
+        return returnOperationStatus(400, `Invalid identifier provided for user activation, multiple users found for identifier ${identifier}`);
       }
       const user: User = users.items[0].payload;
       if (user.active) {
         logger.debug('activation request to an active user' +
           ' which still has the activation code', user);
-        return returnStatus(412, 'activation request to an active user' +
-          ' which still has the activation code', user.id);
+        return returnOperationStatus(412, 'activation request to an active user' +
+          ' which still has the activation code');
       }
       if ((!user.activation_code) || user.activation_code !== activationCode) {
         logger.debug('wrong activation code', user);
-        return returnStatus(412, 'wrong activation code', user.id);
+        return returnOperationStatus(412, 'wrong activation code');
       }
 
       user.active = true;
@@ -1007,7 +1000,7 @@ export class UserService extends ServiceBase {
         logger.info('user activated', user);
         await this.topics['user.resource'].emit('activated', { id: user.id });
       }
-      return { status: updateStatus?.items[0]?.status };
+      return { operation_status: updateStatus?.items[0]?.status };
     }
   }
 
@@ -1030,28 +1023,28 @@ export class UserService extends ServiceBase {
     const users = await super.read({ request: { filters } }, context);
     if (!users || users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
-      return returnStatus(404, 'user does not exist');
+      return returnOperationStatus(404, 'user does not exist');
     } else if (users.total_count > 1) {
-      return returnStatus(400, `Invalid identifier provided for change password, multiple users found for identifier ${identifier}`);
+      return returnOperationStatus(400, `Invalid identifier provided for change password, multiple users found for identifier ${identifier}`);
     }
     const user: User = users.items[0].payload;
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id: user.id, password: pw, new_password: newPw, meta: user.meta },
         AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
       const userPWhash = user.password_hash;
       if (!password.verify(userPWhash, pw)) {
-        return returnStatus(401, 'password does not match', user.id);
+        return returnOperationStatus(401, 'password does not match');
       }
 
       const password_hash = password.hash(newPw);
@@ -1066,7 +1059,7 @@ export class UserService extends ServiceBase {
         logger.info('password changed for user', { identifier });
         await this.topics['user.resource'].emit('passwordChanged', user);
       }
-      return { status: updateStatus?.items[0]?.status };
+      return { operation_status: updateStatus?.items[0]?.status };
     }
   }
 
@@ -1088,9 +1081,9 @@ export class UserService extends ServiceBase {
     if (users.total_count === 1) {
       user = users.items[0].payload;
     } else if (!users || users.total_count === 0) {
-      return returnStatus(404, 'user not found');
+      return returnOperationStatus(404, 'user not found');
     } else if (users.total_count > 1) {
-      return returnStatus(400, `Invalid identifier provided for request password change, multiple users found for identifier ${identifier}`);
+      return returnOperationStatus(400, `Invalid identifier provided for request password change, multiple users found for identifier ${identifier}`);
     }
 
     logger.verbose('Received a password change request for user', { id: user.id });
@@ -1112,7 +1105,7 @@ export class UserService extends ServiceBase {
         await this.topics.rendering.emit('renderRequest', renderRequest);
       }
     }
-    return { status: updateStatus?.items[0]?.status };
+    return { operation_status: updateStatus?.items[0]?.status };
   }
 
   /**
@@ -1126,7 +1119,7 @@ export class UserService extends ServiceBase {
     const { identifier, activation_code } = call.request;
     const newPassword = call.request.password;
     let subject = call.request.subject;
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, {
         activation_code,
@@ -1134,10 +1127,10 @@ export class UserService extends ServiceBase {
       }, AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1146,16 +1139,16 @@ export class UserService extends ServiceBase {
       let user;
       const users = await super.read({ request: { filters } });
       if (!users || users.total_count === 0) {
-        return returnStatus(404, 'user not found');
+        return returnOperationStatus(404, 'user not found');
       } else if (users.total_count === 1) {
         user = users.items[0].payload;
       } else if (users.total_count > 1) {
-        return returnStatus(400, `Invalid identifier provided for confirm password change, multiple users found for identifier ${identifier}`);
+        return returnOperationStatus(400, `Invalid identifier provided for confirm password change, multiple users found for identifier ${identifier}`);
       }
 
       if (!user.activation_code || user.activation_code !== activation_code) {
         logger.debug('wrong activation code upon password change confirmation for user', user.name);
-        return returnStatus(412, 'wrong activation code', user.id);
+        return returnOperationStatus(412, 'wrong activation code');
       }
 
       user.activation_code = '';
@@ -1169,7 +1162,7 @@ export class UserService extends ServiceBase {
         logger.info('password changed for user', user.id);
         await this.topics['user.resource'].emit('passwordChanged', user);
       }
-      return { status: updateStatus?.items[0]?.status };
+      return { operation_status: updateStatus?.items[0]?.status };
     }
   }
 
@@ -1185,15 +1178,15 @@ export class UserService extends ServiceBase {
     const identifier = request.identifier;
     const new_email = request.new_email;
     const subject = call.request.subject;
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     // check for the identifier against name or email in DB
     const filters = getDefaultFilter(identifier);
     const users = await super.read({ request: { filters } }, context);
     if (!users || users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
-      return returnStatus(404, 'user does not exist');
+      return returnOperationStatus(404, 'user does not exist');
     } else if (users.total_count > 1) {
-      return returnStatus(400, `Invalid identifier provided for request email change, multiple users found for identifier ${identifier}`);
+      return returnOperationStatus(400, `Invalid identifier provided for request email change, multiple users found for identifier ${identifier}`);
     }
     const user: User = users.items[0].payload;
     try {
@@ -1201,11 +1194,11 @@ export class UserService extends ServiceBase {
         AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1227,7 +1220,7 @@ export class UserService extends ServiceBase {
           await this.topics.rendering.emit('renderRequest', renderRequest);
         }
       }
-      return { status: updateStatus?.items[0]?.status };
+      return { operation_status: updateStatus?.items[0]?.status };
     }
   }
 
@@ -1248,14 +1241,14 @@ export class UserService extends ServiceBase {
     const users = await super.read({ request: { filters } });
     if (users && users.total_count === 0) {
       logger.debug('user does not exist', identifier);
-      return returnStatus(404, 'user does not exist');
+      return returnOperationStatus(404, 'user does not exist');
     } else if (users.total_count > 1) {
-      return returnStatus(400, `Invalid identifier provided for confirm email change, multiple users found for identifier ${identifier}`);
+      return returnOperationStatus(400, `Invalid identifier provided for confirm email change, multiple users found for identifier ${identifier}`);
     }
 
     const user: User = users.items[0].payload;
     let subject = call.request.subject;
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, {
         activation_code: activationCode,
@@ -1263,16 +1256,16 @@ export class UserService extends ServiceBase {
       }, AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
       if (user.activation_code !== activationCode) {
         logger.debug('wrong activation code upon email confirmation for user', user);
-        return returnStatus(412, 'wrong activation code', user.id);
+        return returnOperationStatus(412, 'wrong activation code');
       }
       user.email = user.new_email;
       user.new_email = '';
@@ -1287,7 +1280,7 @@ export class UserService extends ServiceBase {
         logger.info('Email address changed for user', user.id);
         await this.topics['user.resource'].emit('emailChangeConfirmed', user);
       }
-      return { status: updateStatus?.items[0]?.status };
+      return { operation_status: updateStatus?.items[0]?.status };
     }
   }
 
@@ -1300,22 +1293,22 @@ export class UserService extends ServiceBase {
   async update(call: any, context?: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
-      return returnStatus(400, 'No items were provided for update');
+      return returnOperationStatus(400, 'No items were provided for update');
     }
     let items = call.request.items;
     let subject = call.request.subject;
     // update meta data for owner information
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1328,11 +1321,11 @@ export class UserService extends ServiceBase {
         } catch (err) {
           const errMessage = err.details ? err.details : err.message;
           // for unhandled promise rejection
-          return returnStatus(400, errMessage);
+          return returnOperationStatus(400, errMessage);
         }
       }
       // each item includes payload and status in turn
-      let updateWithStatus = { items: [], status: {} };
+      let updateWithStatus = { items: [], operation_status: {} };
       for (let i = 0; i < items.length; i += 1) {
         // read the user from DB and update the special fields from DB
         // for user modification
@@ -1386,7 +1379,7 @@ export class UserService extends ServiceBase {
           }
           if (acsResponse.decision != Decision.PERMIT) {
             // return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
-            updateWithStatus.items.push(returnStatus(acsResponse.response.status.code, acsResponse.response.status.message, user.id));
+            updateWithStatus.items.push(returnStatus(acsResponse.operation_status.code, acsResponse.operation_status.message, user.id));
             items = _.filter(items, (item) => item.id !== user.id);
             continue;
           }
@@ -1583,23 +1576,23 @@ export class UserService extends ServiceBase {
   async upsert(call: any, context?: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
-      return returnStatus(400, 'No items were provided for upsert');
+      return returnOperationStatus(400, 'No items were provided for upsert');
     }
 
     const usersList = call.request.items;
     let subject = call.request.subject;
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
-    let acsResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1612,7 +1605,7 @@ export class UserService extends ServiceBase {
         } catch (err) {
           const errMessage = err.details ? err.details : err.message;
           // for unhandled promise rejection
-          return returnStatus(400, errMessage);
+          return returnOperationStatus(400, errMessage);
         }
       }
       let result = [];
@@ -1649,11 +1642,11 @@ export class UserService extends ServiceBase {
           let updateResponse = await this.update({ request: { items: [user], subject } });
           result.push(updateResponse.items[0]);
         } else if (users.total_count > 1) {
-          return returnStatus(400, `Invalid identifier provided user upsert, multiple users found for identifier ${user.name}`);
+          return returnOperationStatus(400, `Invalid identifier provided user upsert, multiple users found for identifier ${user.name}`);
         }
       }
-      const status = { code: 200, message: 'success' };
-      return { items: result, status };
+      const operation_status = { code: 200, message: 'success' };
+      return { items: result, operation_status };
     }
   }
 
@@ -1741,22 +1734,22 @@ export class UserService extends ServiceBase {
 
     if (users && users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
-      return returnStatus(404, `user with identifier ${identifier} does not exist for unregistering`);
+      return returnOperationStatus(404, `user with identifier ${identifier} does not exist for unregistering`);
     } else if (users.total_count > 1) {
-      return returnStatus(400, `Invalid identifier provided for unregistering, multiple users found for identifier ${identifier}`);
+      return returnOperationStatus(400, `Invalid identifier provided for unregistering, multiple users found for identifier ${identifier}`);
     }
 
     const acsResources = await this.createMetadata(users.items, AuthZAction.DELETE, subject);
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.DELETE,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1772,7 +1765,7 @@ export class UserService extends ServiceBase {
         logger.info('user with identifier deleted', { identifier });
         await this.topics['user.resource'].emit('unregistered', userID);
       }
-      return { status: unregisterStatus?.status[0] };
+      return { operation_status: unregisterStatus?.status[0] };
     }
   }
 
@@ -1806,16 +1799,16 @@ export class UserService extends ServiceBase {
       action = AuthZAction.DROP;
       acsResources = [{ collection: call.request.collection }];
     }
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, acsResources, action,
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatusArray([{ code: err.code, message: err.message }]);
+      return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatusArray([{ code: acsResponse.response.status.code, message: acsResponse.response.status.message }]);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1826,29 +1819,14 @@ export class UserService extends ServiceBase {
             collection: request.collection
           }
         };
-        const deleteStatusArr = await super.delete(serviceCall, context);
+        const deleteResponse = await super.delete(serviceCall, context);
         logger.info('Users collection deleted');
-        return deleteStatusArr;
+        return deleteResponse;
       }
       if (!_.isArray(userIDs)) {
         userIDs = [userIDs];
       }
       logger.silly('Deleting User IDs', { userIDs });
-      // Check each user exist if one of the user does not exist throw an error
-      for (let userID of userIDs) {
-        const filters = [{
-          filter: [{
-            field: 'id',
-            operation: FilterOperation.eq,
-            value: userID
-          }]
-        }];
-        const users = await super.read({ request: { filters } }, context);
-        if (users.total_count === 0) {
-          logger.debug('User does not exist for deleting', { userID });
-          return returnStatusArray([{ code: 404, message: 'User does not exist for deleting', id: userID }]);
-        }
-      }
 
       // delete users
       const serviceCall = {
@@ -1871,15 +1849,16 @@ export class UserService extends ServiceBase {
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
       const deletedUserIDs = await this.modifyUsers(orgIDs, false, context, subject);
-      return { user_ids: deletedUserIDs.map((user) => { return user.id; }) };
+      const operation_status = returnCodeMessage(200, 'success');
+      return { user_ids: deletedUserIDs.map((user) => { return user.id; }), operation_status };
     }
   }
 
@@ -1903,10 +1882,10 @@ export class UserService extends ServiceBase {
         'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1929,7 +1908,7 @@ export class UserService extends ServiceBase {
       });
 
       if (_.isEmpty(result) || _.isEmpty(result.items) || result.items.total_count == 0) {
-        return returnStatus(404, `Role ${role} does not exist`);
+        return returnOperationStatus(404, `Role ${role} does not exist`);
       }
 
       const roleObj = result.items[0].payload;
@@ -1941,12 +1920,12 @@ export class UserService extends ServiceBase {
         request: { filters: roleRequestFiltersWithACS }
       }, {});
       if (_.isEmpty(userResult) || _.isEmpty(userResult.items) || userResult.items.total_count == 0) {
-        return returnStatus(404, 'No users were found in the system');
+        return returnOperationStatus(404, 'No users were found in the system');
       }
 
       const users = userResult.items;
 
-      let usersWithRole: any = { items: [], status: {} };
+      let usersWithRole: any = { items: [], operation_status: {} };
 
       for (let user of users) {
         let found = false;
@@ -1971,8 +1950,8 @@ export class UserService extends ServiceBase {
           }
         }
       }
-      usersWithRole.status.code = 200;
-      usersWithRole.status.message = 'success';
+      usersWithRole.operation_status.code = 200;
+      usersWithRole.operation_status.message = 'success';
       return usersWithRole;
     }
   }
@@ -2385,7 +2364,7 @@ export class UserService extends ServiceBase {
     if (invitedByUsers.total_count === 1) {
       invitedByUser = invitedByUsers.items[0];
     } else {
-      return returnStatus(404, `user with identifier ${invited_by_user_identifier} not found`, invited_by_user_identifier);
+      return returnOperationStatus(404, `user with identifier ${invited_by_user_identifier} not found`);
     }
 
     return {
@@ -2409,18 +2388,18 @@ export class UserService extends ServiceBase {
     if (users.total_count === 1) {
       user = users.items[0].payload;
       if (user.active) {
-        return returnStatus(412, `activation request to an active user ${identifier}`);
+        return returnOperationStatus(412, `activation request to an active user ${identifier}`);
       }
       if (this.emailEnabled && !user.guest) {
         await this.fetchHbsTemplates();
         const renderRequest = this.makeActivationEmailData(user);
         await this.topics.rendering.emit('renderRequest', renderRequest);
       }
-      return returnStatus(200, 'success', user.id);
+      return returnOperationStatus(200, 'success');
     } else if (users.total_count === 0) {
-      return returnStatus(404, `user with identifier ${identifier} not found`, identifier);
+      return returnOperationStatus(404, `user with identifier ${identifier} not found`);
     } else if (users.total_count > 1) {
-      return returnStatus(400, `Invalid identifier provided for send activation email, multiple users found for identifier ${identifier}`, identifier);
+      return returnOperationStatus(400, `Invalid identifier provided for send activation email, multiple users found for identifier ${identifier}`);
     }
   }
 
@@ -2433,34 +2412,38 @@ export class UserService extends ServiceBase {
     if (users.total_count === 1) {
       user = users.items[0].payload;
     } else if (users.total_count === 0) {
-      return returnStatus(404, `user with identifier ${identifier} not found`);
+      return returnOperationStatus(404, `user with identifier ${identifier} not found`);
     } else if (users.total_count > 1) {
-      return returnStatus(400, `Invalid identifier provided for send invitation email, multiple users found for identifier ${identifier}`);
+      return returnOperationStatus(400, `Invalid identifier provided for send invitation email, multiple users found for identifier ${identifier}`);
     }
 
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, { id: user.id, identifier, invited_by_user_identifier, meta: user.meta },
         AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
       if (this.emailEnabled && user.invite) {
         const userForInvitation = await this.makeUserForInvitationData(user, invited_by_user_identifier);
+        // error
+        if (userForInvitation && userForInvitation.operation_status && userForInvitation.operation_status.code) {
+          return userForInvitation;
+        }
         await this.fetchHbsTemplates();
         const renderRequest = this.makeInvitationEmailData(userForInvitation);
         await this.topics.rendering.emit('renderRequest', renderRequest);
       } else {
         this.logger.info('User invite not enabled for identifier', { identifier });
       }
-      return returnStatus(200, 'success', user.id);
+      return returnOperationStatus(200, 'success');
     }
   }
 }
@@ -2495,16 +2478,16 @@ export class RoleService extends ServiceBase {
     const items = call.request.items;
     let subject = call.request.subject;
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.CREATE, subject);
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.CREATE,
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -2533,10 +2516,10 @@ export class RoleService extends ServiceBase {
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -2552,24 +2535,24 @@ export class RoleService extends ServiceBase {
   async update(call: any, context?: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
-      return returnStatus(400, 'No items were provided for update');
+      return returnOperationStatus(400, 'No items were provided for update');
     }
 
     const items = call.request.items;
     let subject = call.request.subject;
     // update owner information
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -2597,16 +2580,16 @@ export class RoleService extends ServiceBase {
         }
         // check for ACS if owner information is changed
         if (!_.isEqual(role.meta.owner, rolesDB.meta.owner)) {
-          let acsResponse: AccessResponse;
+          let acsResponse: DecisionResponse;
           try {
             acsResponse = await checkAccessRequest(subject, [role], AuthZAction.MODIFY,
               'role', this, undefined, false);
           } catch (err) {
             this.logger.error('Error occurred requesting access-control-srv:', err);
-            return returnStatus(err.code, err.message);
+            return returnOperationStatus(err.code, err.message);
           }
           if (acsResponse.decision != Decision.PERMIT) {
-            return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+            return { operation_status: acsResponse.operation_status };
           }
         }
       }
@@ -2622,7 +2605,7 @@ export class RoleService extends ServiceBase {
   async upsert(call: any, context?: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
-      return returnStatus(400, 'No items were provided for upsert');
+      return returnOperationStatus(400, 'No items were provided for upsert');
     }
 
     let subject = call.request.subject;
@@ -2633,11 +2616,11 @@ export class RoleService extends ServiceBase {
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -2671,11 +2654,11 @@ export class RoleService extends ServiceBase {
         'role', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      return returnStatus(err.code, err.message);
+      return returnOperationStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -2686,38 +2669,23 @@ export class RoleService extends ServiceBase {
             collection: request.collection
           }
         };
-        await super.delete(serviceCall, context);
+        const deleteResponse = await super.delete(serviceCall, context);
         logger.info('Role collection deleted:');
-        return {};
+        return deleteResponse;
       }
       if (!_.isArray(roleIDs)) {
         roleIDs = [roleIDs];
       }
       logger.silly('deleting Role IDs:', { roleIDs });
-      // Check each user exist if one of the user does not exist throw an error
-      for (let roleID of roleIDs) {
-        const filters = [{
-          filter: [{
-            field: 'id',
-            operation: FilterOperation.eq,
-            value: roleID
-          }]
-        }];
-        const roles = await super.read({ request: { filters } }, context);
-        if (roles.total_count === 0) {
-          logger.debug('Role does not exist for deleting:', { roleID });
-          return roles;
-        }
-      }
       // delete users
       const serviceCall = {
         request: {
           ids: roleIDs
         }
       };
-      await super.delete(serviceCall, context);
-      logger.info('Roles deleted:', roleIDs);
-      return {};
+      const deleteResponse = await super.delete(serviceCall, context);
+      logger.info('Roles deleted:', { roleIDs });
+      return deleteResponse;
     }
   }
 

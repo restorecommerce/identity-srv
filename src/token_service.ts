@@ -1,6 +1,6 @@
 import { errors } from '@restorecommerce/chassis-srv';
 import { Logger } from 'winston';
-import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject } from '@restorecommerce/acs-client';
+import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject, DecisionResponse } from '@restorecommerce/acs-client';
 import { checkAccessRequest } from './utils';
 import * as _ from 'lodash';
 import { UserService } from './service';
@@ -48,7 +48,8 @@ export class TokenService {
   **/
   async upsert(call: ReqTokenData, context?: any): Promise<any> {
     if (!call || !call.request || !call.request.id) {
-      throw new errors.InvalidArgument('No id was provided for creat / upsert');
+      const response = { status: { code: 400, message: 'No id was provided for creat / upsert' } };
+      return marshallProtobufAny(response);
     }
 
     // using techUser to update user Tokens
@@ -57,7 +58,7 @@ export class TokenService {
     if (techUsersCfg && techUsersCfg.length > 0) {
       tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
     }
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     let tokenData = call.request;
     // unmarshall payload
     const payload = unmarshallProtobufAny(tokenData.payload);
@@ -69,10 +70,12 @@ export class TokenService {
         'token', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      const response = { status: { code: err.code, message: err.message } };
+      return marshallProtobufAny(response);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      const response = { status: { code: acsResponse.operation_status.code, message: acsResponse.operation_status.message } };
+      return marshallProtobufAny(response);
     }
 
     const type = tokenData.type;
@@ -113,17 +116,26 @@ export class TokenService {
           this.logger.error('Error Updating Token', err);
         }
         response = {
-          status: `Token updated successfully for Subject ${user.name}`
+          status: {
+            code: 200,
+            message: `Token updated successfully for Subject ${user.name}`
+          }
         };
       } else {
         response = {
-          status: `Invalid account, Subject ${payload.accountId} does not exist`
+          status: {
+            code: 401,
+            message: `Invalid account, Subject ${payload.accountId} does not exist`
+          }
         };
       }
       return marshallProtobufAny(response);
     } catch (err) {
       response = {
-        status: `Error updating token for Subject ${payload.accountId}`
+        status: {
+          code: err.code,
+          message: `Error updating token for Subject ${payload.accountId}`
+        }
       };
       this.logger.error(`Error updating token for Subject ${payload.accountId}`, { err });
       return marshallProtobufAny(response);
@@ -136,7 +148,8 @@ export class TokenService {
   **/
   async find(call: any, context?: any): Promise<any> {
     if (!call || !call.request || !call.request.id) {
-      throw new errors.InvalidArgument('No id was provided for find');
+      const response = { status: { code: 400, message: 'No id was provided for find' } };
+      return marshallProtobufAny(response);
     }
 
     let subject = call.request.subject;
@@ -149,10 +162,12 @@ export class TokenService {
         'token', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      const response = { status: { code: err.code, message: err.message } };
+      return marshallProtobufAny(response);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      const response = { status: { code: acsResponse.operation_status.code, message: acsResponse.operation_status.message } };
+      return marshallProtobufAny(response);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -195,7 +210,8 @@ export class TokenService {
   **/
   async destroy(call: any, context?: any): Promise<any> {
     if (!call || !call.request || !call.request.id) {
-      throw new errors.InvalidArgument('Key was not provided for delete operation');
+      const response = { status: { code: 400, message: 'Key was not provided for delete operation' } };
+      return marshallProtobufAny(response);
     }
 
     let subject = call.request.subject;
@@ -208,10 +224,12 @@ export class TokenService {
         'token', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      const response = { status: { code: err.code, message: err.message } };
+      return marshallProtobufAny(response);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      const response = { status: { code: acsResponse.operation_status.code, message: acsResponse.operation_status.message } };
+      return marshallProtobufAny(response);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -266,13 +284,23 @@ export class TokenService {
               });
             });
           }
-          response = `Key for subject ${user.id} deleted successfully`;
+          response = {
+            status: {
+              code: 200,
+              message: `Key for subject ${user.id} deleted successfully`
+            }
+          };
         }
       } catch (err) {
-        response = `Error deleting token for subject ${user.id}`;
         this.logger.error(response);
+        response = {
+          status: {
+            code: err.code,
+            message: `Error deleting token for subject ${user.id}`
+          }
+        };
       }
-      return marshallProtobufAny({ response });
+      return marshallProtobufAny(response);
     }
   }
 
@@ -282,10 +310,11 @@ export class TokenService {
   **/
   async consume(call: any, context?: any): Promise<any> {
     if (!call || !call.request || !call.request.id) {
-      throw new errors.InvalidArgument('ID was not provided for consume operation');
+      const response = { status: { code: 400, message: 'ID was not provided for consume operation' } };
+      return marshallProtobufAny(response);
     }
 
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     const token = call.request.id;
     const subject = { token };
     try {
@@ -293,10 +322,12 @@ export class TokenService {
         'token', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      const response = { status: { code: err.code, message: err.message } };
+      return marshallProtobufAny(response);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      const response = { status: { code: acsResponse.operation_status.code, message: acsResponse.operation_status.message } };
+      return marshallProtobufAny(response);
     }
 
     try {
@@ -310,9 +341,12 @@ export class TokenService {
           await this.userService.update({ request: { items: [user], subject } });
         }
       };
-      return marshallProtobufAny({ response: `AccessToken with ID ${call.request.id} consumed` });
+      let response = { status: { code: 200, message: `AccessToken with ID ${call.request.id} consumed` } };
+      return marshallProtobufAny(response);
     } catch (err) {
-      return marshallProtobufAny({ response: `error consuming access token` });
+      this.logger.error('Error consuming token', { message: err.message });
+      let response = { status: { code: err.code, message: err.message } };
+      return marshallProtobufAny(response);
     }
   }
 
@@ -322,7 +356,8 @@ export class TokenService {
   **/
   async revokeByGrantId(call: any, context?: any): Promise<any> {
     if (!call || !call.request || !call.request.id) {
-      throw new errors.InvalidArgument('GrantId was not provided for revoke operation');
+      const response = { status: { code: 400, message: 'GrantId was not provided for revoke operation' } };
+      return marshallProtobufAny(response);
     }
 
     let subject = call.request.subject;
@@ -341,16 +376,18 @@ export class TokenService {
     });
     Object.assign(subject, { tokens });
     call.request = await this.createMetadata(call.request, subject);
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, call.request, AuthZAction.DELETE,
         'token', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      const response = { status: { code: err.code, message: err.message } };
+      return marshallProtobufAny(response);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      const response = { status: { code: acsResponse.operation_status.code, message: acsResponse.operation_status.message } };
+      return marshallProtobufAny(response);
     }
 
     if (acsResponse.decision === Decision.PERMIT) {

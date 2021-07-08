@@ -1,10 +1,10 @@
 import { ServiceBase, ResourcesAPIBase, FilterOperation } from '@restorecommerce/resource-base-interface';
 import { Logger } from 'winston';
 import { errors } from '@restorecommerce/chassis-srv';
-import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject } from '@restorecommerce/acs-client';
+import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject, DecisionResponse } from '@restorecommerce/acs-client';
 import { Topic } from '@restorecommerce/kafka-client';
-import { checkAccessRequest } from './utils';
-import { AccessResponse, ReadPolicyResponse } from './interface';
+import { checkAccessRequest, returnOperationStatus } from './utils';
+import { ReadPolicyResponse } from './interface';
 import * as _ from 'lodash';
 
 export class AuthenticationLogService extends ServiceBase {
@@ -21,7 +21,7 @@ export class AuthenticationLogService extends ServiceBase {
 
   async create(call: any, context?: any): Promise<any> {
     if (!call || !call.request || !call.request.items || call.request.items.length == 0) {
-      throw new errors.InvalidArgument('No role was provided for creation');
+      return returnOperationStatus(400, 'No role was provided for creation');
     }
 
     let subject = call.request.subject;
@@ -44,10 +44,10 @@ export class AuthenticationLogService extends ServiceBase {
         'authentication_log', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -63,24 +63,24 @@ export class AuthenticationLogService extends ServiceBase {
   async update(call: any, context?: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
-      throw new errors.InvalidArgument('No items were provided for update');
+      return returnOperationStatus(400, 'No items were provided for update');
     }
 
     let items = call.request.items;
     let subject = call.request.subject;
     // update owner information
     items = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY,
         'authentication_log', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnOperationStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -96,7 +96,7 @@ export class AuthenticationLogService extends ServiceBase {
         }];
         const auth_logs = await super.read({ request: { filters } }, context);
         if (auth_logs.total_count === 0) {
-          throw new errors.NotFound('roles not found for updating');
+          return returnOperationStatus(400, 'roles not found for updating');
         }
         const authLogDB = auth_logs.data.items[0];
         // update meta information from existing Object in case if its
@@ -108,16 +108,16 @@ export class AuthenticationLogService extends ServiceBase {
         }
         // check for ACS if owner information is changed
         if (!_.isEqual(auth_log.meta.owner, authLogDB.meta.owner)) {
-          let acsResponse: AccessResponse;
+          let acsResponse: DecisionResponse;
           try {
             acsResponse = await checkAccessRequest(subject, [auth_log], AuthZAction.MODIFY,
               'authentication_log', this, undefined, false);
           } catch (err) {
             this.logger.error('Error occurred requesting access-control-srv:', err);
-            throw err;
+            return returnOperationStatus(err.code, err.message);
           }
           if (acsResponse.decision != Decision.PERMIT) {
-            throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+            return { operation_status: acsResponse.operation_status };
           }
         }
       }
@@ -133,22 +133,22 @@ export class AuthenticationLogService extends ServiceBase {
   async upsert(call: any, context?: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
-      throw new errors.InvalidArgument('No items were provided for upsert');
+      return returnOperationStatus(400, 'No items were provided for upsert');
     }
 
     let subject = call.request.subject;
     call.reqeust.items = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.MODIFY,
         'authentication_log', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnOperationStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -176,17 +176,17 @@ export class AuthenticationLogService extends ServiceBase {
     if (call.request.collection) {
       acsResources = [{ collection: call.request.collection }];
     }
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(subject, resources, AuthZAction.DELETE,
         'authentication_log', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
-      throw err;
+      return returnOperationStatus(err.code, err.message);
     }
 
     if (acsResponse.decision != Decision.PERMIT) {
-      throw new PermissionDenied(acsResponse.response.status.message, acsResponse.response.status.code);
+      return { operation_status: acsResponse.operation_status };
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -197,9 +197,9 @@ export class AuthenticationLogService extends ServiceBase {
             collection: request.collection
           }
         };
-        await super.delete(serviceCall, context);
+        const deleteResponse = await super.delete(serviceCall, context);
         logger.info('AuthenticationLog collection deleted:');
-        return {};
+        return deleteResponse;
       }
       if (!_.isArray(authLogIDs)) {
         authLogIDs = [authLogIDs];
@@ -217,7 +217,7 @@ export class AuthenticationLogService extends ServiceBase {
         const roles = await super.read({ request: { filters } }, context);
         if (roles.total_count === 0) {
           logger.debug('AuthLog does not exist for deleting:', { authLogID });
-          throw new errors.NotFound(`AuthLog with ${authLogID} does not exist for deleting`);
+          return returnOperationStatus(400, `AuthLog with ${authLogID} does not exist for deleting`);
         }
       }
       // delete users
@@ -226,9 +226,9 @@ export class AuthenticationLogService extends ServiceBase {
           ids: authLogIDs
         }
       };
-      await super.delete(serviceCall, context);
+      const deleteResponse = await super.delete(serviceCall, context);
       logger.info('AuthenticationLogs deleted:', { authLogIDs });
-      return {};
+      return deleteResponse;
     }
   }
 
@@ -275,7 +275,7 @@ export class AuthenticationLogService extends ServiceBase {
         });
         // update owner info
         if (result.items.length === 1) {
-          let item = result.items[0];
+          let item = result.items[0].payload;
           resource.meta.owner = item.meta.owner;
         } else if (result.items.length === 0 && !resource.meta.owner) {
           let ownerAttributes = _.cloneDeep(orgOwnerAttributes);

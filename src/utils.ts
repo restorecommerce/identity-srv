@@ -1,5 +1,5 @@
 import {
-  AuthZAction, Decision, PolicySetRQ, accessRequest, Subject
+  AuthZAction, Decision, PolicySetRQ, accessRequest, Subject, DecisionResponse
 } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
 import { UserService, RoleService } from './service';
@@ -9,7 +9,7 @@ import { createServiceConfig } from '@restorecommerce/service-config';
 import { GrpcClient } from '@restorecommerce/grpc-client';
 import { createLogger } from '@restorecommerce/logger';
 import * as bcrypt from 'bcryptjs';
-import { AccessResponse, ReadPolicyResponse } from './interface';
+import { ReadPolicyResponse } from './interface';
 import { FilterOperation, OperatorType } from '@restorecommerce/resource-base-interface';
 
 // Create a ids client instance
@@ -40,7 +40,7 @@ const getUserServiceClient = async () => {
 /* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
 export async function checkAccessRequest(subject: Subject, resources: any, action: AuthZAction,
   entity: string, service: UserService | RoleService | AuthenticationLogService | TokenService,
-  resourceNameSpace?: string, useCache = true): Promise<AccessResponse | ReadPolicyResponse> {
+  resourceNameSpace?: string, useCache = true): Promise<DecisionResponse | ReadPolicyResponse> {
   let authZ = service.authZ;
   let data = _.cloneDeep(resources);
   let dbSubject;
@@ -62,35 +62,27 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
     data.entity = entity;
   }
 
-  let result: Decision | PolicySetRQ;
+  let result: DecisionResponse | ReadPolicyResponse;
   try {
     result = await accessRequest(subject, data, action, authZ, entity, resourceNameSpace, useCache);
   } catch (err) {
     return {
       decision: Decision.DENY,
-      response: {
-        payload: undefined,
-        count: 0,
-        status: {
-          code: err.code || 500,
-          message: err.details || err.message,
-        }
+      operation_status: {
+        code: err.code || 500,
+        message: err.details || err.message,
       }
     };
   }
-  if (typeof result === 'string') {
-    return {
-      decision: result
-    };
+  if (result && (result as ReadPolicyResponse).policy_sets) {
+    let custom_queries = data.args.custom_queries;
+    let custom_arguments = data.args.custom_arguments;
+    (result as ReadPolicyResponse).filters = data.args.filters;
+    (result as ReadPolicyResponse).custom_query_args = { custom_queries, custom_arguments };
+    return result as ReadPolicyResponse;
+  } else {
+    return result as DecisionResponse;
   }
-  let custom_queries = data.args.custom_queries;
-  let custom_arguments = data.args.custom_arguments;
-  return {
-    decision: Decision.PERMIT,
-    policySet: result,
-    filters: data.args.filters,
-    custom_query_args: { custom_queries, custom_arguments }
-  };
 }
 
 export const password = {
@@ -140,12 +132,21 @@ export const getNameFilter = (userName) => {
   }];
 };
 
-export const returnStatus = (code: number, message: string, id?: string) => {
+export const returnOperationStatus = (code: number, message: string) => {
   if (!code) {
     code = 500; // defaults to internal server error if no code is provided
   }
-  if (!id) {
-    id = '';
+  return {
+    operation_status: {
+      code,
+      message
+    }
+  };
+};
+
+export const returnStatus = (code: number, message: string, id?: string) => {
+  if (!code) {
+    code = 500; // defaults to internal server error if no code is provided
   }
   return {
     status: {
@@ -153,6 +154,16 @@ export const returnStatus = (code: number, message: string, id?: string) => {
       code,
       message
     }
+  };
+};
+
+export const returnCodeMessage = (code: number, message: string) => {
+  if (!code) {
+    code = 500; // defaults to internal server error if no code is provided
+  }
+  return {
+    code,
+    message
   };
 };
 
