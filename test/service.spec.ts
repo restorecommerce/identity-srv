@@ -190,11 +190,11 @@ describe('testing identity-srv', () => {
         });
         should.exist(result);
         should.exist(result.items);
-        should.exist(result.status);
+        should.exist(result.operation_status);
         result.items.should.have.length(3);
         // validate overall status
-        result.status.code.should.equal(200);
-        result.status.message.should.equal('success');
+        result.operation_status.code.should.equal(200);
+        result.operation_status.message.should.equal('success');
         // validate individual status
         _.forEach(result.items, (item) => {
           item.status.code.should.equal(200);
@@ -274,9 +274,9 @@ describe('testing identity-srv', () => {
           await renderingTopic.on('renderRequest', listener);
           const result = await userService.sendActivationEmail({ identifier: user.name });
           should.exist(result);
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           await renderingTopic.$wait(offset);
           await renderingTopic.removeListener('renderRequest', listener);
         });
@@ -612,7 +612,7 @@ describe('testing identity-srv', () => {
           }));
           should.exist(result);
           should.exist(result.items[0].payload);
-          should.exist(result.status);
+          should.exist(result.operation_status);
           should.exist(result.items[0].status);
           result.items[0].status.code.should.equal(200);
           result.items[0].status.message.should.equal('success');
@@ -626,7 +626,7 @@ describe('testing identity-srv', () => {
           }));
           should.exist(result);
           should.exist(result.items[0].payload);
-          should.exist(result.status);
+          should.exist(result.operation_status);
           should.exist(result.items[0].status);
           result.items[0].status.code.should.equal(200);
           result.items[0].status.message.should.equal('success');
@@ -636,9 +636,9 @@ describe('testing identity-srv', () => {
             role: 'invalid_role',
           }));
           result.items.should.be.empty();
-          should.exist(result.status);
-          result.status.code.should.equal(404);
-          result.status.message.should.equal('Role invalid_role does not exist');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(404);
+          result.operation_status.message.should.equal('Role invalid_role does not exist');
         });
       });
 
@@ -779,9 +779,9 @@ describe('testing identity-srv', () => {
             new_password: 'newPassword'
           }));
           should.exist(result);
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           await topic.$wait(offset);
 
           result = await (userService.find({
@@ -806,9 +806,9 @@ describe('testing identity-srv', () => {
             identifier: user.name
           });
           should.exist(result);
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
 
           result = await (userService.find({
             id: testUserID,
@@ -834,9 +834,9 @@ describe('testing identity-srv', () => {
           });
 
           should.exist(result);
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
 
           result = await (userService.find({
             id: testUserID,
@@ -878,9 +878,9 @@ describe('testing identity-srv', () => {
             new_email: 'newmail@newmail.com',
           }));
           should.exist(result);
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
 
           await topic.$wait(offset);
           const filters = [{
@@ -920,9 +920,9 @@ describe('testing identity-srv', () => {
             identifier: user.name
           }));
           should.exist(result);
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
 
           await topic.$wait(offset);
           const filters = [{
@@ -968,8 +968,8 @@ describe('testing identity-srv', () => {
           // validate item status and overall status
           result.items[0].status.code.should.equal(200);
           result.items[0].status.message.should.equal('success');
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           await topic.removeListener('userModified', listener);
         });
 
@@ -993,8 +993,8 @@ describe('testing identity-srv', () => {
           // validate item status and overall status
           result.items[0].status.code.should.equal(200);
           result.items[0].status.message.should.equal('success');
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
         });
 
         it(`should not allow to update 'name' field`,
@@ -1012,8 +1012,8 @@ describe('testing identity-srv', () => {
             // validate item status and overall status
             result.items[0].status.code.should.equal(400);
             result.items[0].status.message.should.equal('User name field cannot be updated');
-            result.status.code.should.equal(200);
-            result.status.message.should.equal('success');
+            result.operation_status.code.should.equal(200);
+            result.operation_status.message.should.equal('success');
           });
       });
 
@@ -1027,15 +1027,15 @@ describe('testing identity-srv', () => {
           const deleteResp = await userService.delete({
             ids: [testUserID]
           });
-          should.exist(deleteResp.status);
+          should.exist(deleteResp.operation_status);
           deleteResp.status[0].code.should.equal(404);
           deleteResp.status[0].message.should.equal('User does not exist for deleting');
           const result = await userService.find({
             id: testUserID,
           });
           result.items.should.be.empty();
-          result.status.code.should.equal(404);
-          result.status.message.should.equal('user not found');
+          result.operation_status.code.should.equal(404);
+          result.operation_status.message.should.equal('user not found');
         });
       });
 
@@ -1077,8 +1077,8 @@ describe('testing identity-srv', () => {
           await topic.on('renderRequest', listener);
           const result = await (userService.sendInvitationEmail({ identifier: sampleUser.name, invited_by_user_identifier: invitingUser.name }));
           should.exist(result);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           await topic.removeListener('renderRequest', listener);
         });
       });
@@ -1102,8 +1102,8 @@ describe('testing identity-srv', () => {
           // validate item status and overall status
           result.items[0].status.code.should.equal(200);
           result.items[0].status.message.should.equal('success');
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
         });
 
         it('should upsert (update) user and delete user collection', async function upsert(): Promise<void> {
@@ -1124,8 +1124,8 @@ describe('testing identity-srv', () => {
           // validate item status and overall status
           result.items[0].status.code.should.equal(200);
           result.items[0].status.message.should.equal('success');
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           // delete user collection
           const deleteResult = await userService.delete({
             collection: true
@@ -1206,8 +1206,8 @@ describe('testing identity-srv', () => {
           // validate item status and overall status
           result.items[0].status.code.should.equal(200);
           result.items[0].status.message.should.equal('success');
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
         });
         it('should allow to update a User role_associations, first and last name with valid role and valid HR scope', async () => {
           testUser.first_name = 'testFirstName';
@@ -1235,8 +1235,8 @@ describe('testing identity-srv', () => {
           // validate item status and overall status
           result.items[0].status.code.should.equal(200);
           result.items[0].status.message.should.equal('success');
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           await userService.unregister({ identifier: result.items[0].payload.name });
         });
 
@@ -1244,16 +1244,16 @@ describe('testing identity-srv', () => {
           testUser.role_associations[0].role = 'invalid_role';
           const result = await userService.create({ items: [testUser], subject });
           result.items.should.be.empty();
-          result.status.code.should.equal(400);
-          result.status.message.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
         });
 
         it('should not allow to create a User with role assocation which is not assignable', async () => {
           testUser.role_associations[0].role = 'super-admin-r-id';
           const result = await userService.create({ items: [testUser], subject });
           result.items.should.be.empty();
-          result.status.code.should.equal(400);
-          result.status.message.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id does not have permissions');
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id does not have permissions');
         });
 
         it('should throw an error when hierarchical do not match creator role', async () => {
@@ -1276,8 +1276,8 @@ describe('testing identity-srv', () => {
           ];
           const result = await userService.create({ items: [testUser], subject });
           result.items.should.be.empty();
-          result.status.code.should.equal(400);
-          result.status.message.should.equal('No Hierarchical Scopes could be found');
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal('No Hierarchical Scopes could be found');
         });
 
         it('should not allow to create a User with role assocation with invalid hierarchical_scope', async () => {
@@ -1298,8 +1298,8 @@ describe('testing identity-srv', () => {
           ];
           const result = await userService.create({ items: [testUser], subject });
           result.items.should.be.empty();
-          result.status.code.should.equal(400);
-          result.status.message.should.equal('the role user-r-id cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal('the role user-r-id cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
 
           // disable authorization
           cfg.set('authorization:enabled', false);

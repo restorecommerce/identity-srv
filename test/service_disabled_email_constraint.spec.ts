@@ -196,8 +196,8 @@ describe('testing identity-srv', () => {
         should.exist(result.items);
         result.items.should.have.length(3);
         // validate item status and overall status
-        result.status.code.should.equal(200);
-        result.status.message.should.equal('success');
+        result.operation_status.code.should.equal(200);
+        result.operation_status.message.should.equal('success');
         _.forEach(result.items, (item) => {
           item.status.code.should.equal(200);
           item.status.message.should.equal('success');
@@ -277,8 +277,8 @@ describe('testing identity-srv', () => {
           should.exist(getResult.items);
           getResult.items.length.should.equal(4);
           // validate item status and overall status
-          getResult.status.code.should.equal(200);
-          getResult.status.message.should.equal('success');
+          getResult.operation_status.code.should.equal(200);
+          getResult.operation_status.message.should.equal('success');
           _.forEach(getResult.items, (item) => {
             item.status.code.should.equal(200);
             item.status.message.should.equal('success');
@@ -294,21 +294,21 @@ describe('testing identity-srv', () => {
         });
         it('should throw an error when re-send activation email for registered user with email identifier when is not unique', async function sendActivationEmail(): Promise<void> {
           const result = await userService.sendActivationEmail({ identifier: user.email });
-          should.exist(result.status);
-          result.status.code.should.equal(400);
-          result.status.message.should.equal('Invalid identifier provided for send activation email, multiple users found for identifier test@ms.restorecommerce.io');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal('Invalid identifier provided for send activation email, multiple users found for identifier test@ms.restorecommerce.io');
         });
         it('should successfully re-send activation email for registered user with user name as identifier', async function sendActivationEmail(): Promise<void> {
           const result = await userService.sendActivationEmail({ identifier: user.name });
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
         });
         it('should successfully unregister user with user name as identifier', async function unregisterUsers(): Promise<void> {
           const result = await userService.unregister({ identifier: 'test.user1' });
           should.exist(result);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           await userService.unregister({ identifier: 'test.user2' });
           await userService.unregister({ identifier: 'test.user3' });
           await userService.unregister({ identifier: 'test.user4' });
@@ -338,8 +338,8 @@ describe('testing identity-srv', () => {
           should.exist(result.items);
           result.items.length.should.equal(4);
           // validate item status and overall status
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           _.forEach(result.items, (item) => {
             item.status.code.should.equal(200);
             item.status.message.should.equal('success');
@@ -355,8 +355,8 @@ describe('testing identity-srv', () => {
           result.items[0].status.code.should.equal(409);
           result.items[0].status.message.should.equal('user does already exist');
           // overall status
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
         });
       });
 
@@ -372,8 +372,8 @@ describe('testing identity-srv', () => {
             item.status.message.should.equal('success');
           });
           // overall status
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
         });
         it('finding by name should return only specific user', async () => {
           const result = await userService.find({
@@ -386,8 +386,8 @@ describe('testing identity-srv', () => {
             item.status.message.should.equal('success');
           });
           // overall status
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
         });
       });
 
@@ -423,15 +423,15 @@ describe('testing identity-srv', () => {
       describe('Unregister', () => {
         it('should throw an error when unregistering with email identifier when is not unique', async () => {
           const result = await userService.unregister({ identifier: 'test@ms.restorecommerce.io' });
-          should.exist(result.status);
-          result.status.code.should.equal(400);
-          result.status.message.should.equal('Invalid identifier provided for unregistering, multiple users found for identifier test@ms.restorecommerce.io');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal('Invalid identifier provided for unregistering, multiple users found for identifier test@ms.restorecommerce.io');
         });
         it('should successfully unregister with unique user name as identifier', async () => {
           const result = await userService.unregister({ identifier: 'testuser1' });
           should.exist(result);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           await userService.unregister({ identifier: 'testuser2' });
           await userService.unregister({ identifier: 'testuser3' });
           await userService.unregister({ identifier: 'testuser4' });
@@ -457,17 +457,17 @@ describe('testing identity-srv', () => {
             activation_code
           });
           should.exist(result);
-          result.status.code.should.equal(400);
-          result.status.message.should.equal('Invalid identifier provided for user activation, multiple users found for identifier test@ms.restorecommerce.io');
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal('Invalid identifier provided for user activation, multiple users found for identifier test@ms.restorecommerce.io');
         });
         it('should successfully activate user with unique user name as identifier', async () => {
           const result = await userService.activate({
             identifier: 'test.user1',
             activation_code
           });
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
         });
       });
 
@@ -481,9 +481,9 @@ describe('testing identity-srv', () => {
             password: 'notsecure',
             new_password: 'secure'
           });
-          should.exist(result.status);
-          result.status.code.should.equal(400);
-          result.status.message.should.equal(`Invalid identifier provided for change password, multiple users found for identifier ${email}`);
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal(`Invalid identifier provided for change password, multiple users found for identifier ${email}`);
         });
         it('should allow to ChangePassword with user name as identifier', async () => {
           // password_hash before change pass
@@ -497,9 +497,9 @@ describe('testing identity-srv', () => {
             password: 'notsecure',
             new_password: 'secure'
           });
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           // password_hash after change pass
           const user_after = await userService.find({
             name: userName
@@ -511,9 +511,9 @@ describe('testing identity-srv', () => {
           const result = await userService.requestPasswordChange({
             identifier: email
           });
-          should.exist(result.status);
-          result.status.code.should.equal(400);
-          result.status.message.should.equal(`Invalid identifier provided for request password change, multiple users found for identifier ${email}`);
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal(`Invalid identifier provided for request password change, multiple users found for identifier ${email}`);
         });
         it('should successfully RequestPasswordChange with user name as identifier', async () => {
           // activation_code should be empty initially
@@ -523,9 +523,9 @@ describe('testing identity-srv', () => {
           const result = await userService.requestPasswordChange({
             identifier: userName
           });
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           // activation_code value should exist after requesting passwordChange
           const user_mod = await userService.find({
             name: userName
@@ -539,9 +539,9 @@ describe('testing identity-srv', () => {
             activation_code,
             password: 'newpassword'
           });
-          should.exist(result.status);
-          result.status.code.should.equal(400);
-          result.status.message.should.equal(`Invalid identifier provided for confirm password change, multiple users found for identifier ${email}`);
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal(`Invalid identifier provided for confirm password change, multiple users found for identifier ${email}`);
         });
         it('should successfully ConfirmPasswordChange with user name as identifier', async () => {
           // password_hash before confirm pass
@@ -555,9 +555,9 @@ describe('testing identity-srv', () => {
             activation_code,
             password: 'newpassword'
           });
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           // password_hash after confirm pass
           const user_after = await userService.find({
             name: userName
@@ -576,18 +576,18 @@ describe('testing identity-srv', () => {
             identifier: email,
             invited_by_user_identifier: 'test.user1'
           });
-          should.exist(result.status);
-          result.status.code.should.equal(400);
-          result.status.message.should.equal(`Invalid identifier provided for send invitation email, multiple users found for identifier ${email}`);
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal(`Invalid identifier provided for send invitation email, multiple users found for identifier ${email}`);
         });
         it('should successfully send invitation with user name as identifier', async () => {
           const result = await userService.sendInvitationEmail({
             identifier: userName,
             invited_by_user_identifier: 'test.user1'
           });
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
         });
         it('should throw an error when confirming invitation with email as identifier when not unique', async () => {
           const user = await userService.find({ name: userName });
@@ -597,9 +597,9 @@ describe('testing identity-srv', () => {
             password: 'new_password',
             activation_code
           });
-          should.exist(result.status);
-          result.status.code.should.equal(400);
-          result.status.message.should.equal(`Invalid identifier provided for user invitation confirmation, multiple users found for identifier ${email}`);
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal(`Invalid identifier provided for user invitation confirmation, multiple users found for identifier ${email}`);
         });
         it('should successfully confirm user invitation with user name as identifier', async () => {
           const result = await userService.confirmUserInvitation({
@@ -607,9 +607,9 @@ describe('testing identity-srv', () => {
             password: 'new_password',
             activation_code
           });
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
         });
       });
 
@@ -622,18 +622,18 @@ describe('testing identity-srv', () => {
             identifier: email,
             new_email: 'new_test@ms.restorecommerce.io'
           });
-          should.exist(result.status);
-          result.status.code.should.equal(400);
-          result.status.message.should.equal(`Invalid identifier provided for request email change, multiple users found for identifier ${email}`);
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal(`Invalid identifier provided for request email change, multiple users found for identifier ${email}`);
         });
         it('should change new_email field with provided email using user name as identifier', async () => {
           const result = await userService.requestEmailChange({
             identifier: userName,
             new_email: 'new_test@ms.restorecommerce.io'
           });
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           const user_mod = await userService.find({
             name: userName
           });
@@ -646,18 +646,18 @@ describe('testing identity-srv', () => {
             identifier: email,
             activation_code
           });
-          should.exist(result.status);
-          result.status.code.should.equal(400);
-          result.status.message.should.equal(`Invalid identifier provided for confirm email change, multiple users found for identifier ${email}`);
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal(`Invalid identifier provided for confirm email change, multiple users found for identifier ${email}`);
         });
         it('should successfully change email with confirmEmailChange and name as identifier', async () => {
           const result = await userService.confirmEmailChange({
             identifier: userName,
             activation_code
           });
-          should.exist(result.status);
-          result.status.code.should.equal(200);
-          result.status.message.should.equal('success');
+          should.exist(result.operation_status);
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
           const user = await userService.find({ name: userName });
           const changed_email = user.items[0].payload.email;
           changed_email.should.equal('new_test@ms.restorecommerce.io');
