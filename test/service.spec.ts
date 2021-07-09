@@ -1247,17 +1247,21 @@ describe('testing identity-srv', () => {
         it('should not allow to create a User with invalid role existing in system', async () => {
           testUser.role_associations[0].role = 'invalid_role';
           const result = await userService.create({ items: [testUser], subject });
-          result.items.should.be.empty();
-          result.operation_status.code.should.equal(400);
-          result.operation_status.message.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
+          result.items[0].status.code.should.equal(403);
+          result.items[0].status.message.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
+          result.items[0].status.id.should.equal('testuser');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
         });
 
         it('should not allow to create a User with role assocation which is not assignable', async () => {
           testUser.role_associations[0].role = 'super-admin-r-id';
           const result = await userService.create({ items: [testUser], subject });
-          result.items.should.be.empty();
-          result.operation_status.code.should.equal(400);
-          result.operation_status.message.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id does not have permissions');
+          result.items[0].status.code.should.equal(403);
+          result.items[0].status.message.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id does not have permissions');
+          result.items[0].status.id.should.equal('testuser');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
         });
 
         it('should throw an error when hierarchical do not match creator role', async () => {
@@ -1279,9 +1283,11 @@ describe('testing identity-srv', () => {
             }
           ];
           const result = await userService.create({ items: [testUser], subject });
-          result.items.should.be.empty();
-          result.operation_status.code.should.equal(400);
-          result.operation_status.message.should.equal('No Hierarchical Scopes could be found');
+          result.items[0].status.code.should.equal(401);
+          result.items[0].status.message.should.equal('No Hierarchical Scopes could be found');
+          result.items[0].status.id.should.equal('testuser');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
         });
 
         it('should not allow to create a User with role assocation with invalid hierarchical_scope', async () => {
@@ -1301,9 +1307,11 @@ describe('testing identity-srv', () => {
             }
           ];
           const result = await userService.create({ items: [testUser], subject });
-          result.items.should.be.empty();
-          result.operation_status.code.should.equal(400);
-          result.operation_status.message.should.equal('the role user-r-id cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
+          result.items[0].status.code.should.equal(403);
+          result.items[0].status.message.should.equal('the role user-r-id cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
+          result.items[0].status.id.should.equal('testuser');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
 
           // disable authorization
           cfg.set('authorization:enabled', false);

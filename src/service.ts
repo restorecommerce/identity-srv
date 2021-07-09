@@ -324,7 +324,7 @@ export class UserService extends ServiceBase {
    * @return type is any since it can be guest or user type
    */
   async create(call: any, context?: any): Promise<any> {
-    const usersList: User[] = call.request.items;
+    let usersList: User[] = call.request.items;
     const insertedUsers = { items: [], total_count: 0, operation_status: { code: 0, message: '' } };
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
@@ -345,7 +345,17 @@ export class UserService extends ServiceBase {
     if (acsResponse.decision === Decision.PERMIT) {
       if (this.cfg.get('authorization:enabled')) {
         try {
-          await this.verifyUserRoleAssociations(usersList, subject);
+          // validate and remove item if there is an error when verifying role associations
+          for (let item of usersList) {
+            const verficationResponse = await this.verifyUserRoleAssociations([item], subject);
+            // error verifying role associations
+            const userID = item.id;
+            if (!_.isEmpty(verficationResponse) && verficationResponse.status && verficationResponse.status.message) {
+              insertedUsers.items.push(returnStatus(verficationResponse.status.code,
+                verficationResponse.status.message, verficationResponse.status.id));
+              usersList = _.filter(usersList, (item) => (item.id != userID));
+            }
+          }
         } catch (err) {
           this.logger.error('Error caught verifying user role associations', { message: err.message });
           const errMessage = err.details ? err.details : err.message;
@@ -380,7 +390,7 @@ export class UserService extends ServiceBase {
     }
   }
 
-  private async verifyUserRoleAssociations(usersList: User[], subject: any): Promise<void> {
+  private async verifyUserRoleAssociations(usersList: User[], subject: any): Promise<any> {
     let validateRoleScope = false;
     let token, redisHRScopesKey, user;
     let hierarchical_scopes = [];
@@ -434,7 +444,7 @@ export class UserService extends ServiceBase {
         }, AuthZAction.MODIFY, this.authZ);
       } catch (err) {
         this.logger.error('Error making wahtIsAllowedACS request for verifying role associations', { message: err.message });
-        throw err;
+        return returnStatus(err.code, err.message, usersList[0].id);
       }
       // for apiKey no need to verifyUserRoleAssociations
       const configuredApiKey = this.cfg.get('authentication:apiKey');
@@ -471,7 +481,7 @@ export class UserService extends ServiceBase {
       }
     } catch (err) {
       this.logger.error('Error caught calling ACS:', { err });
-      throw err;
+      return returnStatus(err.code, err.message);
     }
     // check if the assignable_by_roles contain createAccessRole
     for (let user of usersList) {
@@ -502,7 +512,7 @@ export class UserService extends ServiceBase {
         let message = `One or more of the target role IDs are invalid ${targetUserRoleIds},` +
           ` no such role exist in system`;
         this.logger.verbose(message);
-        throw new errors.InvalidArgument(message);
+        return returnStatus(400, message, user.id);
       }
       let dbTargetRoles = [];
       for (let targetRole of rolesData.items) {
@@ -514,7 +524,7 @@ export class UserService extends ServiceBase {
             let message = `The target role ${targetRole.payload.id} cannot be assigned to` +
               ` user ${userName} as user role ${createAccessRole} does not have permissions`;
             this.logger.verbose(message);
-            throw new errors.InvalidArgument(message);
+            return returnStatus(403, message, user.id);
           }
         }
       }
@@ -526,7 +536,7 @@ export class UserService extends ServiceBase {
           let message = `The target role ${targetUserRoleId} is invalid and cannot be assigned to` +
             ` user ${userName}`;
           this.logger.verbose(message);
-          throw new errors.InvalidArgument(message);
+          return returnStatus(403, message, user.id);
         }
       }
     }
@@ -555,11 +565,14 @@ export class UserService extends ServiceBase {
       // gives the subject to create users, then no need to further
       // validate the role associations
       if (_.isEmpty(hrScopes)) {
-        throw new errors.InvalidArgument('No Hierarchical Scopes could be found');
+        return returnStatus(401, 'No Hierarchical Scopes could be found', usersList[0].id);
       }
       for (let user of usersList) {
         if (user.role_associations && user.role_associations.length > 0) {
-          this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, subject);
+          const validationResponse = this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, subject, user.id);
+          if (!_.isEmpty(validationResponse)) {
+            return validationResponse;
+          }
           if (!_.isEmpty(user.tokens)) {
             for (let token of user.tokens) {
               if (!token.interactive && !_.isEmpty(token.scopes)) {
@@ -568,7 +581,7 @@ export class UserService extends ServiceBase {
                   if (!_.find(user.role_associations, { id: scope })) {
                     let message = `Invalid token scope ${scope} found for Subject ${user.id}`;
                     this.logger.verbose(message);
-                    throw new errors.InvalidArgument(message);
+                    return returnStatus(400, message, user.id);
                   }
                 }
               }
@@ -585,7 +598,7 @@ export class UserService extends ServiceBase {
    * @param user
    */
   private validateUserRoleAssociations(userRoleAssocs: RoleAssociation[],
-    hrScopes: HierarchicalScope[], userName: string, subject: Subject) {
+    hrScopes: HierarchicalScope[], userName: string, subject: Subject, userID: string) {
     if (userRoleAssocs && !_.isEmpty(userRoleAssocs)) {
       for (let userRoleAssoc of userRoleAssocs) {
         let validUserRoleAssoc = false;
@@ -638,7 +651,7 @@ export class UserService extends ServiceBase {
             }
             let message = `the role ${userRole} cannot be assigned to user ${userName};${details}`;
             this.logger.verbose(message);
-            throw new errors.InvalidArgument(message);
+            return returnStatus(403, message, userID);
           }
         }
       }
@@ -1316,20 +1329,31 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
+      let updateWithStatus = { items: [], operation_status: {} };
       if (this.cfg.get('authorization:enabled')) {
         try {
           const roleAssocsModified = await this.roleAssocsModified(items, context);
           if (roleAssocsModified) {
-            await this.verifyUserRoleAssociations(items, subject);
+            // validate and remove item if there is an error when verifying role associations
+            for (let item of items) {
+              const verficationResponse = await this.verifyUserRoleAssociations([item], subject);
+              // error verifying role associations
+              const userID = item.id;
+              if (!_.isEmpty(verficationResponse) && verficationResponse.status && verficationResponse.status.message) {
+                updateWithStatus.items.push(returnStatus(verficationResponse.status.code,
+                  verficationResponse.status.message, verficationResponse.status.id));
+                items = _.filter(items, (item) => (item.id != userID));
+              }
+            }
           }
         } catch (err) {
+          this.logger.error('Error validating role associations');
           const errMessage = err.details ? err.details : err.message;
           // for unhandled promise rejection
           return returnOperationStatus(400, errMessage);
         }
       }
       // each item includes payload and status in turn
-      let updateWithStatus = { items: [], operation_status: {} };
       for (let i = 0; i < items.length; i += 1) {
         // read the user from DB and update the special fields from DB
         // for user modification
@@ -1464,7 +1488,7 @@ export class UserService extends ServiceBase {
                       resolve(numberOfDeletedKeys);
                     });
                   }
-                  return resolve(redisResp);
+                  resolve(redisResp);
                 }
                 resolve(undefined);
               });
@@ -1583,7 +1607,7 @@ export class UserService extends ServiceBase {
       return returnOperationStatus(400, 'No items were provided for upsert');
     }
 
-    const usersList = call.request.items;
+    let usersList = call.request.items;
     let subject = call.request.subject;
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
@@ -1600,11 +1624,22 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
+      let upsertWithStatus = { items: [], total_count: 0, operation_status: {} };
       if (this.cfg.get('authorization:enabled')) {
         try {
           const roleAssocsModified = await this.roleAssocsModified(usersList, context);
           if (roleAssocsModified) {
-            await this.verifyUserRoleAssociations(usersList, subject);
+            // validate and remove item if there is an error when verifying role associations
+            for (let item of usersList) {
+              const verficationResponse = await this.verifyUserRoleAssociations([item], subject);
+              // error verifying role associations
+              const userID = item.id;
+              if (!_.isEmpty(verficationResponse) && verficationResponse.status && verficationResponse.status.message) {
+                upsertWithStatus.items.push(returnStatus(verficationResponse.status.code,
+                  verficationResponse.status.message, verficationResponse.status.id));
+                usersList = _.filter(usersList, (item) => (item.id != userID));
+              }
+            }
           }
         } catch (err) {
           const errMessage = err.details ? err.details : err.message;
@@ -1612,12 +1647,11 @@ export class UserService extends ServiceBase {
           return returnOperationStatus(400, errMessage);
         }
       }
-      let result = [];
-      const items = call.request.items;
-      for (let i = 0; i < items.length; i += 1) {
+      // let result = [];
+      for (let i = 0; i < usersList.length; i += 1) {
         // read the user from DB and update the special fields from DB
         // for user modification
-        const user = items[i];
+        const user = usersList[i];
         let filters;
         if (this.uniqueEmailConstraint) {
 
@@ -1641,16 +1675,17 @@ export class UserService extends ServiceBase {
         const users = await super.read({ request: { filters } }, context);
         if (users.total_count === 0) {
           // call the create method, checks all conditions before inserting
-          result.push(await this.createUser(user));
+          upsertWithStatus.items.push(await this.createUser(user));
         } else if (users.total_count === 1) {
           let updateResponse = await this.update({ request: { items: [user], subject } });
-          result.push(updateResponse.items[0]);
+          upsertWithStatus.items.push(updateResponse.items[0]);
         } else if (users.total_count > 1) {
           return returnOperationStatus(400, `Invalid identifier provided user upsert, multiple users found for identifier ${user.name}`);
         }
       }
-      const operation_status = { code: 200, message: 'success' };
-      return { items: result, operation_status };
+      upsertWithStatus.operation_status = { code: 200, message: 'success' };
+      upsertWithStatus.total_count = upsertWithStatus?.items?.length;
+      return upsertWithStatus;
     }
   }
 
