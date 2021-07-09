@@ -1029,7 +1029,11 @@ describe('testing identity-srv', () => {
           });
           should.exist(deleteResp.operation_status);
           deleteResp.status[0].code.should.equal(404);
-          deleteResp.status[0].message.should.equal('User does not exist for deleting');
+          deleteResp.status[0].message.should.equal('document not found');
+          should.exist(deleteResp.status[0].id);
+          should.exist(deleteResp.operation_status);
+          deleteResp.operation_status.code.should.equal(200);
+          deleteResp.operation_status.message.should.equal('success');
           const result = await userService.find({
             id: testUserID,
           });

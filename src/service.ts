@@ -325,7 +325,7 @@ export class UserService extends ServiceBase {
    */
   async create(call: any, context?: any): Promise<any> {
     const usersList: User[] = call.request.items;
-    const insertedUsers = { items: [], operation_status: { code: 0, message: '' } };
+    const insertedUsers = { items: [], total_count: 0, operation_status: { code: 0, message: '' } };
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
     let subject = call.request.subject;
@@ -373,6 +373,9 @@ export class UserService extends ServiceBase {
         }
       }
       insertedUsers.operation_status = returnCodeMessage(200, 'success');
+      if (insertedUsers.items && insertedUsers.items.length > 0) {
+        insertedUsers.total_count = insertedUsers.items.length;
+      }
       return insertedUsers;
     }
   }
@@ -435,7 +438,8 @@ export class UserService extends ServiceBase {
       }
       // for apiKey no need to verifyUserRoleAssociations
       const configuredApiKey = this.cfg.get('authentication:apiKey');
-      if (acsResponse.decision === Decision.PERMIT && (configuredApiKey === subject.token)) {
+      if ((acsResponse.decision === Decision.PERMIT) &&
+        (configuredApiKey && subject.token && configuredApiKey === subject.token)) {
         return;
       }
       if (acsResponse && (acsResponse as PolicySetRQResponse).policy_sets && (acsResponse as PolicySetRQResponse).policy_sets.length > 0) {
