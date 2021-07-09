@@ -1523,8 +1523,8 @@ export class UserService extends ServiceBase {
         }
       }
       let updateStatus = await super.update(call, context);
-      const updateStatusObj = _.merge(updateWithStatus, updateStatus);
-      return updateStatusObj;
+      updateStatus.items.push(...updateWithStatus.items);
+      return updateStatus;
     }
   }
 

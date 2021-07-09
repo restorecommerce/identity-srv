@@ -973,6 +973,63 @@ describe('testing identity-srv', () => {
           await topic.removeListener('userModified', listener);
         });
 
+        it('should update first user successfully and give error status for second user update', async function changeEmailId(): Promise<void> {
+          this.timeout(3000);
+          const listener = function listener(message: any, context: any): void {
+            should.exist(message);
+
+            const newUser = message;
+            newUser.first_name.should.equal('JohnNew');
+            newUser.first_name.should.not.equal(user.first_name);
+          };
+          await topic.on('userModified', listener);
+
+          // create second user
+          const testuser2: any = {
+            id: 'testuser2',
+            name: 'test.user2',
+            first_name: 'test',
+            last_name: 'user',
+            password: 'notsecure',
+            email: 'test2@ms.restorecommerce.io',
+            role_associations: [{
+              role: 'user-r-id',
+              attributes: []
+            }]
+          };
+          const secondUser = await userService.create({ items: [testuser2] });
+          const offset = await topic.$offset(-1);
+          // update both users
+          const result = await userService.update({
+            items: [{
+              id: testUserID,
+              name: 'test.user1', // existing user
+              first_name: 'JohnNew',
+              meta
+            }, {
+              id: 'testuser2',
+              name: 'testNew', // should fail changing user name
+              first_name: 'testNew',
+              meta
+            }]
+          });
+          await topic.$wait(offset);
+          should.exist(result);
+          should.exist(result.items[0].payload);
+          result.items[0].payload.name.should.equal('test.user1');
+          // validate item status and overall status
+          result.items[0].status.code.should.equal(200);
+          result.items[0].status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
+          await topic.removeListener('userModified', listener);
+          // Validate second User error status
+          result.items[1].status.code.should.equal(400);
+          result.items[1].status.message.should.equal('User name field cannot be updated');
+          // unregister second user
+          await userService.unregister({identifier: 'testuser2'});
+        });
+
         it(`should allow to update special fields such as 'email' and 'password`, async function changeEmailId(): Promise<void> {
           this.timeout(3000);
 
@@ -1017,20 +1074,17 @@ describe('testing identity-srv', () => {
           });
       });
 
-      describe('calling unregister', function unregister(): void {
-        it('should remove the user', async function unregister(): Promise<void> {
-          await userService.unregister({
-            identifier: testUserName,
-          });
-
-          // this should return an error since user does not exist
+      describe('calling delete', function deleteUser(): void {
+        it('should delete the first user successfully and give error status for second user', async function deleteUser(): Promise<void> {
+          // first delete success message, second delete failure message
           const deleteResp = await userService.delete({
-            ids: [testUserID]
+            ids: [testUserID, 'invalidID']
           });
-          should.exist(deleteResp.operation_status);
-          deleteResp.status[0].code.should.equal(404);
-          deleteResp.status[0].message.should.equal('document not found');
-          should.exist(deleteResp.status[0].id);
+          deleteResp.status[0].code.should.equal(200);
+          deleteResp.status[0].message.should.equal('success');
+          deleteResp.status[1].code.should.equal(404);
+          deleteResp.status[1].message.should.equal('document not found');
+          deleteResp.status[1].id.should.equal('invalidID');
           should.exist(deleteResp.operation_status);
           deleteResp.operation_status.code.should.equal(200);
           deleteResp.operation_status.message.should.equal('success');
@@ -1252,6 +1306,38 @@ describe('testing identity-srv', () => {
           result.items[0].status.id.should.equal('testuser');
           result.operation_status.code.should.equal(200);
           result.operation_status.message.should.equal('success');
+        });
+
+        it('should create first user and give an error status for second user containing invalid role', async () => {
+          // create first user
+          const testuser1: any = {
+            id: 'testuser2',
+            name: 'test.user2',
+            first_name: 'test',
+            last_name: 'user',
+            password: 'notsecure',
+            email: 'test2@ms.restorecommerce.io',
+            role_associations: [{
+              role: 'user-r-id',
+              attributes: []
+            }]
+          };
+          testUser.role_associations[0].role = 'invalid_role';
+          const result = await userService.create({ items: [testuser1, testUser], subject });
+          result.items[0].status.code.should.equal(403);
+          result.items[0].status.message.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
+          result.items[0].status.id.should.equal('testuser');
+          // first user created, validate result
+          result.items[1].status.code.should.equal(200);
+          result.items[1].status.message.should.equal('success');
+          result.items[1].status.id.should.equal('testuser2');
+          result.items[1].payload.name.should.equal('test.user2');
+          result.items[1].payload.email.should.equal('test2@ms.restorecommerce.io');
+          // overall status
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
+          // unregister testuser2
+          await userService.unregister({ identifier: 'testuser2' });
         });
 
         it('should not allow to create a User with role assocation which is not assignable', async () => {
