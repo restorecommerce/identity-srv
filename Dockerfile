@@ -4,6 +4,7 @@
 FROM node:16.3.0-alpine as base
 ENV NO_UPDATE_NOTIFIER=true
 RUN npm install -g npm
+RUN npm install -g typescript
 
 RUN apk add --no-cache git
 RUN apk add g++ make python3
