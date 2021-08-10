@@ -2680,7 +2680,7 @@ export class RoleService extends ServiceBase {
     let resources = {};
     let subject = call.request.subject;
     let acsResources;
-    if (roleIDs) {
+    if (!_.isEmpty(roleIDs)) {
       Object.assign(resources, { id: roleIDs });
       acsResources = await this.createMetadata({ id: roleIDs }, AuthZAction.DELETE, subject);
     }

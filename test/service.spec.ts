@@ -151,6 +151,17 @@ describe('testing identity-srv', () => {
   });
 
   after(async function stopServer(): Promise<void> {
+    // delete user and roles collection
+    let userService = await connect('client:user', 'user');
+    await userService.delete({
+      collection: true
+    });
+    roleService = await connect('client:role', 'role');
+    await roleService.delete({
+      collection: true
+    });
+    // stop mock acs-srv
+    stopGrpcMockServer();
     this.timeout(60000);
     await worker.stop();
     await events.stop();
@@ -1403,16 +1414,6 @@ describe('testing identity-srv', () => {
           cfg.set('authorization:enabled', false);
           cfg.set('authorization:enforce', false);
           updateConfig(cfg);
-
-          // delete user and roles collection
-          await userService.delete({
-            collection: true
-          });
-          await roleService.delete({
-            collection: true
-          });
-          // stop mock acs-srv
-          stopGrpcMockServer();
         });
       });
     });

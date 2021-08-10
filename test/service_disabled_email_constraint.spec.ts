@@ -148,6 +148,15 @@ describe('testing identity-srv', () => {
   });
 
   after(async function stopServer(): Promise<void> {
+    // drop all roles and users
+    await roleService.delete({
+      collection: true
+    });
+    let userService = await connect('client:user', 'user');
+    await userService.delete({
+      collection: true
+    });
+    await stopGrpcMockServer();
     this.timeout(60000);
     worker && await worker.stop();
     events && await events.stop();
@@ -661,14 +670,6 @@ describe('testing identity-srv', () => {
           const user = await userService.find({ name: userName });
           const changed_email = user.items[0].payload.email;
           changed_email.should.equal('new_test@ms.restorecommerce.io');
-          // drop all roles and users
-          await roleService.delete({
-            collection: true
-          });
-          await userService.delete({
-            collection: true
-          });
-          await stopGrpcMockServer();
         });
       });
     });
