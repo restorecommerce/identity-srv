@@ -399,14 +399,14 @@ export class UserService extends ServiceBase {
     }
     if (token) {
       user = await this.findByToken({ request: { token } });
-      if (user) {
-        const tokenFound = _.find(user.tokens, { token });
+      if (user && user.payload) {
+        const tokenFound = _.find(user.payload.tokens, { token });
         if (tokenFound && tokenFound.interactive) {
-          redisHRScopesKey = `cache:${user.id}:hrScopes`;
+          redisHRScopesKey = `cache:${user.payload.id}:hrScopes`;
         } else if (tokenFound && !tokenFound.interactive) {
-          redisHRScopesKey = `cache:${user.id}:${token}:hrScopes`;
+          redisHRScopesKey = `cache:${user.payload.id}:${token}:hrScopes`;
         }
-        subject.role_associations = user.role_associations;
+        subject.role_associations = user.payload.role_associations;
       }
     }
 
