@@ -193,7 +193,7 @@ export class TokenService {
         };
       }
       if (!data) {
-        return undefined;
+        return marshallProtobufAny({ message: 'No data found for provided token value' });
       }
 
       if (typeof data === 'string') {
