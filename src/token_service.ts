@@ -86,7 +86,7 @@ export class TokenService {
       // pass tech user for subject find operation
       const userData = await this.userService.find({ request: { id: payload.accountId, subject: tokenTechUser } });
       if (userData && userData.items && userData.items.length > 0) {
-        let user = userData.items[0];
+        let user = userData.items[0].payload;
         let currentTokenList = [];
         if (user && user.tokens && user.tokens.length > 0) {
           currentTokenList = user.tokens;
@@ -242,7 +242,7 @@ export class TokenService {
           payload = unmarshallProtobufAny(payload);
           const userData = await this.userService.find({ request: { id: payload.accountId, subject } });
           if (userData && userData.items && userData.items.length > 0) {
-            let user = userData.items[0];
+            let user = userData.items[0].payload;
             // check if the token is existing if not update it
             let updateToken = false;
             let currentTokenList = [];
@@ -336,7 +336,7 @@ export class TokenService {
         // update last access
         const userData = await this.userService.find({ request: { id: tokenData.accountId, subject } });
         if (userData && userData.items && userData.items.length > 0) {
-          let user = userData.items[0];
+          let user = userData.items[0].payload;
           user.last_access = new Date().getTime();
           await this.userService.update({ request: { items: [user], subject } });
         }
