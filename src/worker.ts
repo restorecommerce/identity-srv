@@ -5,7 +5,7 @@ import { createLogger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { Logger } from 'winston';
 import { UserService, RoleService } from './service';
-import { ACSAuthZ, initAuthZ, updateConfig, authZ as FallbackAuthZ } from '@restorecommerce/acs-client';
+import { ACSAuthZ, initAuthZ, updateConfig, authZ as FallbackAuthZ, initializeCache } from '@restorecommerce/acs-client';
 import Redis from 'ioredis';
 import { AuthenticationLogService } from './authlog_service';
 import { TokenService } from './token_service';
@@ -157,7 +157,7 @@ export class Worker {
     this.redisClient = new Redis(redisConfig);
 
     // init ACS cache
-    // await initializeCache();
+    await initializeCache();
 
     const cis = new UserCommandInterface(server, this.cfg, logger, events, this.redisClient);
 
