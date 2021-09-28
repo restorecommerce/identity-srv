@@ -1,3 +1,7 @@
+## 0.2.4 (September 28th, 2021)
+
+- up acs-client dep
+
 ## 0.2.3 (September 28th, 2021)
 
 - added support for `loginIdentifierProperty`
