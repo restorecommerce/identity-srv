@@ -755,8 +755,6 @@ describe('testing identity-srv', () => {
             identifier: user.email,
             password: user.password,
           }));
-
-          console.log('Email login response is..', result);
           should.not.exist(result.payload);
           should.exist(result.status.code);
           should.exist(result.status.message);
