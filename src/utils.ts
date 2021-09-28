@@ -132,6 +132,29 @@ export const getNameFilter = (userName) => {
   }];
 };
 
+export const getLoginIdentifierFilter = (loginIdentifiers, value) => {
+  if (typeof loginIdentifiers === 'string') {
+    return [{
+      filter: [{
+        field: loginIdentifiers,
+        operation: FilterOperation.eq,
+        value
+      }]
+    }];
+  } else if (_.isArray(loginIdentifiers)) {
+    let filters = [{ filter: [], operator: OperatorType.or }];
+    for (let identifier of loginIdentifiers) {
+      filters[0].filter.push(
+        {
+          field: identifier,
+          operation: FilterOperation.eq,
+          value
+        });
+    }
+    return filters;
+  }
+};
+
 export const returnOperationStatus = (code: number, message: string) => {
   if (!code) {
     code = 500; // defaults to internal server error if no code is provided

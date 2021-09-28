@@ -1,3 +1,7 @@
+## 0.2.3 (September 28th, 2021)
+
+- added support for `loginIdentifierProperty`
+
 ## 0.2.2 (September 21st, 2021)
 
 - up RC dependencies

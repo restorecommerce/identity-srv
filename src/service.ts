@@ -10,8 +10,11 @@ import {
   HierarchicalScope, RoleAssociation, PolicySetRQResponse, DecisionResponse
 } from '@restorecommerce/acs-client';
 import Redis from 'ioredis';
-import { checkAccessRequest, password, unmarshallProtobufAny, marshallProtobufAny, getDefaultFilter, getNameFilter, returnOperationStatus, returnStatusArray, returnCodeMessage, returnStatus } from './utils';
-import { errors } from '@restorecommerce/chassis-srv';
+import {
+  checkAccessRequest, password, unmarshallProtobufAny, marshallProtobufAny,
+  getDefaultFilter, getNameFilter, returnOperationStatus, returnCodeMessage,
+  returnStatus, getLoginIdentifierFilter
+} from './utils';
 import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common';
 import {
   validateFirstChar, validateSymbolRepeat, validateAllChar,
@@ -1705,9 +1708,12 @@ export class UserService extends ServiceBase {
     const identifier = call.request.identifier;
     const obfuscateAuthNErrorReason = this.cfg.get('obfuscateAuthNErrorReason') ?
       this.cfg.get('obfuscateAuthNErrorReason') : false;
-    // check for the identifier against name or email in DB
-    const filters = getDefaultFilter(identifier);
-
+    let loginIdentifierProperty = this.cfg.get('service:loginIdentifierProperty');
+    // if loginIdentifierProperty is not set defaults to name / email
+    if (!loginIdentifierProperty) {
+      loginIdentifierProperty = ['name', 'email'];
+    }
+    const filters = getLoginIdentifierFilter(loginIdentifierProperty, identifier);
     const users = await super.read({ request: { filters } }, context);
     if (users.total_count === 0) {
       if (obfuscateAuthNErrorReason) {

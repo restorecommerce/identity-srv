@@ -147,6 +147,8 @@ describe('testing identity-srv', () => {
     // disable authorization
     cfg.set('authorization:enabled', false);
     cfg.set('authorization:enforce', false);
+    // enable login with only name
+    cfg.set('service:loginIdentifierProperty', ['name']);
     updateConfig(cfg);
   });
 
@@ -748,6 +750,20 @@ describe('testing identity-srv', () => {
           result.payload.should.deepEqual(userDBDoc);
         });
 
+        it('should return an error when trying to login with email field, since loginIdentifierProperty is set to name', async function login(): Promise<void> {
+          const result = await (userService.login({
+            identifier: user.email,
+            password: user.password,
+          }));
+
+          console.log('Email login response is..', result);
+          should.not.exist(result.payload);
+          should.exist(result.status.code);
+          should.exist(result.status.message);
+          result.status.code.should.equal(404);
+          result.status.message.should.equal('user not found');
+        });
+
         it('should return an obfuscated error in case the passwords don`t match', async function login(): Promise<void> {
           cfg.set('obfuscateAuthNErrorReason', true);
           const result = await (userService.login({
@@ -1038,7 +1054,7 @@ describe('testing identity-srv', () => {
           result.items[1].status.code.should.equal(400);
           result.items[1].status.message.should.equal('User name field cannot be updated');
           // unregister second user
-          await userService.unregister({identifier: 'testuser2'});
+          await userService.unregister({ identifier: 'testuser2' });
         });
 
         it(`should allow to update special fields such as 'email' and 'password`, async function changeEmailId(): Promise<void> {

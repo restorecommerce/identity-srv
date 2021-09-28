@@ -3,6 +3,9 @@
     "userActivationRequired": true,
     "register": true,
     "enableEmail": true,
+    "loginIdentifierProperty": [
+      "name", "email"
+    ],
     "hbs_templates": {
       "registrationSubjectTpl": "http://localhost:8080/identity-srv/templates/registration_subject.hbs",
       "registrationBodyTpl": "http://localhost:8080/identity-srv/templates/registration_body.hbs",

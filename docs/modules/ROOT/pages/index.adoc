@@ -25,6 +25,7 @@ A microservice for identity management.
 The following service specific configuration properties are available:
 
 * `uniqueEmailConstraint` [`true`]: `name` and `email` fields for registering / creating user are unique (by default if this config is missing its true), if set to false it allows to register / create users with same email identifier, however `name` should always be unique.
+* `loginIdentifierProperty` [`name`, `email`]: list of identifiers to enable user to login, if the config is missing then by default user can login with either name or email.
 * `userActivationRequired` [`true`]: if set to `false`, users do not require account activation to be able to log in and use their account.
 * `register` [`true`]: if set to `false`, the `Register` endpoint is disabled and users can only be created through the bulk creation method `Create`, which can be seen as an admin-only operation.
 * `enableEmail` [`true`]: if set to `true`, emails are sent out upon specific events, like account creation and email change.
