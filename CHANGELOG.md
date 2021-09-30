@@ -1,3 +1,7 @@
+## 0.2.5 (September 30th, 2021)
+
+- fix response for findByToken for empty token
+
 ## 0.2.4 (September 28th, 2021)
 
 - up acs-client dep
