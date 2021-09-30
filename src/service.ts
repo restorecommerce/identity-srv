@@ -272,6 +272,8 @@ export class UserService extends ServiceBase {
           resolve({ status: { code: 400, message: 'multiple users found for token' } });
         });
       });
+    } else {
+      return { status: { code: 400, message: 'Token not provided' } };
     }
     return userData;
   }
