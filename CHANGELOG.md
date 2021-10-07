@@ -1,3 +1,7 @@
+## 0.2.6 (October 7th, 2021)
+
+- updated acs-client and protos
+
 ## 0.2.5 (September 30th, 2021)
 
 - fix response for findByToken for empty token
