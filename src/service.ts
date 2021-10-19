@@ -969,8 +969,17 @@ export class UserService extends ServiceBase {
     const activationCode = request.activation_code;
     let subject = call.request.subject;
     let acsResponse: DecisionResponse;
+    // check for the identifier against name or email in DB
+    const filters = getDefaultFilter(identifier);
+    const users = await super.read({ request: { filters } }, context);
+    if (!users || users.total_count === 0) {
+      return returnOperationStatus(404, 'user not found');
+    } else if (users.total_count > 1) {
+      return returnOperationStatus(400, `Invalid identifier provided for user activation, multiple users found for identifier ${identifier}`);
+    }
+    const user: User = users.items[0].payload;
     try {
-      acsResponse = await checkAccessRequest(subject, { id: identifier, active: true, activation_code: activationCode },
+      acsResponse = await checkAccessRequest(subject, { id: user.id, active: true, activation_code: activationCode },
         AuthZAction.MODIFY, 'user', this);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
@@ -988,15 +997,6 @@ export class UserService extends ServiceBase {
       if (!activationCode) {
         return returnOperationStatus(400, 'argument activation_code is empty');
       }
-      // check for the identifier against name or email in DB
-      const filters = getDefaultFilter(identifier);
-      const users = await super.read({ request: { filters } }, context);
-      if (!users || users.total_count === 0) {
-        return returnOperationStatus(404, 'user not found');
-      } else if (users.total_count > 1) {
-        return returnOperationStatus(400, `Invalid identifier provided for user activation, multiple users found for identifier ${identifier}`);
-      }
-      const user: User = users.items[0].payload;
       if (user.active) {
         logger.debug('activation request to an active user' +
           ' which still has the activation code', user);
@@ -1142,9 +1142,20 @@ export class UserService extends ServiceBase {
     const newPassword = call.request.password;
     let subject = call.request.subject;
     let acsResponse: DecisionResponse;
+    // check for the identifier against name or email in DB
+    const filters = getDefaultFilter(identifier);
+    let user;
+    const users = await super.read({ request: { filters } });
+    if (!users || users.total_count === 0) {
+      return returnOperationStatus(404, 'user not found');
+    } else if (users.total_count === 1) {
+      user = users.items[0].payload;
+    } else if (users.total_count > 1) {
+      return returnOperationStatus(400, `Invalid identifier provided for confirm password change, multiple users found for identifier ${identifier}`);
+    }
     try {
       acsResponse = await checkAccessRequest(subject, {
-        id: identifier,
+        id: user.id,
         activation_code,
         password_hash: password.hash(newPassword)
       }, AuthZAction.MODIFY, 'user', this);
@@ -1157,18 +1168,6 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
-      // check for the identifier against name or email in DB
-      const filters = getDefaultFilter(identifier);
-      let user;
-      const users = await super.read({ request: { filters } });
-      if (!users || users.total_count === 0) {
-        return returnOperationStatus(404, 'user not found');
-      } else if (users.total_count === 1) {
-        user = users.items[0].payload;
-      } else if (users.total_count > 1) {
-        return returnOperationStatus(400, `Invalid identifier provided for confirm password change, multiple users found for identifier ${identifier}`);
-      }
-
       if (!user.activation_code || user.activation_code !== activation_code) {
         logger.debug('wrong activation code upon password change confirmation for user', user.name);
         return returnOperationStatus(412, 'wrong activation code');
