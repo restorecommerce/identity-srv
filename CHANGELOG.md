@@ -1,3 +1,7 @@
+## 0.2.7 (October 19th, 2021)
+
+- fix activate and confirm password to pass user id for acs check  (needed in ACL check)
+
 ## 0.2.6 (October 7th, 2021)
 
 - updated acs-client and protos
