@@ -1,3 +1,8 @@
+## 0.2.8 (November 11th, 2021)
+
+- make password optional for tech user creation
+- enable login for tech users
+
 ## 0.2.7 (October 19th, 2021)
 
 - fix activate and confirm password to pass user id for acs check  (needed in ACL check)

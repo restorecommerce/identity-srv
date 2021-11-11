@@ -698,9 +698,6 @@ export class UserService extends ServiceBase {
     if (!user.name) {
       return returnStatus(400, 'argument name is empty', user.id);
     }
-    if (user.user_type && user.user_type === TECHNICAL_USER && user.password) {
-      return returnStatus(400, 'argument password should be empty for technical user', user.id);
-    }
 
     const serviceCfg = this.cfg.get('service');
 
@@ -1705,7 +1702,8 @@ export class UserService extends ServiceBase {
   async login(call: any, context?: any): Promise<UserPayload> {
     if (_.isEmpty(call) || _.isEmpty(call.request) ||
       (_.isEmpty(call.request.identifier) || (_.isEmpty(call.request.password) &&
-        _.isEmpty(call.request.token)))) {
+        _.isEmpty(call.request.token)))
+    ) {
       return returnStatus(400, 'Missing credentials');
     }
     const identifier = call.request.identifier;
@@ -1736,7 +1734,7 @@ export class UserService extends ServiceBase {
       }
     }
 
-    if (user.user_type && user.user_type === TECHNICAL_USER) {
+    if (user.user_type && user.user_type === TECHNICAL_USER && call.request.token) {
       const tokens = user.tokens;
       for (let eachToken of tokens) {
         if (call.request.token === eachToken.token) {
@@ -1748,7 +1746,7 @@ export class UserService extends ServiceBase {
       } else {
         return returnStatus(401, 'password does not match', user.id);
       }
-    } else if (!user.user_type || user.user_type != TECHNICAL_USER) {
+    } else if (call.request.password) {
       const match = password.verify(user.password_hash, call.request.password);
       if (!match) {
         if (obfuscateAuthNErrorReason) {

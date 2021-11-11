@@ -367,6 +367,64 @@ describe('testing identity-srv', () => {
           result.operation_status.code.should.equal(200);
           result.operation_status.message.should.equal('success');
         });
+        it('Shoul create a tech user without password and delete it', async () => {
+          // techUser with no password
+          let techUser = Object.assign(testusersTemplate,
+            {
+              id: 'techUserID1', name: 'techUserName', email: 'techuser@techuser',
+              user_type: 'TECHNICAL_USER',
+              role_associations: [{
+                id: 'user-r-role-assoc-id',
+                role: 'user-r-id',
+                attributes: []
+              }],
+              tokens: [{
+                name: 'techUserTOken',
+                token: 'c110091d9c54438ea50c72fb32148457',
+                scopes: ['user-r-role-assoc-id']
+              }]
+            });
+          const result = await userService.create({ items: [techUser] });
+          should.exist(result.items);
+          should.exist(result.items[0].payload);
+          result.items[0].payload.tokens[0].token.should.equal('c110091d9c54438ea50c72fb32148457');
+          result.items[0].status.code.should.equal(200);
+          result.items[0].status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
+          const deleteResponse = await userService.delete({ ids: ['techUserID1'] });
+          deleteResponse.status[0].id.should.equal('techUserID1');
+          deleteResponse.status[0].code.should.equal(200);
+          deleteResponse.status[0].message.should.equal('success');
+          deleteResponse.operation_status.code.should.equal(200);
+          deleteResponse.operation_status.message.should.equal('success');
+        });
+        it('Shoul create a tech user with password', async () => {
+          // techUser
+          let techUser = Object.assign(testusersTemplate, {
+            id: 'techUserID1',
+            name: 'techUserName', password: 'Test1!Test1!',
+            email: 'techuser@techuser', user_type: 'TECHNICAL_USER',
+            role_associations: [{
+              id: 'user-r-role-assoc-id',
+              role: 'user-r-id',
+              attributes: []
+            }],
+            tokens: [{
+              name: 'techUserTOken',
+              token: 'c110091d9c54438ea50c72fb32148457',
+              scopes: ['user-r-role-assoc-id']
+            }]
+          });
+          const result = await userService.create({ items: [techUser] });
+          should.exist(result.items);
+          should.exist(result.items[0].payload);
+          result.items[0].payload.tokens[0].token.should.equal('c110091d9c54438ea50c72fb32148457');
+          result.items[0].status.code.should.equal(200);
+          result.items[0].status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
+        });
       });
 
       describe('calling find', () => {
@@ -423,6 +481,21 @@ describe('testing identity-srv', () => {
           result.status.message.should.equal('success');
           const compareResult = await userService.find({
             name: 'testuser1',
+          });
+          const userDBDoc = compareResult.items[0].payload;
+          result.payload.should.deepEqual(userDBDoc);
+        });
+        it('should login for tech user wth valid user name identifier and password', async () => {
+          const result = await userService.login({
+            identifier: 'techUserName',
+            password: 'Test1!Test1!',
+          });
+          should.exist(result);
+          should.exist(result.payload);
+          result.status.code.should.equal(200);
+          result.status.message.should.equal('success');
+          const compareResult = await userService.find({
+            name: 'techUserName',
           });
           const userDBDoc = compareResult.items[0].payload;
           result.payload.should.deepEqual(userDBDoc);
