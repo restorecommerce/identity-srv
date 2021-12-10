@@ -1,3 +1,8 @@
+## 0.2.9 (December 10th, 2021)
+
+- updated acs-client with restructured checkAccessRequest api
+- updated logger and other dependencies
+
 ## 0.2.8 (November 11th, 2021)
 
 - make password optional for tech user creation
