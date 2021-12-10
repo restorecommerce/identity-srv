@@ -1,10 +1,8 @@
 import { ServiceBase, ResourcesAPIBase, FilterOperation } from '@restorecommerce/resource-base-interface';
 import { Logger } from 'winston';
-import { errors } from '@restorecommerce/chassis-srv';
-import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject, DecisionResponse } from '@restorecommerce/acs-client';
+import { ACSAuthZ, AuthZAction, Decision, Subject, DecisionResponse, PolicySetRQResponse, Operation } from '@restorecommerce/acs-client';
 import { Topic } from '@restorecommerce/kafka-client';
 import { checkAccessRequest, returnOperationStatus } from './utils';
-import { ReadPolicyResponse } from './interface';
 import * as _ from 'lodash';
 
 export class AuthenticationLogService extends ServiceBase {
@@ -19,7 +17,7 @@ export class AuthenticationLogService extends ServiceBase {
     this.cfg = cfg;
   }
 
-  async create(call: any, context?: any): Promise<any> {
+  async create(call: any, context: any): Promise<any> {
     if (!call || !call.request || !call.request.items || call.request.items.length == 0) {
       return returnOperationStatus(400, 'No role was provided for creation');
     }
@@ -35,13 +33,15 @@ export class AuthenticationLogService extends ServiceBase {
    * @param {context}
    * @return type is any since it can be guest or user type
    */
-  async read(call: any, context?: any): Promise<any> {
+  async read(call: any, context: any): Promise<any> {
     const readRequest = call.request;
     let subject = call.request.subject;
-    let acsResponse: ReadPolicyResponse;
+    let acsResponse: PolicySetRQResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
-        'authentication_log', this);
+      context.subject = subject;
+      context.resources = [];
+      acsResponse = await checkAccessRequest(context, [{ resource: 'authentication_log' }], AuthZAction.READ,
+        Operation.whatIsAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -50,6 +50,10 @@ export class AuthenticationLogService extends ServiceBase {
       return { operation_status: acsResponse.operation_status };
     }
 
+    if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
+      readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
+      readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
+    }
     if (acsResponse.decision === Decision.PERMIT) {
       return await super.read({ request: readRequest });
     }
@@ -60,7 +64,7 @@ export class AuthenticationLogService extends ServiceBase {
    * @param call
    * @param context
    */
-  async update(call: any, context?: any): Promise<any> {
+  async update(call: any, context: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
       return returnOperationStatus(400, 'No items were provided for update');
@@ -72,8 +76,10 @@ export class AuthenticationLogService extends ServiceBase {
     items = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, items, AuthZAction.MODIFY,
-        'authentication_log', this);
+      context.subject = subject;
+      context.resources = items;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'authentication_log', id: items.map(e => e.id) }],
+        AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -110,8 +116,10 @@ export class AuthenticationLogService extends ServiceBase {
         if (!_.isEqual(auth_log.meta.owner, authLogDB.meta.owner)) {
           let acsResponse: DecisionResponse;
           try {
-            acsResponse = await checkAccessRequest(subject, [auth_log], AuthZAction.MODIFY,
-              'authentication_log', this, undefined, false);
+            context.subject = subject;
+            context.resources = auth_log;
+            acsResponse = await checkAccessRequest(subject, [{ resource: 'authentication_log', id: auth_log.id }], AuthZAction.MODIFY,
+              Operation.isAllowed, false);
           } catch (err) {
             this.logger.error('Error occurred requesting access-control-srv:', err);
             return returnOperationStatus(err.code, err.message);
@@ -130,7 +138,7 @@ export class AuthenticationLogService extends ServiceBase {
    * @param call
    * @param context
    */
-  async upsert(call: any, context?: any): Promise<any> {
+  async upsert(call: any, context: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
       return returnOperationStatus(400, 'No items were provided for upsert');
@@ -140,8 +148,10 @@ export class AuthenticationLogService extends ServiceBase {
     call.reqeust.items = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, call.request.items, AuthZAction.MODIFY,
-        'authentication_log', this);
+      context.subject = subject;
+      context.resources = call.request.items;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'authentication_log', id: call.request.items.map(e => e.id) }],
+        AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -162,7 +172,7 @@ export class AuthenticationLogService extends ServiceBase {
    * @param {any} context
    * @return {} returns empty response
    */
-  async delete(call: any, context?: any): Promise<any> {
+  async delete(call: any, context: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
     let authLogIDs = request.ids;
@@ -178,8 +188,10 @@ export class AuthenticationLogService extends ServiceBase {
     }
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, resources, AuthZAction.DELETE,
-        'authentication_log', this);
+      context.subject = subject;
+      context.resources = acsResources;
+      acsResponse = await checkAccessRequest(subject, [{resource: 'authentication_log', id: authLogIDs }],
+        AuthZAction.DELETE, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);

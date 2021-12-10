@@ -1,15 +1,11 @@
 import {
-  AuthZAction, Decision, PolicySetRQ, accessRequest, Subject, DecisionResponse
+  AuthZAction, Decision, accessRequest, Subject, DecisionResponse, Operation, PolicySetRQResponse, Filters
 } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
-import { UserService, RoleService } from './service';
-import { AuthenticationLogService } from './authlog_service';
-import { TokenService } from './token_service';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { GrpcClient } from '@restorecommerce/grpc-client';
 import { createLogger } from '@restorecommerce/logger';
 import * as bcrypt from 'bcryptjs';
-import { ReadPolicyResponse } from './interface';
 import { FilterOperation, OperatorType } from '@restorecommerce/resource-base-interface';
 
 // Create a ids client instance
@@ -19,7 +15,12 @@ const getUserServiceClient = async () => {
     const cfg = createServiceConfig(process.cwd());
     // identity-srv client to resolve subject ID by token
     const grpcIDSConfig = cfg.get('client:user');
-    const logger = createLogger(cfg.get('logger'));
+    const loggerCfg = cfg.get('logger');
+    loggerCfg.esTransformer = (msg) => {
+      msg.fields = JSON.stringify(msg.fields);
+      return msg;
+    };
+    const logger = createLogger(loggerCfg);
     if (grpcIDSConfig) {
       const idsClient = new GrpcClient(grpcIDSConfig, logger);
       idsClientInstance = idsClient.user;
@@ -28,6 +29,34 @@ const getUserServiceClient = async () => {
   return idsClientInstance;
 };
 
+export interface Resource {
+  resource: string;
+  id?: string | string[]; // for what is allowed operation id is not mandatory
+  property?: string[];
+}
+
+export interface Attribute {
+  id: string;
+  value: string;
+  attribute: Attribute[];
+}
+
+export interface CtxResource {
+  id: string;
+  meta: {
+    created?: number;
+    modified?: number;
+    modified_by?: string;
+    owner: Attribute[]; // id and owner is mandatory in ctx resource other attributes are optional
+  };
+  [key: string]: any;
+}
+
+export interface GQLClientContext {
+  // if subject is missing by default it will be treated as unauthenticated subject
+  subject?: Subject;
+  resources?: CtxResource[];
+}
 
 /**
  * Perform an access request using inputs from a GQL request
@@ -38,11 +67,9 @@ const getUserServiceClient = async () => {
  * @param entity The entity type to check access against
  */
 /* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
-export async function checkAccessRequest(subject: Subject, resources: any, action: AuthZAction,
-  entity: string, service: UserService | RoleService | AuthenticationLogService | TokenService,
-  resourceNameSpace?: string, useCache = true): Promise<DecisionResponse | ReadPolicyResponse> {
-  let authZ = service.authZ;
-  let data = _.cloneDeep(resources);
+export async function checkAccessRequest(ctx: GQLClientContext, resource: Resource[], action: AuthZAction,
+  operation: Operation, useCache = true): Promise<DecisionResponse | PolicySetRQResponse> {
+  let subject = ctx.subject;
   let dbSubject;
   // resolve subject id using findByToken api and update subject with id
   if (subject && subject.token) {
@@ -55,16 +82,9 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
     }
   }
 
-  if (!_.isArray(resources) && action != AuthZAction.READ) {
-    data = [resources];
-  } else if (action === AuthZAction.READ) {
-    data.args = resources;
-    data.entity = entity;
-  }
-
-  let result: DecisionResponse | ReadPolicyResponse;
+  let result: DecisionResponse | PolicySetRQResponse;
   try {
-    result = await accessRequest(subject, data, action, authZ, entity, resourceNameSpace, useCache);
+    result = await accessRequest(subject, resource, action, ctx, operation, 'arangoDB', useCache);
   } catch (err) {
     return {
       decision: Decision.DENY,
@@ -74,15 +94,7 @@ export async function checkAccessRequest(subject: Subject, resources: any, actio
       }
     };
   }
-  if (result && (result as ReadPolicyResponse).policy_sets) {
-    let custom_queries = data.args.custom_queries;
-    let custom_arguments = data.args.custom_arguments;
-    (result as ReadPolicyResponse).filters = data.args.filters;
-    (result as ReadPolicyResponse).custom_query_args = { custom_queries, custom_arguments };
-    return result as ReadPolicyResponse;
-  } else {
-    return result as DecisionResponse;
-  }
+  return result;
 }
 
 export const password = {
@@ -202,4 +214,23 @@ export const returnStatusArray = (codeIdMsgObj: CodeIdMsgObj[]) => {
     statusArray.status.push(codeMsgObj);
   }
   return statusArray;
+};
+
+/**
+ * accessResponse returned from `acs-client` contains the filters for the list of
+ * resources requested and it returns resource filter map, below api
+ * returns applicable `Filters[]` for the specified resource, it iterates through
+ * the ACS response and returns the applicable `Filters[]` for the resource.
+ * @param accessResponse ACS response
+ * @param enitity enitity name
+ */
+export const getACSFilters = (accessResponse: PolicySetRQResponse, resource: string): Filters[] => {
+  let acsFilters = [];
+  const resourceFilterMap = accessResponse?.filters;
+  const resourceFilter = resourceFilterMap?.filter((e) => e?.resource === resource);
+  // for a given entity there should be one filter map
+  if (resourceFilter && resourceFilter.length === 1 && resourceFilter[0].filters) {
+    acsFilters = resourceFilter[0].filters;
+  }
+  return acsFilters;
 };

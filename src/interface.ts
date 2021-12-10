@@ -55,6 +55,8 @@ export interface FindUser {
   name?: string;
   subject?: Subject;
   filters?: FilterOp [];
+  custom_queries?: string[];
+  custom_arguments?: any;
 }
 
 export interface FindUserByToken {
@@ -144,27 +146,9 @@ export interface Response {
   };
 }
 
-export interface AccessResponse {
-  decision: Decision;
-  obligation?: string;
-  operation_status: {
-    code: number;
-    message: string;
-  };
-}
-
 export interface FilterType {
   field?: string;
   operation?: 'lt' | 'lte' | 'gt' | 'gte' | 'eq' | 'in' | 'isEmpty' | 'iLike';
   value?: string;
   type?: 'string' | 'boolean' | 'number' | 'date' | 'array';
-}
-
-export interface ReadPolicyResponse extends AccessResponse {
-  policy_sets?: PolicySetRQ[];
-  filters?: FilterOp [];
-  custom_query_args?: {
-    custom_queries: any;
-    custom_arguments: any;
-  };
 }

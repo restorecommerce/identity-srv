@@ -7,13 +7,13 @@ import { DocumentMetadata, OperatorType } from '@restorecommerce/resource-base-i
 import { Logger } from 'winston';
 import {
   ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest,
-  HierarchicalScope, RoleAssociation, PolicySetRQResponse, DecisionResponse
+  HierarchicalScope, RoleAssociation, PolicySetRQResponse, DecisionResponse, ResolvedSubject, Operation
 } from '@restorecommerce/acs-client';
 import Redis from 'ioredis';
 import {
   checkAccessRequest, password, unmarshallProtobufAny, marshallProtobufAny,
   getDefaultFilter, getNameFilter, returnOperationStatus, returnCodeMessage,
-  returnStatus, getLoginIdentifierFilter
+  returnStatus, getLoginIdentifierFilter, getACSFilters
 } from './utils';
 import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common';
 import {
@@ -23,10 +23,10 @@ import {
 import { TokenService } from './token_service';
 import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base';
 import {
-  FindUser, AccessResponse, FindUserByToken, Call, ReadPolicyResponse,
-  User, UserInviationReq, ActivateUser, ChangePassword, ForgotPassword,
-  ConfirmPasswordChange, EmailChange, ConfirmEmailChange, UnregisterRequest,
-  SendActivationEmailRequest, SendInvitationEmailRequest, UserPayload
+  FindUser, FindUserByToken, Call, User, UserInviationReq, ActivateUser,
+  ChangePassword, ForgotPassword, ConfirmPasswordChange, EmailChange,
+  ConfirmEmailChange, UnregisterRequest, SendActivationEmailRequest,
+  SendInvitationEmailRequest, UserPayload
 } from './interface';
 
 const TECHNICAL_USER = 'TECHNICAL_USER';
@@ -90,13 +90,15 @@ export class UserService extends ServiceBase {
    * @param {Call<FindUser>} call request containing either userid, username or email
    * @return the list of users found
    */
-  async find(call: Call<FindUser>, context?: any): Promise<any> {
+  async find(call: Call<FindUser>, context: any): Promise<any> {
     let { id, name, email, subject } = call.request;
     const readRequest = call.request;
-    let acsResponse: ReadPolicyResponse;
+    let acsResponse: PolicySetRQResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, readRequest,
-        AuthZAction.READ, 'user', this);
+      context.subject = subject;
+      context.resources = [];
+      acsResponse = await checkAccessRequest(context, [{ resource: 'user' }],
+        AuthZAction.READ, Operation.whatIsAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -145,13 +147,18 @@ export class UserService extends ServiceBase {
       if (techUsersCfg && techUsersCfg.length > 0) {
         techUser = _.find(techUsersCfg, { id: subject.id });
       }
-      if (!techUser && readRequest.filters) {
-        acsFilterObj = readRequest.filters;
+      let filters = getACSFilters(acsResponse, 'user');
+      if (!techUser && filters) {
+        acsFilterObj = filters;
       }
       if (!_.isEmpty(acsFilterObj)) {
         _.merge(filterStructure, acsFilterObj);
       }
       readRequest.filters = filterStructure;
+      if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
+        readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
+        readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
+      }
       const users = await super.read({ request: readRequest }, context);
       if (users.total_count > 0) {
         logger.silly('found user(s)', { users });
@@ -193,7 +200,7 @@ export class UserService extends ServiceBase {
    * @param {call} call request containing token
    * @return user found
    */
-  async findByToken(call: Call<FindUserByToken>, context?: any): Promise<UserPayload> {
+  async findByToken(call: Call<FindUserByToken>, context: any): Promise<UserPayload> {
     const { token } = call.request;
     let userData;
     const logger = this.logger;
@@ -260,7 +267,7 @@ export class UserService extends ServiceBase {
                     }
                   }
                 }
-                await this.update({ request: { items: [user], subject: tokenTechUser } });
+                await this.update({ request: { items: [user], subject: tokenTechUser } }, context);
                 return resolve({ payload: user, status: { code: 200, message: 'success' } });
               } else if (dbToken && dbToken.expires_in < Math.round(new Date().getTime() / 1000)) {
                 logger.debug('Token expired');
@@ -294,16 +301,18 @@ export class UserService extends ServiceBase {
   /**
    * Extends ServiceBase.read()
    * @param  {any} call request contains read request
-   * @param {context}
+   * @param {ctx}
    * @return type is any since it can be guest or user type
    */
-  async read(call: any, context?: any): Promise<any> {
+  async read(call: any, ctx: any): Promise<any> {
     const readRequest = call.request;
     let subject = call.request.subject;
-    let acsResponse: ReadPolicyResponse;
+    let acsResponse: PolicySetRQResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
-        'user', this);
+      ctx.subject = subject;
+      ctx.resources = [];
+      acsResponse = await checkAccessRequest(ctx, [{ resource: 'user' }], AuthZAction.READ,
+        Operation.whatIsAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return {
@@ -317,6 +326,10 @@ export class UserService extends ServiceBase {
       return { operation_status: acsResponse.operation_status };
     }
 
+    if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
+      readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
+      readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
+    }
     if (acsResponse.decision === Decision.PERMIT) {
       return await super.read({ request: readRequest });
     }
@@ -328,7 +341,7 @@ export class UserService extends ServiceBase {
    * @param {context}
    * @return type is any since it can be guest or user type
    */
-  async create(call: any, context?: any): Promise<any> {
+  async create(call: any, context: any): Promise<any> {
     let usersList: User[] = call.request.items;
     const insertedUsers = { items: [], total_count: 0, operation_status: { code: 0, message: '' } };
     // verify the assigned role_associations with the HR scope data before creating
@@ -338,8 +351,10 @@ export class UserService extends ServiceBase {
     const acsResources = await this.createMetadata(usersList, AuthZAction.CREATE, subject);
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.CREATE,
-        'user', this);
+      context.subject = subject;
+      context.resources = acsResources;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(item => item.id) }], AuthZAction.CREATE,
+        Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv', err);
       return returnOperationStatus(err.code, err.message);
@@ -403,7 +418,7 @@ export class UserService extends ServiceBase {
       token = subject.token;
     }
     if (token) {
-      user = await this.findByToken({ request: { token } });
+      user = await this.findByToken({ request: { token } }, {});
       if (user && user.payload) {
         const tokenFound = _.find(user.payload.tokens, { token });
         if (tokenFound && tokenFound.interactive) {
@@ -443,10 +458,8 @@ export class UserService extends ServiceBase {
       // the user role associations if not skip validation
       let acsResponse: DecisionResponse | PolicySetRQResponse;
       try {
-        acsResponse = await accessRequest(subject, {
-          entity: 'user',
-          args: { filter: [] }
-        }, AuthZAction.MODIFY, this.authZ);
+        let ctx = { subject, resources: [] };
+        acsResponse = await checkAccessRequest(ctx, [{ resource: 'user' }], AuthZAction.MODIFY, Operation.whatIsAllowed);
       } catch (err) {
         this.logger.error('Error making wahtIsAllowedACS request for verifying role associations', { message: err.message });
         return returnStatus(err.code, err.message, usersList[0].id);
@@ -512,7 +525,7 @@ export class UserService extends ServiceBase {
           filters,
           subject
         }
-      });
+      }, {});
       if (rolesData && rolesData.total_count === 0) {
         let message = `One or more of the target role IDs are invalid ${targetUserRoleIds},` +
           ` no such role exist in system`;
@@ -603,7 +616,7 @@ export class UserService extends ServiceBase {
    * @param user
    */
   private validateUserRoleAssociations(userRoleAssocs: RoleAssociation[],
-    hrScopes: HierarchicalScope[], userName: string, subject: Subject, userID: string) {
+    hrScopes: HierarchicalScope[], userName: string, subject: ResolvedSubject, userID: string) {
     if (userRoleAssocs && !_.isEmpty(userRoleAssocs)) {
       for (let userRoleAssoc of userRoleAssocs) {
         let validUserRoleAssoc = false;
@@ -682,7 +695,7 @@ export class UserService extends ServiceBase {
    * Validates User and creates it in DB,
    * @param user
    */
-  private async createUser(user: User, context?: any): Promise<UserPayload> {
+  private async createUser(user: User, context: any): Promise<UserPayload> {
     const logger = this.logger;
 
     // User creation
@@ -795,7 +808,7 @@ export class UserService extends ServiceBase {
    * @param {context}
    * @return type is any since it can be guest or user type
    */
-  async register(call: any, context?: any): Promise<UserPayload> {
+  async register(call: any, context: any): Promise<UserPayload> {
     const user: User = call.request || call;
     const register = this.cfg.get('service:register');
     if (!register) {
@@ -837,17 +850,34 @@ export class UserService extends ServiceBase {
     return createdUser;
   }
 
-  async confirmUserInvitation(call: any, context: any): Promise<any> {
+  async confirmUserInvitation(call: any, ctx: any): Promise<any> {
     const userInviteReq: UserInviationReq = call.request || call;
-    let subject = call.request.subject;
+    // find the actual user object from DB using the UserInvitationReq identifier
+    // activate user and update password
+    const identifier = userInviteReq.identifier;
+    const subject = call.request.subject ? call.request.subject : {};
+    const filters = getDefaultFilter(identifier);
+    let user;
+    const users = await super.read({ request: { filters } });
+    if (users && users.total_count === 1) {
+      user = users.items[0].payload;
+    } else if (users.total_count === 0) {
+      return returnOperationStatus(404, `user not found for identifier ${identifier}`);
+    } else if (users.total_count > 1) {
+      return returnOperationStatus(400, `Invalid identifier provided for user invitation confirmation, multiple users found for identifier ${identifier}`);
+    }
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, {
+      ctx.subject = subject;
+      ctx.resources = {
+        id: user.id,
         active: true,
         activation_code: userInviteReq.activation_code,
         password_hash: password.hash(userInviteReq.password),
-        unauthenticated: true
-      }, AuthZAction.MODIFY, 'user', this);
+        meta: user.meta
+      };
+      acsResponse = await checkAccessRequest(ctx, [{ resource: 'user', id: user.id, property: ['active', 'activation_code', 'password_hash'] }],
+        AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -857,20 +887,6 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
-      // find the actual user object from DB using the UserInvitationReq identifier
-      // activate user and update password
-      const identifier = userInviteReq.identifier;
-      const filters = getDefaultFilter(identifier);
-      let user;
-      const users = await super.read({ request: { filters } });
-      if (users && users.total_count === 1) {
-        user = users.items[0].payload;
-      } else if (users.total_count === 0) {
-        return returnOperationStatus(404, `user not found for identifier ${identifier}`);
-      } else if (users.total_count > 1) {
-        return returnOperationStatus(400, `Invalid identifier provided for user invitation confirmation, multiple users found for identifier ${identifier}`);
-      }
-
       if ((!userInviteReq.activation_code) || userInviteReq.activation_code !== user.activation_code) {
         this.logger.debug('wrong activation code', { user });
         return returnOperationStatus(412, 'wrong activation code');
@@ -956,19 +972,19 @@ export class UserService extends ServiceBase {
   /**
    * Endpoint to activate a User
    *  @param  {Call} call request containing user details
-   *  @param {any} context
+   *  @param {any} ctx
    *  @return empty response
    */
-  async activate(call: Call<ActivateUser>, context?: any): Promise<any> {
+  async activate(call: Call<ActivateUser>, ctx: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
     const identifier = request.identifier;
     const activationCode = request.activation_code;
-    let subject = call.request.subject;
+    const subject = call.request.subject ? call.request.subject : {};
     let acsResponse: DecisionResponse;
     // check for the identifier against name or email in DB
     const filters = getDefaultFilter(identifier);
-    const users = await super.read({ request: { filters } }, context);
+    const users = await super.read({ request: { filters } }, ctx);
     if (!users || users.total_count === 0) {
       return returnOperationStatus(404, 'user not found');
     } else if (users.total_count > 1) {
@@ -976,10 +992,12 @@ export class UserService extends ServiceBase {
     }
     const user: User = users.items[0].payload;
     try {
-      acsResponse = await checkAccessRequest(subject, { id: user.id, active: true, activation_code: activationCode },
-        AuthZAction.MODIFY, 'user', this);
+      ctx.subject = subject;
+      ctx.resources = { id: user.id, active: true, activation_code: activationCode, meta: user.meta };
+      acsResponse = await checkAccessRequest(ctx, [{ resource: 'user', id: user.id, property: ['active', 'activation_code'] }],
+        AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for activate', err);
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -1014,7 +1032,7 @@ export class UserService extends ServiceBase {
           items: [user]
         }
       };
-      const updateStatus = await super.update(serviceCall, context);
+      const updateStatus = await super.update(serviceCall, ctx);
       if (updateStatus?.items[0].status?.message === 'success') {
         logger.info('user activated', user);
         await this.topics['user.resource'].emit('activated', { id: user.id });
@@ -1026,10 +1044,10 @@ export class UserService extends ServiceBase {
   /**
    * Endpoint to change user password.
    * @param  {Call} call request containing user details
-   * @param {any} context
+   * @param {any} ctx
    * @return {User} returns user details
    */
-  async changePassword(call: Call<ChangePassword>, context?: any): Promise<any> {
+  async changePassword(call: Call<ChangePassword>, ctx: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
     const identifier = request.identifier;
@@ -1039,7 +1057,7 @@ export class UserService extends ServiceBase {
     let subject = call.request.subject;
     // check for the identifier against name or email in DB
     const filters = getDefaultFilter(identifier);
-    const users = await super.read({ request: { filters } }, context);
+    const users = await super.read({ request: { filters } }, ctx);
     if (!users || users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
       return returnOperationStatus(404, 'user does not exist');
@@ -1049,10 +1067,12 @@ export class UserService extends ServiceBase {
     const user: User = users.items[0].payload;
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, { id: user.id, password: pw, new_password: newPw, meta: user.meta },
-        AuthZAction.MODIFY, 'user', this);
+      ctx.subject = subject;
+      ctx.rsources = { id: user.id, password: pw, new_password: newPw, meta: user.meta };
+      acsResponse = await checkAccessRequest(ctx, [{ resource: 'user', id: user.id, property: ['password', 'new_password'] }],
+        AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for changePassword', err);
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -1073,7 +1093,7 @@ export class UserService extends ServiceBase {
           items: [user]
         }
       };
-      const updateStatus = await super.update(serviceCall, context);
+      const updateStatus = await super.update(serviceCall, ctx);
       if (updateStatus?.items[0]?.status?.message === 'success') {
         logger.info('password changed for user', { identifier });
         await this.topics['user.resource'].emit('passwordChanged', user);
@@ -1090,7 +1110,7 @@ export class UserService extends ServiceBase {
    * @param call
    * @param context
    */
-  async requestPasswordChange(call: Call<ForgotPassword>, context?: any): Promise<any> {
+  async requestPasswordChange(call: Call<ForgotPassword>, context: any): Promise<any> {
     const logger = this.logger;
     const identifier = call.request.identifier;
     // check for the identifier against name or email in DB
@@ -1131,9 +1151,9 @@ export class UserService extends ServiceBase {
    * Endpoint which is called after the user confirms a password change request.
    *
    * @param call Activation code, new password, user name
-   * @param context
+   * @param ctx
    */
-  async confirmPasswordChange(call: Call<ConfirmPasswordChange>, context?: any): Promise<any> {
+  async confirmPasswordChange(call: Call<ConfirmPasswordChange>, ctx: any): Promise<any> {
     const logger = this.logger;
     const { identifier, activation_code } = call.request;
     const newPassword = call.request.password;
@@ -1151,11 +1171,14 @@ export class UserService extends ServiceBase {
       return returnOperationStatus(400, `Invalid identifier provided for confirm password change, multiple users found for identifier ${identifier}`);
     }
     try {
-      acsResponse = await checkAccessRequest(subject, {
+      ctx.subject = subject;
+      ctx.resources = {
         id: user.id,
         activation_code,
-        password_hash: password.hash(newPassword)
-      }, AuthZAction.MODIFY, 'user', this);
+        password_hash: password.hash(newPassword),
+        meta: user.meta
+      };
+      acsResponse = await checkAccessRequest(ctx, [{ resource: 'user', id: user.id, property: ['activation_code', 'password_hash'] }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -1188,10 +1211,10 @@ export class UserService extends ServiceBase {
   /**
    * Endpoint to change email Id.
    * @param  {Call} call request containing new email Id of User
-   * @param {any} context
+   * @param {any} ctx
    * @return {User} returns user details
    */
-  async requestEmailChange(call: Call<EmailChange>, context?: any): Promise<any> {
+  async requestEmailChange(call: Call<EmailChange>, ctx: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
     const identifier = request.identifier;
@@ -1200,7 +1223,7 @@ export class UserService extends ServiceBase {
     let acsResponse: DecisionResponse;
     // check for the identifier against name or email in DB
     const filters = getDefaultFilter(identifier);
-    const users = await super.read({ request: { filters } }, context);
+    const users = await super.read({ request: { filters } }, ctx);
     if (!users || users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
       return returnOperationStatus(404, 'user does not exist');
@@ -1209,8 +1232,10 @@ export class UserService extends ServiceBase {
     }
     const user: User = users.items[0].payload;
     try {
-      acsResponse = await checkAccessRequest(subject, { id: user.id, identifier, new_email, meta: user.meta },
-        AuthZAction.MODIFY, 'user', this);
+      ctx.subject = subject;
+      ctx.resources = { id: user.id, identifier, new_email, meta: user.meta };
+      acsResponse = await checkAccessRequest(ctx, [{ resource: 'user', id: user.id, property: ['identifier', 'new_email'] }],
+        AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -1228,7 +1253,7 @@ export class UserService extends ServiceBase {
           items: [user]
         }
       };
-      const updateStatus = await super.update(serviceCall, context);
+      const updateStatus = await super.update(serviceCall, ctx);
       if (updateStatus?.items[0]?.status?.message === 'success') {
         logger.info('Email change requested for user', { email: new_email });
         await this.topics['user.resource'].emit('emailChangeRequested', user);
@@ -1246,10 +1271,10 @@ export class UserService extends ServiceBase {
   /**
    * Endpoint to confirm email change.
    * @param  {Call<ConfirmEmailChange>} call request containing new email Id of User
-   * @param {any} context
+   * @param {any} ctx
    * @return {User} returns user details
    */
-  async confirmEmailChange(call: Call<ConfirmEmailChange>, context?: any): Promise<any> {
+  async confirmEmailChange(call: Call<ConfirmEmailChange>, ctx: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
     const identifier = request.identifier;
@@ -1269,11 +1294,14 @@ export class UserService extends ServiceBase {
     let subject = call.request.subject;
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, {
+      ctx.subject = subject;
+      ctx.resources = {
         id: user.id,
         activation_code: activationCode,
-        email: user.new_email
-      }, AuthZAction.MODIFY, 'user', this);
+        email: user.new_email,
+        meta: user.meta
+      };
+      acsResponse = await checkAccessRequest(ctx, [{ resource: 'user', id: user.id, property: ['email', 'activation_code'] }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -1295,7 +1323,7 @@ export class UserService extends ServiceBase {
           items: [user]
         }
       };
-      const updateStatus = await super.update(serviceCall, context);
+      const updateStatus = await super.update(serviceCall, ctx);
       if (updateStatus?.items[0]?.status?.message === 'success') {
         logger.info('Email address changed for user', user.id);
         await this.topics['user.resource'].emit('emailChangeConfirmed', user);
@@ -1310,7 +1338,7 @@ export class UserService extends ServiceBase {
    * @param call
    * @param context
    */
-  async update(call: any, context?: any): Promise<any> {
+  async update(call: any, context: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
       return returnOperationStatus(400, 'No items were provided for update');
@@ -1321,8 +1349,10 @@ export class UserService extends ServiceBase {
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
-        'user', this);
+      context.subject = subject;
+      context.resources = acsResources;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY,
+        Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -1397,10 +1427,12 @@ export class UserService extends ServiceBase {
         }
         // check for ACS if owner information is changed
         if (!_.isEqual(user.meta.owner, dbUser.meta.owner)) {
-          let acsResponse: AccessResponse;
+          let acsResponse: DecisionResponse;
           try {
-            acsResponse = await checkAccessRequest(subject, [user], AuthZAction.MODIFY,
-              'user', this, undefined, false);
+            context.subject = subject;
+            context.resources = user;
+            acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: user.id }], AuthZAction.MODIFY,
+              Operation.isAllowed, false);
           } catch (err) {
             this.logger.error('Error occurred requesting access-control-srv:', err);
             // return returnStatus(err.code, err.message);
@@ -1520,7 +1552,7 @@ export class UserService extends ServiceBase {
                     id: dbToken.id, token: dbToken.token
                   }
                 }
-              });
+              }, {});
             }
           }
         }
@@ -1531,7 +1563,7 @@ export class UserService extends ServiceBase {
     }
   }
 
-  private async roleAssocsModified(usersList: User[], context?: any) {
+  private async roleAssocsModified(usersList: User[], context: any) {
     this.logger.debug('Checking for changes in role-associations');
     let roleAssocsModified = false;
     for (let user of usersList) {
@@ -1604,7 +1636,7 @@ export class UserService extends ServiceBase {
    * @param call
    * @param context
    */
-  async upsert(call: any, context?: any): Promise<any> {
+  async upsert(call: any, context: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
       return returnOperationStatus(400, 'No items were provided for upsert');
@@ -1615,8 +1647,10 @@ export class UserService extends ServiceBase {
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
-        'user', this);
+      context.subject = subject;
+      context.resources = acsResources;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY,
+        Operation.whatIsAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -1678,9 +1712,9 @@ export class UserService extends ServiceBase {
         const users = await super.read({ request: { filters } }, context);
         if (users.total_count === 0) {
           // call the create method, checks all conditions before inserting
-          upsertWithStatus.items.push(await this.createUser(user));
+          upsertWithStatus.items.push(await this.createUser(user, context));
         } else if (users.total_count === 1) {
-          let updateResponse = await this.update({ request: { items: [user], subject } });
+          let updateResponse = await this.update({ request: { items: [user], subject } }, context);
           upsertWithStatus.items.push(updateResponse.items[0]);
         } else if (users.total_count > 1) {
           return returnOperationStatus(400, `Invalid identifier provided user upsert, multiple users found for identifier ${user.name}`);
@@ -1699,7 +1733,7 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {User} returns user details
    */
-  async login(call: any, context?: any): Promise<UserPayload> {
+  async login(call: any, context: any): Promise<UserPayload> {
     if (_.isEmpty(call) || _.isEmpty(call.request) ||
       (_.isEmpty(call.request.identifier) || (_.isEmpty(call.request.password) &&
         _.isEmpty(call.request.token)))
@@ -1768,7 +1802,7 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {} returns empty response
    */
-  async unregister(call: Call<UnregisterRequest>, context?: any): Promise<any> {
+  async unregister(call: Call<UnregisterRequest>, context: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
     const identifier = request.identifier;
@@ -1788,10 +1822,12 @@ export class UserService extends ServiceBase {
     const acsResources = await this.createMetadata(users.items, AuthZAction.DELETE, subject);
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.DELETE,
-        'user', this);
+      context.subject = subject;
+      context.resources = acsResources;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.DELETE,
+        Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv unregistering user', err);
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -1821,7 +1857,7 @@ export class UserService extends ServiceBase {
    * @param {any} context
    * @return {} returns empty response
    */
-  async delete(call: any, context?: any): Promise<any> {
+  async delete(call: any, context: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
     let userIDs = request.ids;
@@ -1847,8 +1883,10 @@ export class UserService extends ServiceBase {
     }
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, acsResources, action,
-        'user', this);
+      context.subject = subject;
+      context.resources = acsResources;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], action,
+        Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -1886,13 +1924,15 @@ export class UserService extends ServiceBase {
     }
   }
 
-  async deleteUsersByOrg(call: any, context?: any): Promise<any> {
+  async deleteUsersByOrg(call: any, context: any): Promise<any> {
     const orgIDs = call.request.org_ids;
     let subject = call.request.subject;
-    let acsResponse: ReadPolicyResponse;
+    let acsResponse: PolicySetRQResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, { id: orgIDs }, AuthZAction.DELETE,
-        'user', this);
+      context.subject = subject;
+      context.resources = { id: orgIDs };
+      acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: orgIDs }], AuthZAction.DELETE,
+        Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv', err);
       return returnOperationStatus(err.code, err.message);
@@ -1913,7 +1953,7 @@ export class UserService extends ServiceBase {
    * @param call
    * @param context
    */
-  async findByRole(call: any, context?: any): Promise<any> {
+  async findByRole(call: any, context: any): Promise<any> {
     const role: string = call.role || call.request.role || undefined;
     if (!role) {
       return returnStatus(400, 'missing role name');
@@ -1922,10 +1962,12 @@ export class UserService extends ServiceBase {
     const reqAttributes: any[] = call.attributes || call.request.attributes || [];
     const findByRoleRequest = { role, filters: {} };
     let subject = call.request.subject;
-    let acsResponse: ReadPolicyResponse;
+    let acsResponse: PolicySetRQResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, findByRoleRequest, AuthZAction.READ,
-        'user', this);
+      context.subject = subject;
+      context.resources = [];
+      acsResponse = await checkAccessRequest(context, [{ resource: 'user' }], AuthZAction.READ,
+        Operation.whatIsAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -1951,7 +1993,7 @@ export class UserService extends ServiceBase {
           }],
           subject
         }
-      });
+      }, {});
 
       if (_.isEmpty(result) || _.isEmpty(result.items) || result.items.total_count == 0) {
         return returnOperationStatus(404, `Role ${role} does not exist`);
@@ -1962,8 +2004,13 @@ export class UserService extends ServiceBase {
 
       // note: inefficient, a custom AQL query should be the final solution
       let roleRequestFiltersWithACS: any = findByRoleRequest.filters;
+      let custom_queries, custom_arguments;
+      if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
+        custom_queries = acsResponse.custom_query_args[0].custom_queries;
+        custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
+      }
       const userResult = await super.read({
-        request: { filters: roleRequestFiltersWithACS }
+        request: { filters: roleRequestFiltersWithACS, custom_queries, custom_arguments }
       }, {});
       if (_.isEmpty(userResult) || _.isEmpty(userResult.items) || userResult.items.total_count == 0) {
         return returnOperationStatus(404, 'No users were found in the system');
@@ -2164,7 +2211,7 @@ export class UserService extends ServiceBase {
   }
 
   async disableUsers(orgIDs: string[]): Promise<void> {
-    await this.modifyUsers(orgIDs, true);
+    await this.modifyUsers(orgIDs, true, {});
   }
 
   disableAC() {
@@ -2188,7 +2235,7 @@ export class UserService extends ServiceBase {
   }
 
   private async modifyUsers(orgIds: string[], deactivate: boolean,
-    context?: any, subject?: any): Promise<User[]> {
+    context: any, subject?: any): Promise<User[]> {
     const ROLE_SCOPING_ENTITY = this.cfg.get('urns:roleScopingEntity');
     const ORGANIZATION_URN = this.cfg.get('urns:organization');
     const ROLE_SCOPING_INSTANCE = this.cfg.get('urns:roleScopingInstance');
@@ -2358,8 +2405,16 @@ export class UserService extends ServiceBase {
           if (result.items.length === 1) {
             let item = result.items[0].payload;
             resource.meta.owner = item.meta.owner;
-          } else if (result.items.length === 0 && !resource.meta.owner) {
-            let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+          } else if (result.items.length === 0) {
+            if (_.isEmpty(resource.id)) {
+              resource.id = uuid.v4().replace(/-/g, '');
+            }
+            let ownerAttributes;
+            if (!resource.meta.owner) {
+              ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+            } else {
+              ownerAttributes = resource.meta.owner;
+            }
             ownerAttributes.push(
               {
                 id: urns.ownerIndicatoryEntity,
@@ -2371,8 +2426,16 @@ export class UserService extends ServiceBase {
               });
             resource.meta.owner = ownerAttributes;
           }
-        } else if (action === AuthZAction.CREATE && !resource.meta.owner) {
-          let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+        } else if (action === AuthZAction.CREATE) {
+          if (_.isEmpty(resource.id)) {
+            resource.id = uuid.v4().replace(/-/g, '');
+          }
+          let ownerAttributes;
+          if (!resource.meta.owner) {
+            ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+          } else {
+            ownerAttributes = resource.meta.owner;
+          }
           ownerAttributes.push(
             {
               id: urns.ownerIndicatoryEntity,
@@ -2425,7 +2488,7 @@ export class UserService extends ServiceBase {
     };
   }
 
-  async sendActivationEmail(call: Call<SendActivationEmailRequest>, context?: any): Promise<any> {
+  async sendActivationEmail(call: Call<SendActivationEmailRequest>, context: any): Promise<any> {
     const { identifier, subject } = call.request;
     let user;
     // check for the identifier against name or email in DB
@@ -2449,7 +2512,7 @@ export class UserService extends ServiceBase {
     }
   }
 
-  async sendInvitationEmail(call: Call<SendInvitationEmailRequest>, context?: any): Promise<any> {
+  async sendInvitationEmail(call: Call<SendInvitationEmailRequest>, context: any): Promise<any> {
     const { identifier, invited_by_user_identifier, subject } = call.request;
     let user;
     // check for the identifier against name or email in DB
@@ -2465,8 +2528,10 @@ export class UserService extends ServiceBase {
 
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, { id: user.id, identifier, invited_by_user_identifier, meta: user.meta },
-        AuthZAction.MODIFY, 'user', this);
+      context.subject = subject;
+      context.resources = { id: user.id, identifier, invited_by_user_identifier, meta: user.meta };
+      acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: user.id }],
+        AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -2516,20 +2581,20 @@ export class RoleService extends ServiceBase {
     await this.redisClient.quit();
   }
 
-  async create(call: any, context?: any): Promise<any> {
+  async create(call: any, context: any): Promise<any> {
     if (!call || !call.request || !call.request.items || call.request.items.length == 0) {
       return returnStatus(400, 'No role was provided for creation');
     }
-
-    const items = call.request.items;
     let subject = call.request.subject;
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.CREATE, subject);
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.CREATE,
-        'role', this);
+      context.subject = subject;
+      context.resources = acsResources;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.CREATE,
+        Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for creating role', err);
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -2553,13 +2618,15 @@ export class RoleService extends ServiceBase {
    * @param {context}
    * @return type is any since it can be guest or user type
    */
-  async read(call: any, context?: any): Promise<any> {
+  async read(call: any, context: any): Promise<any> {
     const readRequest = call.request;
     let subject = call.request.subject;
-    let acsResponse: ReadPolicyResponse;
+    let acsResponse: PolicySetRQResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, readRequest, AuthZAction.READ,
-        'role', this);
+      context.subject = subject;
+      context.resources = [];
+      acsResponse = await checkAccessRequest(context, [{ resource: 'rule' }], AuthZAction.READ,
+        Operation.whatIsAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -2567,7 +2634,10 @@ export class RoleService extends ServiceBase {
     if (acsResponse.decision != Decision.PERMIT) {
       return { operation_status: acsResponse.operation_status };
     }
-
+    if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
+      readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
+      readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
+    }
     if (acsResponse.decision === Decision.PERMIT) {
       return await super.read({ request: readRequest });
     }
@@ -2578,7 +2648,7 @@ export class RoleService extends ServiceBase {
    * @param call
    * @param context
    */
-  async update(call: any, context?: any): Promise<any> {
+  async update(call: any, context: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
       return returnOperationStatus(400, 'No items were provided for update');
@@ -2590,8 +2660,10 @@ export class RoleService extends ServiceBase {
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
-        'role', this);
+      context.subject = subject;
+      context.resources = acsResources;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY,
+        Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -2628,8 +2700,10 @@ export class RoleService extends ServiceBase {
         if (!_.isEqual(role.meta.owner, rolesDB.meta.owner)) {
           let acsResponse: DecisionResponse;
           try {
-            acsResponse = await checkAccessRequest(subject, [role], AuthZAction.MODIFY,
-              'role', this, undefined, false);
+            context.subject = subject;
+            context.resources = role;
+            acsResponse = await checkAccessRequest(context, [{ resource: 'role', id: role.id }], AuthZAction.MODIFY,
+              Operation.isAllowed, false);
           } catch (err) {
             this.logger.error('Error occurred requesting access-control-srv:', err);
             return returnOperationStatus(err.code, err.message);
@@ -2648,7 +2722,7 @@ export class RoleService extends ServiceBase {
    * @param call
    * @param context
    */
-  async upsert(call: any, context?: any): Promise<any> {
+  async upsert(call: any, context: any): Promise<any> {
     if (_.isNil(call) || _.isNil(call.request) || _.isNil(call.request.items)
       || _.isEmpty(call.request.items)) {
       return returnOperationStatus(400, 'No items were provided for upsert');
@@ -2656,10 +2730,12 @@ export class RoleService extends ServiceBase {
 
     let subject = call.request.subject;
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, acsResources, AuthZAction.MODIFY,
-        'role', this);
+      context.subject = subject;
+      context.resources = acsResources;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'role', id: acsResources.map(e => e.id) }],
+        AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -2680,7 +2756,7 @@ export class RoleService extends ServiceBase {
    * @param {any} context
    * @return {} returns empty response
    */
-  async delete(call: any, context?: any): Promise<any> {
+  async delete(call: any, context: any): Promise<any> {
     const request = call.request;
     const logger = this.logger;
     let roleIDs = request.ids;
@@ -2694,10 +2770,12 @@ export class RoleService extends ServiceBase {
     if (call.request.collection) {
       acsResources = [{ collection: call.request.collection }];
     }
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, resources, AuthZAction.DELETE,
-        'role', this);
+      context.subject = subject;
+      context.resources = acsResources;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'role', id: acsResources.map(e => e.id) }],
+        AuthZAction.DELETE, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       return returnOperationStatus(err.code, err.message);
@@ -2807,8 +2885,40 @@ export class RoleService extends ServiceBase {
         if (result.items.length === 1) {
           let item = result.items[0].payload;
           resource.meta.owner = item.meta.owner;
-        } else if (result.items.length === 0 && !resource.meta.owner) {
-          let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+        } else if (result.items.length === 0) {
+          if (_.isEmpty(resource.id)) {
+            resource.id = uuid.v4().replace(/-/g, '');
+          }
+          let ownerAttributes;
+          if (!resource.meta.owner) {
+            ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+          } else {
+            ownerAttributes = resource.meta.owner;
+          }
+          if (subject && subject.id) {
+            ownerAttributes.push(
+              {
+                id: urns.ownerIndicatoryEntity,
+                value: urns.user
+              },
+              {
+                id: urns.ownerInstance,
+                value: resource.id
+              });
+          }
+          resource.meta.owner = ownerAttributes;
+        }
+      } else if (action === AuthZAction.CREATE && !resource.meta.owner) {
+        if (_.isEmpty(resource.id)) {
+          resource.id = uuid.v4().replace(/-/g, '');
+        }
+        let ownerAttributes;
+        if (!resource.meta.owner) {
+          ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+        } else {
+          ownerAttributes = resource.meta.owner;
+        }
+        if (subject && subject.id) {
           ownerAttributes.push(
             {
               id: urns.ownerIndicatoryEntity,
@@ -2816,21 +2926,9 @@ export class RoleService extends ServiceBase {
             },
             {
               id: urns.ownerInstance,
-              value: resource.id
+              value: subject.id
             });
-          resource.meta.owner = ownerAttributes;
         }
-      } else if (action === AuthZAction.CREATE && !resource.meta.owner) {
-        let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
-        ownerAttributes.push(
-          {
-            id: urns.ownerIndicatoryEntity,
-            value: urns.user
-          },
-          {
-            id: urns.ownerInstance,
-            value: resource.id
-          });
         resource.meta.owner = ownerAttributes;
       }
     }

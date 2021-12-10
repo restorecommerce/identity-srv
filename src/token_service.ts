@@ -1,11 +1,9 @@
-import { errors } from '@restorecommerce/chassis-srv';
 import { Logger } from 'winston';
-import { ACSAuthZ, PermissionDenied, AuthZAction, Decision, Subject, DecisionResponse } from '@restorecommerce/acs-client';
+import { ACSAuthZ, AuthZAction, Decision, Subject, DecisionResponse, Operation } from '@restorecommerce/acs-client';
 import { checkAccessRequest } from './utils';
 import * as _ from 'lodash';
 import { UserService } from './service';
 import * as uuid from 'uuid';
-import { AccessResponse } from './interface';
 
 interface TokenData {
   id: string;
@@ -46,7 +44,7 @@ export class TokenService {
    * Store / Upsert accessToken Data to User entity
    *
   **/
-  async upsert(call: ReqTokenData, context?: any): Promise<any> {
+  async upsert(call: ReqTokenData, context: any): Promise<any> {
     if (!call || !call.request || !call.request.id) {
       const response = { status: { code: 400, message: 'No id was provided for creat / upsert' } };
       return marshallProtobufAny(response);
@@ -66,8 +64,10 @@ export class TokenService {
     tokenTechUser.scope = payload?.claims?.data?.default_scope;
     try {
       call.request = await this.createMetadata(tokenData, tokenTechUser);
-      acsResponse = await checkAccessRequest(tokenTechUser, call.request, AuthZAction.MODIFY,
-        'token', this);
+      context.subject = tokenTechUser;
+      context.resources = call.request;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'token', id: call.request.id }], AuthZAction.MODIFY,
+        Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       const response = { status: { code: err.code, message: err.message } };
@@ -84,7 +84,7 @@ export class TokenService {
     let response;
     try {
       // pass tech user for subject find operation
-      const userData = await this.userService.find({ request: { id: payload.accountId, subject: tokenTechUser } });
+      const userData = await this.userService.find({ request: { id: payload.accountId, subject: tokenTechUser } }, {});
       if (userData && userData.items && userData.items.length > 0) {
         let user = userData.items[0].payload;
         let currentTokenList = [];
@@ -146,7 +146,7 @@ export class TokenService {
    * Find access token data from User entity by tokenID
    *
   **/
-  async find(call: any, context?: any): Promise<any> {
+  async find(call: any, context: any): Promise<any> {
     if (!call || !call.request || !call.request.id) {
       const response = { status: { code: 400, message: 'No id was provided for find' } };
       return marshallProtobufAny(response);
@@ -156,10 +156,12 @@ export class TokenService {
     const id = call.request.id;
     const type = call.request.type;
     call.request = await this.createMetadata(call.request, subject);
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, { entity: 'token' }, AuthZAction.READ,
-        'token', this);
+      context.subject = subject;
+      context.resources = [];
+      acsResponse = await checkAccessRequest(context, [{ resource: 'token' }], AuthZAction.READ,
+        Operation.whatIsAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       const response = { status: { code: err.code, message: err.message } };
@@ -173,7 +175,7 @@ export class TokenService {
     if (acsResponse.decision === Decision.PERMIT) {
       let data;
       let tokenData;
-      const user = await this.userService.findByToken({ request: { token: id } });
+      const user = await this.userService.findByToken({ request: { token: id } }, {});
       if (user && user.payload && user.payload.tokens && user.payload.tokens.length > 0) {
         let userTokens = user.payload.tokens;
         for (let token of userTokens) {
@@ -208,7 +210,7 @@ export class TokenService {
    * Delete access token data from User entity
    *
   **/
-  async destroy(call: any, context?: any): Promise<any> {
+  async destroy(call: any, context: any): Promise<any> {
     if (!call || !call.request || !call.request.id) {
       const response = { status: { code: 400, message: 'Key was not provided for delete operation' } };
       return marshallProtobufAny(response);
@@ -218,10 +220,12 @@ export class TokenService {
     const id = call.request.id;
     const type = call.request.type;
     call.request = await this.createMetadata(call.request, subject);
-    let acsResponse: AccessResponse;
+    let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, call.request, AuthZAction.DELETE,
-        'token', this);
+      context.subject = subject;
+      context.resources = call.request;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'token', id: call.request.id }], AuthZAction.DELETE,
+        Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       const response = { status: { code: err.code, message: err.message } };
@@ -236,11 +240,11 @@ export class TokenService {
       let response;
       let user: any = {};
       try {
-        let payload = await this.find({ request: { id, subject } });
+        let payload = await this.find({ request: { id, subject } }, {});
         // delete user token here
         if (payload && payload.value) {
           payload = unmarshallProtobufAny(payload);
-          const userData = await this.userService.find({ request: { id: payload.accountId, subject } });
+          const userData = await this.userService.find({ request: { id: payload.accountId, subject } }, {});
           if (userData && userData.items && userData.items.length > 0) {
             let user = userData.items[0].payload;
             // check if the token is existing if not update it
@@ -267,7 +271,7 @@ export class TokenService {
                 tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
               }
               tokenTechUser.scope = user.default_scope;
-              await this.userService.update({ request: { items: [user], subject: tokenTechUser } });
+              await this.userService.update({ request: { items: [user], subject: tokenTechUser } }, {});
             }
           }
           if (id) {
@@ -308,7 +312,7 @@ export class TokenService {
   * Consume access token
   *
   **/
-  async consume(call: any, context?: any): Promise<any> {
+  async consume(call: any, context: any): Promise<any> {
     if (!call || !call.request || !call.request.id) {
       const response = { status: { code: 400, message: 'ID was not provided for consume operation' } };
       return marshallProtobufAny(response);
@@ -318,8 +322,10 @@ export class TokenService {
     const token = call.request.id;
     const subject = { token };
     try {
-      acsResponse = await checkAccessRequest(subject, { entity: 'token' }, AuthZAction.READ,
-        'token', this);
+      context.subject = subject;
+      context.resources = [];
+      acsResponse = await checkAccessRequest(context, [{ resource: 'token' }], AuthZAction.READ,
+        Operation.whatIsAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       const response = { status: { code: err.code, message: err.message } };
@@ -331,14 +337,14 @@ export class TokenService {
     }
 
     try {
-      const tokenData = await this.find({ request: { token, subject: { token } } });
+      const tokenData = await this.find({ request: { token, subject: { token } } }, {});
       if (tokenData) {
         // update last access
-        const userData = await this.userService.find({ request: { id: tokenData.accountId, subject } });
+        const userData = await this.userService.find({ request: { id: tokenData.accountId, subject } }, {});
         if (userData && userData.items && userData.items.length > 0) {
           let user = userData.items[0].payload;
           user.last_access = new Date().getTime();
-          await this.userService.update({ request: { items: [user], subject } });
+          await this.userService.update({ request: { items: [user], subject } }, {});
         }
       };
       let response = { status: { code: 200, message: `AccessToken with ID ${call.request.id} consumed` } };
@@ -354,7 +360,7 @@ export class TokenService {
   * Delete access token data using grant_id
   *
   **/
-  async revokeByGrantId(call: any, context?: any): Promise<any> {
+  async revokeByGrantId(call: any, context: any): Promise<any> {
     if (!call || !call.request || !call.request.id) {
       const response = { status: { code: 400, message: 'GrantId was not provided for revoke operation' } };
       return marshallProtobufAny(response);
@@ -378,8 +384,10 @@ export class TokenService {
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest(subject, call.request, AuthZAction.DELETE,
-        'token', this);
+      context.subject = subject;
+      context.resources = call.request;
+      acsResponse = await checkAccessRequest(context, [{resource: 'token', id: grant_id}], AuthZAction.DELETE,
+        Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);
       const response = { status: { code: err.code, message: err.message } };
@@ -397,10 +405,10 @@ export class TokenService {
 
       if (tokens && _.isArray(tokens)) {
         for (let token of tokens) {
-          const userData = await this.find({ request: { id: token, subject } });
+          const userData = await this.find({ request: { id: token, subject } }, {});
           if (!_.isEmpty(userData)) {
             let tokenData = unmarshallProtobufAny(userData);
-            await this.destroy({ request: { id: tokens, type: tokenData.kind, subject } });
+            await this.destroy({ request: { id: tokens, type: tokenData.kind, subject } }, {});
           }
         }
       }
@@ -437,7 +445,7 @@ export class TokenService {
           });
       } else if (subject && subject.token) {
         // when no subjectID is provided find the subjectID using findByToken
-        const user = await this.userService.findByToken({ request: { token: subject.token } });
+        const user = await this.userService.findByToken({ request: { token: subject.token } }, {});
         if (user && user.payload && user.payload.id) {
           orgOwnerAttributes.push(
             {

@@ -230,7 +230,7 @@ describe('testing identity-srv', () => {
           email: 'test@ms.restorecommerce.io'
         };
       });
-
+/*
       describe('calling register', function registerUser(): void {
         it('should register a user', async function registerUser(): Promise<void> {
           this.timeout(30000);
@@ -1220,7 +1220,7 @@ describe('testing identity-srv', () => {
           });
         });
       });
-
+*/
       // HR scoping tests
       describe('testing hierarchical scopes with authroization enabled', function registerUser(): void {
         // mainOrg -> orgA -> orgB -> orgC
