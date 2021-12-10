@@ -2625,7 +2625,7 @@ export class RoleService extends ServiceBase {
     try {
       context.subject = subject;
       context.resources = [];
-      acsResponse = await checkAccessRequest(context, [{ resource: 'rule' }], AuthZAction.READ,
+      acsResponse = await checkAccessRequest(context, [{ resource: 'role' }], AuthZAction.READ,
         Operation.whatIsAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv:', err);

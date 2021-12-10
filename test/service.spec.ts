@@ -94,11 +94,29 @@ const permitUserRule = {
   effect: 'PERMIT'
 };
 
-let userPolicySetRQ = {
+const permitRoleRule = {
+  id: 'permit_role_id',
+  target: {
+    action: [],
+    resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:role.Role' }],
+    subject: [
+      {
+        id: 'urn:restorecommerce:acs:names:role',
+        value: 'admin-r-id'
+      },
+      {
+        id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+        value: 'urn:restorecommerce:acs:model:organization.Organization'
+      }]
+  },
+  effect: 'PERMIT'
+};
+
+let userRolePolicySetRQ = {
   policy_sets:
     [{
       combining_algorithm: 'urn:oasis:names:tc:xacml:3.0:rule-combining-algorithm:permit-overrides',
-      id: 'user_test_policy_set_id',
+      id: 'user_role_test_policy_set_id',
       policies: [
         {
           combining_algorithm: 'urn:oasis:names:tc:xacml:3.0:rule-combining-algorithm:permit-overrides',
@@ -108,6 +126,20 @@ let userPolicySetRQ = {
             resources: [{
               id: 'urn:restorecommerce:acs:names:model:entity',
               value: 'urn:restorecommerce:acs:model:user.User'
+            }],
+            subject: []
+          }, effect: 'PERMIT',
+          rules: [ // permit or deny rule will be added
+          ],
+          has_rules: true
+        }, {
+          combining_algorithm: 'urn:oasis:names:tc:xacml:3.0:rule-combining-algorithm:permit-overrides',
+          id: 'role_test_policy_id',
+          target: {
+            action: [],
+            resources: [{
+              id: 'urn:restorecommerce:acs:names:model:entity',
+              value: 'urn:restorecommerce:acs:model:role.Role'
             }],
             subject: []
           }, effect: 'PERMIT',
@@ -230,7 +262,7 @@ describe('testing identity-srv', () => {
           email: 'test@ms.restorecommerce.io'
         };
       });
-/*
+
       describe('calling register', function registerUser(): void {
         it('should register a user', async function registerUser(): Promise<void> {
           this.timeout(30000);
@@ -257,10 +289,11 @@ describe('testing identity-srv', () => {
           // validate status
           registerResult.status.code.should.equal(200);
           registerResult.status.message.should.equal('success');
-          userPolicySetRQ.policy_sets[0].policies[0].rules[0] = permitUserRule;
+          userRolePolicySetRQ.policy_sets[0].policies[0].rules[0] = permitUserRule;
+          userRolePolicySetRQ.policy_sets[0].policies[1].rules[0] = permitRoleRule;
           // start mock acs-srv - needed for read operation since acs-client makes a req to acs-srv
           // to get applicable policies although acs-lookup is disabled
-          startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: userPolicySetRQ },
+          startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: userRolePolicySetRQ },
           { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'PERMIT' } }]);
           const filters = [{
             filter: [{
@@ -1220,7 +1253,7 @@ describe('testing identity-srv', () => {
           });
         });
       });
-*/
+
       // HR scoping tests
       describe('testing hierarchical scopes with authroization enabled', function registerUser(): void {
         // mainOrg -> orgA -> orgB -> orgC
@@ -1369,7 +1402,7 @@ describe('testing identity-srv', () => {
           testUser.role_associations[0].role = 'super-admin-r-id';
           const result = await userService.create({ items: [testUser], subject });
           result.items[0].status.code.should.equal(403);
-          result.items[0].status.message.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id does not have permissions');
+          result.items[0].status.message.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id,admin-r-id does not have permissions');
           result.items[0].status.id.should.equal('testuser');
           result.operation_status.code.should.equal(200);
           result.operation_status.message.should.equal('success');
