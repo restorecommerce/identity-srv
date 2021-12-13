@@ -1,4 +1,4 @@
-## 0.2.9 (December 13th, 2021)
+## 0.2.10 (December 13th, 2021)
 
 - added context null check
 
