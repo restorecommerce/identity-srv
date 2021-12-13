@@ -95,12 +95,13 @@ export class UserService extends ServiceBase {
     const readRequest = call.request;
     let acsResponse: PolicySetRQResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = [];
       acsResponse = await checkAccessRequest(context, [{ resource: 'user' }],
         AuthZAction.READ, Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for find', err);
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -309,12 +310,13 @@ export class UserService extends ServiceBase {
     let subject = call.request.subject;
     let acsResponse: PolicySetRQResponse;
     try {
+      if (!ctx) { ctx = {}; };
       ctx.subject = subject;
       ctx.resources = [];
       acsResponse = await checkAccessRequest(ctx, [{ resource: 'user' }], AuthZAction.READ,
         Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for read', err);
       return {
         operation_status: {
           code: err.code,
@@ -351,12 +353,13 @@ export class UserService extends ServiceBase {
     const acsResources = await this.createMetadata(usersList, AuthZAction.CREATE, subject);
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(item => item.id) }], AuthZAction.CREATE,
         Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv', err);
+      this.logger.error('Error occurred requesting access-control-srv for create', err);
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -868,6 +871,7 @@ export class UserService extends ServiceBase {
     }
     let acsResponse: DecisionResponse;
     try {
+      if (!ctx) { ctx = {}; };
       ctx.subject = subject;
       ctx.resources = {
         id: user.id,
@@ -879,7 +883,7 @@ export class UserService extends ServiceBase {
       acsResponse = await checkAccessRequest(ctx, [{ resource: 'user', id: user.id, property: ['active', 'activation_code', 'password_hash'] }],
         AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for confirmUserInvitation', err);
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -992,6 +996,7 @@ export class UserService extends ServiceBase {
     }
     const user: User = users.items[0].payload;
     try {
+      if (!ctx) { ctx = {}; };
       ctx.subject = subject;
       ctx.resources = { id: user.id, active: true, activation_code: activationCode, meta: user.meta };
       acsResponse = await checkAccessRequest(ctx, [{ resource: 'user', id: user.id, property: ['active', 'activation_code'] }],
@@ -1067,8 +1072,9 @@ export class UserService extends ServiceBase {
     const user: User = users.items[0].payload;
     let acsResponse: DecisionResponse;
     try {
+      if (!ctx) { ctx = {}; };
       ctx.subject = subject;
-      ctx.rsources = { id: user.id, password: pw, new_password: newPw, meta: user.meta };
+      ctx.resources = { id: user.id, password: pw, new_password: newPw, meta: user.meta };
       acsResponse = await checkAccessRequest(ctx, [{ resource: 'user', id: user.id, property: ['password', 'new_password'] }],
         AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
@@ -1171,6 +1177,7 @@ export class UserService extends ServiceBase {
       return returnOperationStatus(400, `Invalid identifier provided for confirm password change, multiple users found for identifier ${identifier}`);
     }
     try {
+      if (!ctx) { ctx = {}; };
       ctx.subject = subject;
       ctx.resources = {
         id: user.id,
@@ -1180,7 +1187,7 @@ export class UserService extends ServiceBase {
       };
       acsResponse = await checkAccessRequest(ctx, [{ resource: 'user', id: user.id, property: ['activation_code', 'password_hash'] }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for confirmPasswordChange', err);
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -1232,12 +1239,13 @@ export class UserService extends ServiceBase {
     }
     const user: User = users.items[0].payload;
     try {
+      if (!ctx) { ctx = {}; };
       ctx.subject = subject;
       ctx.resources = { id: user.id, identifier, new_email, meta: user.meta };
       acsResponse = await checkAccessRequest(ctx, [{ resource: 'user', id: user.id, property: ['identifier', 'new_email'] }],
         AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for requestEmailChange', err);
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -1294,6 +1302,7 @@ export class UserService extends ServiceBase {
     let subject = call.request.subject;
     let acsResponse: DecisionResponse;
     try {
+      if (!ctx) { ctx = {}; };
       ctx.subject = subject;
       ctx.resources = {
         id: user.id,
@@ -1303,7 +1312,7 @@ export class UserService extends ServiceBase {
       };
       acsResponse = await checkAccessRequest(ctx, [{ resource: 'user', id: user.id, property: ['email', 'activation_code'] }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for confirmEmailChange', err);
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -1349,12 +1358,13 @@ export class UserService extends ServiceBase {
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY,
         Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for update', err);
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -1429,12 +1439,13 @@ export class UserService extends ServiceBase {
         if (!_.isEqual(user.meta.owner, dbUser.meta.owner)) {
           let acsResponse: DecisionResponse;
           try {
+            if (!context) { context = {}; };
             context.subject = subject;
             context.resources = user;
             acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: user.id }], AuthZAction.MODIFY,
               Operation.isAllowed, false);
           } catch (err) {
-            this.logger.error('Error occurred requesting access-control-srv:', err);
+            this.logger.error('Error occurred requesting access-control-srv for update', err);
             // return returnStatus(err.code, err.message);
             updateWithStatus.items.push(returnStatus(err.code, err.message, user.id));
             items = _.filter(items, (item) => item.id !== user.id);
@@ -1647,12 +1658,13 @@ export class UserService extends ServiceBase {
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY,
         Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for upsert', err);
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -1822,6 +1834,7 @@ export class UserService extends ServiceBase {
     const acsResources = await this.createMetadata(users.items, AuthZAction.DELETE, subject);
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.DELETE,
@@ -1883,12 +1896,13 @@ export class UserService extends ServiceBase {
     }
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], action,
         Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for delete', err);
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -1929,12 +1943,13 @@ export class UserService extends ServiceBase {
     let subject = call.request.subject;
     let acsResponse: PolicySetRQResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = { id: orgIDs };
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: orgIDs }], AuthZAction.DELETE,
         Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv', err);
+      this.logger.error('Error occurred requesting access-control-srv for deleteUsersByOrg', err);
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -1964,12 +1979,13 @@ export class UserService extends ServiceBase {
     let subject = call.request.subject;
     let acsResponse: PolicySetRQResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = [];
       acsResponse = await checkAccessRequest(context, [{ resource: 'user' }], AuthZAction.READ,
         Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for findByRole', err);
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -2528,12 +2544,13 @@ export class UserService extends ServiceBase {
 
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = { id: user.id, identifier, invited_by_user_identifier, meta: user.meta };
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: user.id }],
         AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for sendInvitationEmail', err);
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -2589,6 +2606,7 @@ export class RoleService extends ServiceBase {
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.CREATE, subject);
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.CREATE,
@@ -2623,12 +2641,13 @@ export class RoleService extends ServiceBase {
     let subject = call.request.subject;
     let acsResponse: PolicySetRQResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = [];
       acsResponse = await checkAccessRequest(context, [{ resource: 'role' }], AuthZAction.READ,
         Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for read', err);
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -2660,12 +2679,13 @@ export class RoleService extends ServiceBase {
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY,
         Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for update', err);
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -2700,12 +2720,13 @@ export class RoleService extends ServiceBase {
         if (!_.isEqual(role.meta.owner, rolesDB.meta.owner)) {
           let acsResponse: DecisionResponse;
           try {
+            if (!context) { context = {}; };
             context.subject = subject;
             context.resources = role;
             acsResponse = await checkAccessRequest(context, [{ resource: 'role', id: role.id }], AuthZAction.MODIFY,
               Operation.isAllowed, false);
           } catch (err) {
-            this.logger.error('Error occurred requesting access-control-srv:', err);
+            this.logger.error('Error occurred requesting access-control-srv for update', err);
             return returnOperationStatus(err.code, err.message);
           }
           if (acsResponse.decision != Decision.PERMIT) {
@@ -2732,12 +2753,13 @@ export class RoleService extends ServiceBase {
     const acsResources = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'role', id: acsResources.map(e => e.id) }],
         AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for upsert', err);
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -2772,12 +2794,13 @@ export class RoleService extends ServiceBase {
     }
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'role', id: acsResources.map(e => e.id) }],
         AuthZAction.DELETE, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for delete', err);
       return returnOperationStatus(err.code, err.message);
     }
 

@@ -63,13 +63,14 @@ export class TokenService {
     tokenData.payload = payload;
     tokenTechUser.scope = payload?.claims?.data?.default_scope;
     try {
+      if (!context) { context = {}; };
       call.request = await this.createMetadata(tokenData, tokenTechUser);
       context.subject = tokenTechUser;
       context.resources = call.request;
       acsResponse = await checkAccessRequest(context, [{ resource: 'token', id: call.request.id }], AuthZAction.MODIFY,
         Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for token upsert', err);
       const response = { status: { code: err.code, message: err.message } };
       return marshallProtobufAny(response);
     }
@@ -158,12 +159,13 @@ export class TokenService {
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = [];
       acsResponse = await checkAccessRequest(context, [{ resource: 'token' }], AuthZAction.READ,
         Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for token find', err);
       const response = { status: { code: err.code, message: err.message } };
       return marshallProtobufAny(response);
     }
@@ -222,12 +224,13 @@ export class TokenService {
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = call.request;
       acsResponse = await checkAccessRequest(context, [{ resource: 'token', id: call.request.id }], AuthZAction.DELETE,
         Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for token destroy', err);
       const response = { status: { code: err.code, message: err.message } };
       return marshallProtobufAny(response);
     }
@@ -322,12 +325,13 @@ export class TokenService {
     const token = call.request.id;
     const subject = { token };
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = [];
       acsResponse = await checkAccessRequest(context, [{ resource: 'token' }], AuthZAction.READ,
         Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for token consume', err);
       const response = { status: { code: err.code, message: err.message } };
       return marshallProtobufAny(response);
     }
@@ -384,12 +388,13 @@ export class TokenService {
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = call.request;
-      acsResponse = await checkAccessRequest(context, [{resource: 'token', id: grant_id}], AuthZAction.DELETE,
+      acsResponse = await checkAccessRequest(context, [{ resource: 'token', id: grant_id }], AuthZAction.DELETE,
         Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for token revoke by grant id', err);
       const response = { status: { code: err.code, message: err.message } };
       return marshallProtobufAny(response);
     }

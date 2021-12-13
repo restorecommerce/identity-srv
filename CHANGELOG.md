@@ -1,3 +1,7 @@
+## 0.2.9 (December 13th, 2021)
+
+- added context null check
+
 ## 0.2.9 (December 10th, 2021)
 
 - updated acs-client with restructured checkAccessRequest api

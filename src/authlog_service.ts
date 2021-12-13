@@ -38,12 +38,13 @@ export class AuthenticationLogService extends ServiceBase {
     let subject = call.request.subject;
     let acsResponse: PolicySetRQResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = [];
       acsResponse = await checkAccessRequest(context, [{ resource: 'authentication_log' }], AuthZAction.READ,
         Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for authentication_log read', err);
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Decision.PERMIT) {
@@ -76,12 +77,13 @@ export class AuthenticationLogService extends ServiceBase {
     items = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = items;
       acsResponse = await checkAccessRequest(context, [{ resource: 'authentication_log', id: items.map(e => e.id) }],
         AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for authentication_log update', err);
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -116,12 +118,13 @@ export class AuthenticationLogService extends ServiceBase {
         if (!_.isEqual(auth_log.meta.owner, authLogDB.meta.owner)) {
           let acsResponse: DecisionResponse;
           try {
+            if (!context) { context = {}; };
             context.subject = subject;
             context.resources = auth_log;
             acsResponse = await checkAccessRequest(subject, [{ resource: 'authentication_log', id: auth_log.id }], AuthZAction.MODIFY,
               Operation.isAllowed, false);
           } catch (err) {
-            this.logger.error('Error occurred requesting access-control-srv:', err);
+            this.logger.error('Error occurred requesting access-control-srv for authentication_log update', err);
             return returnOperationStatus(err.code, err.message);
           }
           if (acsResponse.decision != Decision.PERMIT) {
@@ -148,12 +151,13 @@ export class AuthenticationLogService extends ServiceBase {
     call.reqeust.items = await this.createMetadata(call.request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = call.request.items;
       acsResponse = await checkAccessRequest(context, [{ resource: 'authentication_log', id: call.request.items.map(e => e.id) }],
         AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for authentication_log upsert', err);
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -188,12 +192,13 @@ export class AuthenticationLogService extends ServiceBase {
     }
     let acsResponse: DecisionResponse;
     try {
+      if (!context) { context = {}; };
       context.subject = subject;
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(subject, [{resource: 'authentication_log', id: authLogIDs }],
         AuthZAction.DELETE, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv:', err);
+      this.logger.error('Error occurred requesting access-control-srv for authentication_log delete', err);
       return returnOperationStatus(err.code, err.message);
     }
 
