@@ -1,3 +1,7 @@
+## 0.2.11 (December 15th, 2021)
+
+- updated acs-client and other dependencies
+
 ## 0.2.10 (December 13th, 2021)
 
 - added context null check
