@@ -1,3 +1,7 @@
+## 0.2.12 (December 21st, 2021)
+
+- updated RC dependencies
+
 ## 0.2.11 (December 15th, 2021)
 
 - updated acs-client and other dependencies
