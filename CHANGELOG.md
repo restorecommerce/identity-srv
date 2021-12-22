@@ -1,3 +1,7 @@
+## 0.2.15 (December 22nd, 2021)
+
+- removed importHelpers flag from tsconfig
+
 ## 0.2.14 (December 22nd, 2021)
 
 - updated ts config and added no-float promise rule
