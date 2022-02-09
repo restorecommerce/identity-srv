@@ -67,6 +67,7 @@
           "io-restorecommerce-token-srv": "io.restorecommerce.token.Service",
           "io-restorecommerce-identity-reflection": "grpc.reflection.v1alpha.ServerReflection",
           "io-restorecommerce-identity-cis": "io.restorecommerce.commandinterface.Service",
+          "io-restorecommerce-oauth-srv": "io.restorecommerce.oauth.Service",
           "grpc-health-v1": "grpc.health.v1.Health"
         },
         "protos": [
@@ -76,6 +77,7 @@
           "io/restorecommerce/token.proto",
           "grpc/reflection/v1alpha/reflection.proto",
           "io/restorecommerce/commandinterface.proto",
+          "io/restorecommerce/oauth.proto",
           "grpc/health/v1/health.proto"
         ],
         "protoRoot": "node_modules/@restorecommerce/protos/",

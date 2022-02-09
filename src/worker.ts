@@ -12,6 +12,7 @@ import { TokenService } from './token_service';
 import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base';
 import { Database } from 'arangojs';
 import 'source-map-support/register';
+import { OAuthService } from './oauth_service';
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
@@ -210,11 +211,15 @@ export class Worker {
     // token service
     const tokenService = new TokenService(cfg, logger, this.authZ, this.userService);
 
+    // oauth service
+    const oauthService = new OAuthService(cfg, logger, this.userService);
+
     await server.bind(serviceNamesCfg.user, this.userService);
     await server.bind(serviceNamesCfg.role, this.roleService);
     await server.bind(serviceNamesCfg.authenticationLog, authLogService);
     await server.bind(serviceNamesCfg.token, tokenService);
     await server.bind(serviceNamesCfg.cis, cis);
+    await server.bind(serviceNamesCfg.oauth, oauthService);
 
     // Add reflection service
     const reflectionServiceName = serviceNamesCfg.reflection;

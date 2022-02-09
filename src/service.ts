@@ -3,7 +3,11 @@ import * as uuid from 'uuid';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import * as fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, FilterOperation } from '@restorecommerce/resource-base-interface';
-import { DocumentMetadata, OperatorType } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
+import {
+  DocumentMetadata,
+  OperatorType, ReadRequest,
+  ServiceCall
+} from '@restorecommerce/resource-base-interface/lib/core/interfaces';
 import { Logger } from 'winston';
 import {
   ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest,
@@ -335,6 +339,10 @@ export class UserService extends ServiceBase {
     if (acsResponse.decision === Decision.PERMIT) {
       return await super.read({ request: readRequest });
     }
+  }
+
+  superRead(call: ServiceCall<ReadRequest>, context?: any): Promise<any> {
+    return super.read(call, context);
   }
 
   /**
