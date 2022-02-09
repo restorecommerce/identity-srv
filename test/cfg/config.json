@@ -694,5 +694,17 @@
       "role": "user-r-id",
       "attributes": []
     }
-  ]
+  ],
+  "oauth": {
+    "redirect_uri_base": "http://localhost:5000/oauth2/",
+    "services": {
+      "google": {
+        "client_id": "",
+        "client_secret": "",
+        "base_site": "",
+        "authorize_path": "https://accounts.google.com/o/oauth2/auth",
+        "access_token_path": "https://oauth2.googleapis.com/token"
+      }
+    }
+  }
 }
