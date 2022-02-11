@@ -633,6 +633,23 @@ describe('testing identity-srv', () => {
           await userService.unregister({ identifier: result.items[0].payload.name });
         });
 
+        it('should create a user with additional json data and unregister it', async function createUser(): Promise<void> {
+          // append name
+          Object.assign(testuser2, { name: 'test_user@n-fuse.co' });
+          const jsonData = { 'testKey': 'testValue' };
+          Object.assign(testuser2, { data: { value: Buffer.from(JSON.stringify(jsonData)) } });
+          const result = await userService.create({ items: [testuser2] });
+          // read user with json data
+          const userData = await userService.find({ id: 'testuser2' });
+          const decodedData = JSON.parse(userData.items[0].payload.data.value.toString());
+          decodedData.testKey.should.equal('testValue');
+          should.exist(result.items[0].payload);
+          result.items[0].payload.id.should.equal('testuser2');
+          result.items[0].status.code.should.equal(200);
+          result.items[0].status.message.should.equal('success');
+          await userService.unregister({ identifier: result.items[0].payload.name });
+        });
+
         it('should invite a user and confirm User Invitation', async function inviteUser(): Promise<void> {
           Object.assign(testuser2, { invite: true });
           const result = await userService.create({ items: [testuser2] });

@@ -58,7 +58,12 @@ export class UserService extends ServiceBase {
   uniqueEmailConstraint: boolean;
   constructor(cfg: any, topics: any, db: any, logger: Logger,
     isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ) {
-    super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users'),
+    let resourceFieldConfig;
+    if(cfg.get('fieldHandlers')) {
+      resourceFieldConfig = cfg.get('fieldHandlers');
+      resourceFieldConfig['bufferField'] = resourceFieldConfig?.bufferFields?.user;
+    }
+    super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users', resourceFieldConfig),
       isEventsEnabled);
     this.cfg = cfg;
     this.db = db;

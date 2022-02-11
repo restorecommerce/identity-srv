@@ -718,6 +718,11 @@
     "health": "grpc-health-v1",
     "oauth": "io-restorecommerce-oauth-srv"
   },
+  "fieldHandlers": {
+    "bufferFields": {
+      "user": "data"
+    }
+  },
   "errors": {
     "INVALID_CREDENTIALS": {
       "code": "401",
