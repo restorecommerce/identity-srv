@@ -92,7 +92,7 @@ export class TokenService {
         if (user && user.tokens && user.tokens.length > 0) {
           // remove expired tokens
           currentTokenList = (user.tokens).filter(t => {
-            return t.expires_in > Date.now();
+            return t.expires_in >= Math.round(new Date().getTime() / 1000);
           });
         }
         let token_name;
@@ -282,17 +282,8 @@ export class TokenService {
           }
           if (id) {
             // flush token subject cache
-            await new Promise((resolve: any, reject) => {
-              this.userService.tokenRedisClient.del(id, async (err, numberOfDeletedKeys) => {
-                if (err) {
-                  this.logger.error('Error deleting user data from redis', err);
-                  resolve(err);
-                } else {
-                  this.logger.info('Subject data deleted from Reids', { noOfKeys: numberOfDeletedKeys });
-                  resolve();
-                }
-              });
-            });
+            const numberOfDeletedKeys = await this.userService.tokenRedisClient.del(id);
+            this.logger.info('Subject data deleted from Reids', { noOfKeys: numberOfDeletedKeys });
           }
           response = {
             status: {
@@ -375,18 +366,11 @@ export class TokenService {
 
     let subject = call.request.subject;
     const grant_id = call.request.grant_id;
-    let tokens = await new Promise((resolve, reject) => {
-      this.userService.tokenRedisClient.get(grant_id, async (err, response) => {
-        if (!err && response) {
-          this.logger.debug('Found grant_id in redis cache');
-          const redisResp = JSON.parse(response);
-          resolve(redisResp);
-        } else if (err) {
-          this.logger.error('Error retrieving grant_id', { err });
-          return resolve(marshallProtobufAny({ response: `Error retrieving grant_id ${grant_id}` }));
-        }
-      });
-    });
+    let tokens = await this.userService.tokenRedisClient.get(grant_id) as any;
+    if(tokens) {
+      this.logger.debug('Found grant_id in redis cache');
+      tokens = JSON.parse(tokens);
+    }
     Object.assign(subject, { tokens });
     call.request = await this.createMetadata(call.request, subject);
     let acsResponse: DecisionResponse;

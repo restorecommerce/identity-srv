@@ -156,7 +156,7 @@ export class OAuthService {
 
     // remove expired tokens
     const updatedTokens = (resultTokens).filter(t => {
-      return t.expires_in > Date.now();
+      return t.expires_in >= Math.round(new Date().getTime() / 1000);
     });
     user.tokens = updatedTokens;
 

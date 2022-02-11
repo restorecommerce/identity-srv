@@ -6,7 +6,7 @@ import * as chassis from '@restorecommerce/chassis-srv';
 import { Logger } from 'winston';
 import { UserService, RoleService } from './service';
 import { ACSAuthZ, initAuthZ, updateConfig, authZ as FallbackAuthZ, initializeCache } from '@restorecommerce/acs-client';
-import Redis from 'ioredis';
+import { createClient, RedisClientType} from 'redis';
 import { AuthenticationLogService } from './authlog_service';
 import { TokenService } from './token_service';
 import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base';
@@ -18,7 +18,7 @@ const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
 
 class UserCommandInterface extends chassis.CommandInterface {
-  constructor(server: chassis.Server, cfg: any, logger: any, events: Events, redisClient: Redis) {
+  constructor(server: chassis.Server, cfg: any, logger: any, events: Events, redisClient: RedisClientType<any, any>) {
     super(server, cfg, logger, events, redisClient);
   }
 
@@ -91,7 +91,7 @@ export class Worker {
   offsetStore: chassis.OffsetStore;
   userService: UserService;
   authZ: ACSAuthZ;
-  redisClient: Redis;
+  redisClient: RedisClientType<any, any>;
   roleService: RoleService;
 
   constructor(cfg?: any) {
@@ -159,8 +159,10 @@ export class Worker {
 
     // init redis client for subject index
     const redisConfig = cfg.get('redis');
-    redisConfig.db = this.cfg.get('redis:db-indexes:db-subject');
-    this.redisClient = new Redis(redisConfig);
+    redisConfig.database = this.cfg.get('redis:db-indexes:db-subject');
+    this.redisClient = createClient(redisConfig);
+    this.redisClient.on('error', (err) => logger.error('Redis Client Error', err));
+    await this.redisClient.connect();
 
     // init ACS cache
     await initializeCache();

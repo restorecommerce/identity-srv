@@ -1,7 +1,7 @@
 import * as _ from 'lodash';
 import * as uuid from 'uuid';
 import * as kafkaClient from '@restorecommerce/kafka-client';
-import * as fetch from 'node-fetch';
+import fetch from 'node-fetch';
 import { ServiceBase, ResourcesAPIBase, FilterOperation } from '@restorecommerce/resource-base-interface';
 import {
   DocumentMetadata,
@@ -13,7 +13,7 @@ import {
   ACSAuthZ, AuthZAction, Decision, Subject, updateConfig, accessRequest,
   HierarchicalScope, RoleAssociation, PolicySetRQResponse, DecisionResponse, ResolvedSubject, Operation
 } from '@restorecommerce/acs-client';
-import Redis from 'ioredis';
+import { createClient, RedisClientType } from 'redis';
 import {
   checkAccessRequest, password, unmarshallProtobufAny, marshallProtobufAny,
   getDefaultFilter, getNameFilter, returnOperationStatus, returnCodeMessage,
@@ -51,15 +51,15 @@ export class UserService extends ServiceBase {
   emailStyle: string;
   roleService: RoleService;
   authZ: ACSAuthZ;
-  redisClient: Redis;
+  redisClient: RedisClientType<any, any>;
   authZCheck: boolean;
   tokenService: TokenService;
-  tokenRedisClient: Redis;
+  tokenRedisClient: RedisClientType<any, any>;
   uniqueEmailConstraint: boolean;
   constructor(cfg: any, topics: any, db: any, logger: Logger,
     isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ) {
     let resourceFieldConfig;
-    if(cfg.get('fieldHandlers')) {
+    if (cfg.get('fieldHandlers')) {
       resourceFieldConfig = cfg.get('fieldHandlers');
       resourceFieldConfig['bufferField'] = resourceFieldConfig?.bufferFields?.user;
     }
@@ -72,11 +72,17 @@ export class UserService extends ServiceBase {
     this.roleService = roleService;
     this.authZ = authZ;
     const redisConfig = cfg.get('redis');
-    redisConfig.db = cfg.get('redis:db-indexes:db-subject');
-    this.redisClient = new Redis(redisConfig);
+    redisConfig.database = cfg.get('redis:db-indexes:db-subject');
+    this.redisClient = createClient(redisConfig);
+    this.redisClient.on('error', (err) => logger.error('Redis client error in subject store', err));
+    this.redisClient.connect().then((val) =>
+      logger.info('Redis client connection successful for subject store')).catch(err => logger.error('Redis connection error', err));
     this.authZCheck = this.cfg.get('authorization:enabled');
-    redisConfig.db = this.cfg.get('redis:db-indexes:db-findByToken') || 0;
-    this.tokenRedisClient = new Redis(redisConfig);
+    redisConfig.database = this.cfg.get('redis:db-indexes:db-findByToken') || 0;
+    this.tokenRedisClient = createClient(redisConfig);
+    this.tokenRedisClient.on('error', (err) => logger.error('Redis client error in token cache store', err));
+    this.tokenRedisClient.connect().then((val) =>
+      logger.info('Redis client connection successful for token cache store')).catch(err => logger.error('Redis connection error', err));
     this.tokenService = new TokenService(cfg, logger, authZ, this);
     this.emailEnabled = this.cfg.get('service:enableEmail');
     const isConfigSet = this.cfg.get('service:uniqueEmailConstraint');
@@ -215,80 +221,72 @@ export class UserService extends ServiceBase {
     let userData;
     const logger = this.logger;
     if (token) {
-      userData = await new Promise((resolve: any, reject) => {
-        this.tokenRedisClient.get(token, async (err, response) => {
-          if (!err && response) {
-            // user data
-            logger.debug('Found user data in redis cache', { token });
-            const redisResp = JSON.parse(response);
-            // validate token expiry date and delete it if expired
-            if (redisResp && redisResp.tokens) {
-              const dbToken = _.find(redisResp.tokens, { token });
-              if ((dbToken && dbToken.expires_in === 0) || (dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000))) {
-                return resolve({ payload: redisResp, status: returnCodeMessage(200, 'success') });
-              } else {
-                // delete token from redis and update user entity
-                this.tokenRedisClient.del(token, async (err, numberOfDeletedKeys) => {
-                  if (err) {
-                    this.logger.error('Error deleting cached findByTOken data from redis', { err });
-                    resolve({ status: returnCodeMessage(500, 'Error deleting cached findByTOken data from redis') });
-                  } else {
-                    this.logger.info('Redis cached data for findByToken deleted successfully', { noOfKeys: numberOfDeletedKeys });
-                  }
-                  resolve({ status: returnCodeMessage(401, 'Redis cached data for findByToken deleted successfully') });
-                });
-              }
+      userData = await this.tokenRedisClient.get(token);
+      if (userData) {
+        // user data
+        logger.debug('Found user data in redis cache', { token });
+        userData = JSON.parse(userData);
+        // validate token expiry date and delete it if expired
+        if (userData && userData.tokens) {
+          const dbToken = _.find(userData.tokens, { token });
+          if ((dbToken && dbToken.expires_in === 0) || (dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000))) {
+            return { payload: userData, status: returnCodeMessage(200, 'success') };
+          } else {
+            // delete token from redis and update user entity
+            let numberOfDeletedKeys = await this.tokenRedisClient.del(token);
+            this.logger.info('Redis cached data for findByToken deleted successfully', { noOfKeys: numberOfDeletedKeys });
+            return { status: returnCodeMessage(401, 'Redis cached data for findByToken deleted successfully') };
+          }
+        }
+      } else {
+        // when not set in redis
+        // regex filter search field for token array
+        const filters = [{
+          filter: [{
+            field: 'tokens[*].token',
+            operation: FilterOperation.in,
+            value: token
+          }]
+        }];
+        let users = await super.read({ request: { filters } }, context);
+        if (users.total_count === 0) {
+          logger.debug('No user found for provided token value', { token });
+          return { status: { code: 401, message: 'No user found for provided token value' } };
+        }
+        if (users.total_count === 1) {
+          logger.debug('found user from token', { users });
+          if (users.items && users.items[0] && users.items[0].payload) {
+            // validate token expiry and delete if expired
+            const dbToken = _.find(users.items[0].payload.tokens, { token });
+            let tokenTechUser: any = {};
+            const techUsersCfg = this.cfg.get('techUsers');
+            if (techUsersCfg && techUsersCfg.length > 0) {
+              tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
             }
-          }
-          // when not set in redis
-          // regex filter search field for token array
-          const filters = [{
-            filter: [{
-              field: 'tokens[*].token',
-              operation: FilterOperation.in,
-              value: token
-            }]
-          }];
-          let users = await super.read({ request: { filters } }, context);
-          if (users.total_count === 0) {
-            logger.debug('No user found for provided token value', { token });
-            return resolve({ status: { code: 401, message: 'No user found for provided token value' } });
-          }
-          if (users.total_count === 1) {
-            logger.debug('found user from token', { users });
-            if (users.items && users.items[0] && users.items[0].payload) {
-              // validate token expiry and delete if expired
-              const dbToken = _.find(users.items[0].payload.tokens, { token });
-              let tokenTechUser: any = {};
-              const techUsersCfg = this.cfg.get('techUsers');
-              if (techUsersCfg && techUsersCfg.length > 0) {
-                tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
-              }
 
-              if ((dbToken && dbToken.expires_in === 0) || (dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000))) {
-                this.tokenRedisClient.set(token, JSON.stringify(users.items[0].payload));
-                logger.debug('Stored user data to redis cache successfully');
-                // update token last_login
-                let user = users.items[0].payload;
-                if (user && user && user.tokens && user.tokens.length > 0) {
-                  for (let user_token of user.tokens) {
-                    if (user_token.token === token) {
-                      user_token.last_login = new Date().getTime();
-                    }
+            if ((dbToken && dbToken.expires_in === 0) || (dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000))) {
+              await this.tokenRedisClient.set(token, JSON.stringify(users.items[0].payload));
+              logger.debug('Stored user data to redis cache successfully');
+              // update token last_login
+              let user = users.items[0].payload;
+              if (user && user && user.tokens && user.tokens.length > 0) {
+                for (let user_token of user.tokens) {
+                  if (user_token.token === token) {
+                    user_token.last_login = new Date().getTime();
                   }
                 }
-                await this.update({ request: { items: [user], subject: tokenTechUser } }, context);
-                return resolve({ payload: user, status: { code: 200, message: 'success' } });
-              } else if (dbToken && dbToken.expires_in < Math.round(new Date().getTime() / 1000)) {
-                logger.debug('Token expired');
-                resolve({ status: { code: 401, message: 'Token ${token} expired' } });
               }
+              await this.update({ request: { items: [user], subject: tokenTechUser } }, context);
+              return { payload: user, status: { code: 200, message: 'success' } };
+            } else if (dbToken && dbToken.expires_in < Math.round(new Date().getTime() / 1000)) {
+              logger.debug('Token expired');
+              return { status: { code: 401, message: 'Token ${token} expired' } };
             }
           }
-          logger.silly('multiple user found for request', call.request);
-          resolve({ status: { code: 400, message: 'multiple users found for token' } });
-        });
-      });
+        }
+        logger.silly('multiple user found for request', call.request);
+        return { status: { code: 400, message: 'multiple users found for token' } };
+      }
     } else {
       return { status: { code: 400, message: 'Token not provided' } };
     }
@@ -429,7 +427,7 @@ export class UserService extends ServiceBase {
   private async verifyUserRoleAssociations(usersList: User[], subject: any): Promise<any> {
     let validateRoleScope = false;
     let token, redisHRScopesKey, user;
-    let hierarchical_scopes = [];
+    let hierarchical_scopes: any = [];
     if (subject) {
       token = subject.token;
     }
@@ -447,20 +445,8 @@ export class UserService extends ServiceBase {
     }
 
     if (redisHRScopesKey) {
-      hierarchical_scopes = await new Promise((resolve, reject) => {
-        this.redisClient.get(redisHRScopesKey, async (err, response) => {
-          if (!err && response) {
-            // update user HR scope and role_associations from redis
-            const redisResp = JSON.parse(response);
-            resolve(redisResp);
-          }
-          // when not set in redis
-          if (err || (!err && !response)) {
-            resolve(subject.hierarchical_scopes);
-            return subject.hierarchical_scopes;
-          }
-        });
-      });
+      hierarchical_scopes = await this.redisClient.get(redisHRScopesKey) as any;
+      hierarchical_scopes = hierarchical_scopes ? JSON.parse(hierarchical_scopes) : subject.hierarchical_scopes;
     } else if (subject && subject.hierarchical_scopes) {
       hierarchical_scopes = subject.hierarchical_scopes;
     }
@@ -1476,82 +1462,70 @@ export class UserService extends ServiceBase {
         if (user && user.tokens && user.tokens.length > 0) {
           for (let token of user.tokens) {
             const tokenValue = token.token;
-            await new Promise((resolve, reject) => {
-              this.tokenRedisClient.get(tokenValue, async (err, response) => {
-                if (!err && response) {
-                  const redisResp = JSON.parse(response);
-                  const redisRoleAssocs = redisResp.role_associations;
-                  const redisTokens = redisResp.tokens;
-                  const redisID = redisResp.id;
-                  let roleAssocEqual;
-                  let tokensEqual;
-                  let updatedRoleAssocs = user.role_associations;
-                  let updatedTokens = user.tokens;
-                  if (redisID === user.id) {
-                    for (let userRoleAssoc of updatedRoleAssocs) {
-                      let found = false;
-                      for (let redisRoleAssoc of redisRoleAssocs) {
-                        if (redisRoleAssoc.role === userRoleAssoc.role) {
-                          let i = 0;
-                          const attrLenght = userRoleAssoc.attributes.length;
-                          for (let redisAttribute of redisRoleAssoc.attributes) {
-                            for (let userAttribute of userRoleAssoc.attributes) {
-                              if (userAttribute.id === redisAttribute.id && userAttribute.value === redisAttribute.value) {
-                                i++;
-                              }
-                            }
-                          }
-                          if (attrLenght === i) {
-                            found = true;
-                            roleAssocEqual = true;
-                            break;
+            const response = await this.tokenRedisClient.get(tokenValue);
+            if (response) {
+              const redisResp = JSON.parse(response);
+              const redisRoleAssocs = redisResp.role_associations;
+              const redisTokens = redisResp.tokens;
+              const redisID = redisResp.id;
+              let roleAssocEqual;
+              let tokensEqual;
+              let updatedRoleAssocs = user.role_associations;
+              let updatedTokens = user.tokens;
+              if (redisID === user.id) {
+                for (let userRoleAssoc of updatedRoleAssocs) {
+                  let found = false;
+                  for (let redisRoleAssoc of redisRoleAssocs) {
+                    if (redisRoleAssoc.role === userRoleAssoc.role) {
+                      let i = 0;
+                      const attrLenght = userRoleAssoc.attributes.length;
+                      for (let redisAttribute of redisRoleAssoc.attributes) {
+                        for (let userAttribute of userRoleAssoc.attributes) {
+                          if (userAttribute.id === redisAttribute.id && userAttribute.value === redisAttribute.value) {
+                            i++;
                           }
                         }
                       }
-                      if (!found) {
-                        this.logger.debug('Subject Role assocation has been updated', { userRoleAssoc });
-                        roleAssocEqual = false;
+                      if (attrLenght === i) {
+                        found = true;
+                        roleAssocEqual = true;
                         break;
                       }
                     }
                   }
-                  if (redisID === user.id) {
-                    for (let token of updatedTokens) {
-                      // compare only token scopes (since it now contains last_login as well)
-                      for (let redisToken of redisTokens) {
-                        if (redisToken.token === token.token) {
-                          if (!redisToken.scopes) {
-                            redisToken.scopes = [];
-                          }
-                          if (!token.scopes) {
-                            token.scopes = [];
-                          }
-                          tokensEqual = _.isEqual(redisToken.scopes.sort(), token.scopes.sort());
-                        }
-                      }
-                      if (!tokensEqual) {
-                        this.logger.debug('Subject Token scope has been updated', token);
-                        break;
-                      }
-                    }
+                  if (!found) {
+                    this.logger.debug('Subject Role assocation has been updated', { userRoleAssoc });
+                    roleAssocEqual = false;
+                    break;
                   }
-                  if (!roleAssocEqual || !tokensEqual || (updatedRoleAssocs.length != redisRoleAssocs.length)) {
-                    // flush token subject cache
-                    this.tokenRedisClient.del(tokenValue, async (err, numberOfDeletedKeys) => {
-                      if (err) {
-                        this.logger.error('Error deleting cached findByTOken data from redis', { err });
-                        reject(err);
-                      } else {
-                        this.logger.info('Redis cached data for findByToken deleted successfully', { token: tokenValue });
-                      }
-                      resolve(numberOfDeletedKeys);
-                    });
-                  }
-                  resolve(redisResp);
                 }
-                resolve(undefined);
-              });
-            });
+              }
+              if (redisID === user.id) {
+                for (let token of updatedTokens) {
+                  // compare only token scopes (since it now contains last_login as well)
+                  for (let redisToken of redisTokens) {
+                    if (redisToken.token === token.token) {
+                      if (!redisToken.scopes) {
+                        redisToken.scopes = [];
+                      }
+                      if (!token.scopes) {
+                        token.scopes = [];
+                      }
+                      tokensEqual = _.isEqual(redisToken.scopes.sort(), token.scopes.sort());
+                    }
+                  }
+                  if (!tokensEqual) {
+                    this.logger.debug('Subject Token scope has been updated', token);
+                    break;
+                  }
+                }
+              }
+              if (!roleAssocEqual || !tokensEqual || (updatedRoleAssocs.length != redisRoleAssocs.length)) {
+                // flush token subject cache
+                await this.tokenRedisClient.del(tokenValue);
+                this.logger.info('Redis cached data for findByToken deleted successfully', { token: tokenValue });
+              }
+            }
           }
         }
 
@@ -2591,7 +2565,7 @@ export class UserService extends ServiceBase {
 
 export class RoleService extends ServiceBase {
   logger: Logger;
-  redisClient: Redis;
+  redisClient: RedisClientType<any, any>;
   cfg: any;
   authZ: ACSAuthZ;
   authZCheck: boolean;
@@ -2600,8 +2574,11 @@ export class RoleService extends ServiceBase {
     super('role', roleTopic, logger, new ResourcesAPIBase(db, 'roles'), isEventsEnabled);
     this.logger = logger;
     const redisConfig = cfg.get('redis');
-    redisConfig.db = cfg.get('redis:db-indexes:db-subject');
-    this.redisClient = new Redis(redisConfig);
+    redisConfig.database = cfg.get('redis:db-indexes:db-subject');
+    this.redisClient = createClient(redisConfig);
+    this.redisClient.on('error', (err) => logger.error('Redis client error in subject store', err));
+    this.redisClient.connect().then((val) =>
+      logger.info('Redis client connection successful for subject store')).catch(err => logger.error('Redis connection error', err));
     this.authZ = authZ;
     this.cfg = cfg;
     this.authZCheck = this.cfg.get('authorization:enabled');
