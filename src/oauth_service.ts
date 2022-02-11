@@ -154,7 +154,11 @@ export class OAuthService {
       last_login: Date.now()
     });
 
-    user.tokens = resultTokens;
+    // remove expired tokens
+    const updatedTokens = (resultTokens).filter(t => {
+      return t.expires_in > Date.now();
+    });
+    user.tokens = updatedTokens;
 
     await this.userService.update({request: {items: [user], subject: tokenTechUser}}, {});
 

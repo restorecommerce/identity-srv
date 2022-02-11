@@ -90,7 +90,10 @@ export class TokenService {
         let user = userData.items[0].payload;
         let currentTokenList = [];
         if (user && user.tokens && user.tokens.length > 0) {
-          currentTokenList = user.tokens;
+          // remove expired tokens
+          currentTokenList = (user.tokens).filter(t => {
+            return t.expires_in > Date.now();
+          });
         }
         let token_name;
         if (payload.claims && payload.claims.token_name) {
