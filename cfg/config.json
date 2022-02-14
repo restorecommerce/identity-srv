@@ -744,7 +744,7 @@
     },
     {
       "id": "upsert_user_tokens",
-      "token": "123099ffc93b44f6b4a81b1e5589b642"
+      "token": "change.this.token.number"
     }
   ],
   "defaultRegisterUserRoles": [
