@@ -1,3 +1,7 @@
+## 0.2.18 (February 14th, 2022)
+
+- updated redis url
+
 ## 0.2.17 (February 14th, 2022)
 
 - updated dependencies and migrated from ioredis to redis

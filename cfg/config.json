@@ -62,8 +62,7 @@
     }
   },
   "redis": {
-    "host": "localhost",
-    "port": 6379,
+    "url": "redis://localhost:6379",
     "offsetStoreInterval": 1000,
     "db-indexes": {
       "db-offsetStore": 0,
@@ -112,8 +111,7 @@
       "maskedProperty": "urn:restorecommerce:acs:names:obligation:maskedProperty"
     },
     "cache": {
-      "host": "localhost",
-      "port": 6379,
+      "url": "redis://localhost:6379",
       "db-index": 5,
       "ttl": 3600,
       "prefix": "acs:"
