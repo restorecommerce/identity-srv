@@ -1,3 +1,7 @@
+## 0.2.19 (February 14th, 2022)
+
+- fix redis prod url
+
 ## 0.2.18 (February 14th, 2022)
 
 - updated redis url
