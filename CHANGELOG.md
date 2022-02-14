@@ -1,3 +1,13 @@
+## 0.2.17 (February 14th, 2022)
+
+- updated dependencies and migrated from ioredis to redis
+- added data field for user
+- fix to remove expired tokens on login
+
+## 0.2.16 (February 9th, 2022)
+
+- added oauth support
+
 ## 0.2.15 (December 22nd, 2021)
 
 - removed importHelpers flag from tsconfig
