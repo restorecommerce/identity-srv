@@ -38,20 +38,22 @@ export class OAuthService {
     this.userService = userService;
 
     const services = cfg.get('oauth:services');
-    Object.keys(services).forEach(key => {
-      if (!(key in accountResolvers)) {
-        throw new Error('Unknown oauth service: ' + key);
-      }
+    if (services) {
+      Object.keys(services).forEach(key => {
+        if (!(key in accountResolvers)) {
+          throw new Error('Unknown oauth service: ' + key);
+        }
 
-      const service = services[key];
-      this.clients[key] = new OAuth2(
-        service.client_id,
-        service.client_secret,
-        service.base_site,
-        service.authorize_path,
-        service.access_token_path
-      );
-    });
+        const service = services[key];
+        this.clients[key] = new OAuth2(
+          service.client_id,
+          service.client_secret,
+          service.base_site,
+          service.authorize_path,
+          service.access_token_path
+        );
+      });
+    }
   }
 
   async availableServices(call: any, context: any): Promise<any> {
@@ -120,7 +122,7 @@ export class OAuthService {
     });
 
     if (users.total_count === 0) {
-      return {email};
+      return { email };
     }
 
     const user = users.items[0].payload;
@@ -128,7 +130,7 @@ export class OAuthService {
     let tokenTechUser: any = {};
     const techUsersCfg = this.cfg.get('techUsers');
     if (techUsersCfg && techUsersCfg.length > 0) {
-      tokenTechUser = _.find(techUsersCfg, {id: 'upsert_user_tokens'});
+      tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
     }
     tokenTechUser.scope = user.default_scope;
 
@@ -160,9 +162,9 @@ export class OAuthService {
     });
     user.tokens = updatedTokens;
 
-    await this.userService.update({request: {items: [user], subject: tokenTechUser}}, {});
+    await this.userService.update({ request: { items: [user], subject: tokenTechUser } }, {});
 
-    return {email, user: {payload: user, status: {code: 200, message: 'success'}}};
+    return { email, user: { payload: user, status: { code: 200, message: 'success' } } };
   }
 
 }

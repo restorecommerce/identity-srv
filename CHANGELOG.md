@@ -1,3 +1,7 @@
+## 0.2.20 (February 15th, 2022)
+
+- check oauth service config before instantiation of oauth service
+
 ## 0.2.19 (February 14th, 2022)
 
 - fix redis prod url

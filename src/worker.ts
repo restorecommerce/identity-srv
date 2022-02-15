@@ -214,14 +214,17 @@ export class Worker {
     const tokenService = new TokenService(cfg, logger, this.authZ, this.userService);
 
     // oauth service
-    const oauthService = new OAuthService(cfg, logger, this.userService);
+    const oauthServices = cfg.get('oauth:services');
+    if(oauthServices) {
+      const oauthService = new OAuthService(cfg, logger, this.userService);
+      await server.bind(serviceNamesCfg.oauth, oauthService);
+    }
 
     await server.bind(serviceNamesCfg.user, this.userService);
     await server.bind(serviceNamesCfg.role, this.roleService);
     await server.bind(serviceNamesCfg.authenticationLog, authLogService);
     await server.bind(serviceNamesCfg.token, tokenService);
     await server.bind(serviceNamesCfg.cis, cis);
-    await server.bind(serviceNamesCfg.oauth, oauthService);
 
     // Add reflection service
     const reflectionServiceName = serviceNamesCfg.reflection;
