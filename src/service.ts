@@ -185,7 +185,7 @@ export class UserService extends ServiceBase {
     }
   }
 
-  async updateUserTokens(id, token) {
+  async updateUserTokens(id, token, expiredTokens?: any) {
     // temporary hack to update tokens on user(to fix issue when same user login multiple times simultaneously)
     // tokens get overwritten with update operation on simultaneours req
     if (token && token.interactive) {
@@ -208,6 +208,18 @@ export class UserService extends ServiceBase {
       const res_last_access = await query(this.db.db, 'users', aql_last_accesss, bindVars_last_access);
       await res_last_access.all();
       this.logger.debug('Tokens updated successuflly for subject', { id });
+      // check for expired tokens if they exist and remove them
+      if (expiredTokens?.length > 0) {
+        const token_remove = `FOR doc in users FILTER doc.id == @docID UPDATE doc WITH
+      { tokens: REMOVE_VALUES(doc.tokens, @expiredTokens)} IN users return doc`;
+        const bindTokenVars = Object.assign({
+          docID: id,
+          expiredTokens
+        });
+        const res = await query(this.db.db, 'users', token_remove, bindTokenVars);
+        await res.all();
+        this.logger.debug('Expired tokens removed successfully');
+      }
     }
   }
 

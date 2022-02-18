@@ -88,11 +88,11 @@ export class TokenService {
       const userData = await this.userService.find({ request: { id: payload.accountId, subject: tokenTechUser } }, {});
       if (userData && userData.items && userData.items.length > 0) {
         let user = userData.items[0].payload;
-        let currentTokenList = [];
+        let expiredTokenList = [];
         if (user && user.tokens && user.tokens.length > 0) {
           // remove expired tokens
-          currentTokenList = (user.tokens).filter(t => {
-            return t.expires_in >= Math.round(new Date().getTime() / 1000);
+          expiredTokenList = (user.tokens).filter(t => {
+            return t.expires_in < Math.round(new Date().getTime() / 1000);
           });
         }
         let token_name;
@@ -109,12 +109,10 @@ export class TokenService {
           interactive: true,
           last_login: new Date().getTime()
         };
-        currentTokenList.push(token);
-        user.tokens = currentTokenList;
         user.last_access = new Date().getTime();
         try {
           // temporary fix to append tokens on user entity
-          await this.userService.updateUserTokens(user.id, token);
+          await this.userService.updateUserTokens(user.id, token, expiredTokenList);
           this.logger.info('Token updated successfully on user entity', { token, id: user.id });
         } catch (err) {
           this.logger.error('Error Updating Token', err);
