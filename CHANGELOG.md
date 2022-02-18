@@ -1,3 +1,7 @@
+## 0.2.21 (February 18th, 2022)
+
+- updated chassis-srv (includes fix for offset store config)
+
 ## 0.2.20 (February 15th, 2022)
 
 - check oauth service config before instantiation of oauth service
