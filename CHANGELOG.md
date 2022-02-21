@@ -1,3 +1,7 @@
+## 0.2.22 (February 21st, 2022)
+
+- fix oauth service to append token instead of updating entier user object
+
 ## 0.2.21 (February 18th, 2022)
 
 - updated chassis-srv (includes fix for offset store config)
