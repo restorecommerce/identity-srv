@@ -111,7 +111,7 @@ export class TokenService {
         };
         user.last_access = new Date().getTime();
         try {
-          // temporary fix to append tokens on user entity
+          // append tokens on user entity
           await this.userService.updateUserTokens(user.id, token, expiredTokenList);
           this.logger.info('Token updated successfully on user entity', { token, id: user.id });
         } catch (err) {

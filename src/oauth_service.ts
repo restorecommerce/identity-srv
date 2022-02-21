@@ -1,11 +1,13 @@
 import { Logger } from 'winston';
 import { OAuth2 } from 'oauth';
-import { Call, User } from './interface';
+import { Call } from './interface';
 import fetch from 'node-fetch';
 import { UserService } from './service';
 import { FilterOperation } from '@restorecommerce/resource-base-interface';
-import { returnStatus } from './utils';
+import { AuthZAction, Decision, Subject, DecisionResponse, Operation } from '@restorecommerce/acs-client';
+import { checkAccessRequest } from './utils';
 import * as _ from 'lodash';
+import * as uuid from 'uuid';
 
 export const accountResolvers: { [key: string]: (access_token: string) => Promise<string> } = {
   google: async access_token => {
@@ -134,37 +136,116 @@ export class OAuthService {
     }
     tokenTechUser.scope = user.default_scope;
 
+    let expiredTokenList = [];
     const resultTokens = (user.tokens || []).filter(t => {
       return t.name !== call.request.service + '-access_token' && t.name !== call.request.service + '-refresh_token';
     });
 
-    resultTokens.push({
+    if (resultTokens && resultTokens.length > 0) {
+      // remove expired tokens
+      expiredTokenList = resultTokens.filter(t => {
+        return t.expires_in < Math.round(new Date().getTime() / 1000);
+      });
+    }
+    if (!(call.request as any).id) {
+      (call.request as any).id = uuid.v4().replace(/-/g, '');
+    }
+    let acsResponse: DecisionResponse;
+    let tokenData = call.request;
+    try {
+      if (!context) { context = {}; };
+      call.request = await this.createMetadata(tokenData, tokenTechUser);
+      context.subject = tokenTechUser;
+      context.resources = call.request;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'token', id: (call.request as any).id }], AuthZAction.MODIFY,
+        Operation.isAllowed);
+    } catch (err) {
+      this.logger.error('Error occurred requesting access-control-srv for token upsert', err);
+      return { user: { status: { code: err.code, message: err.message } } };
+    }
+
+    if (acsResponse.decision != Decision.PERMIT) {
+      const response = { status: { code: acsResponse.operation_status.code, message: acsResponse.operation_status.message } };
+      return { user: { response } };
+    }
+
+    const accessToken = {
       name: call.request.service + '-access_token',
       expires_in: Date.now() + (data['result']['expires_in'] * 1000),
       token: data['access_token'],
       type: 'access_token',
       interactive: true,
       last_login: Date.now()
-    });
+    };
 
-    resultTokens.push({
+    const refreshToken = {
       name: call.request.service + '-refresh_token',
       expires_in: Date.now() + (1000 * 60 * 60 * 24 * 30 * 6), // 6 months
       token: data['refresh_token'],
       type: 'refresh_token',
       interactive: true,
       last_login: Date.now()
-    });
+    };
 
-    // remove expired tokens
-    const updatedTokens = (resultTokens).filter(t => {
-      return t.expires_in >= Math.round(new Date().getTime() / 1000);
-    });
-    user.tokens = updatedTokens;
-
-    await this.userService.update({ request: { items: [user], subject: tokenTechUser } }, {});
+    try {
+      // append access token on user entity
+      await this.userService.updateUserTokens(user.id, accessToken, expiredTokenList);
+      // append refresh token on user entity
+      await this.userService.updateUserTokens(user.id, refreshToken);
+      this.logger.info('Token updated successfully on user entity', { id: user.id });
+    } catch (err) {
+      this.logger.error('Error Updating Token', err);
+      return { user: { status: { code: err.code, message: err.message } } };
+    }
 
     return { email, user: { payload: user, status: { code: 200, message: 'success' } } };
+  }
+
+  /**
+   * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
+   * @param reaources list of resources
+   * @param entity entity name
+   * @param action resource action
+   */
+  async createMetadata(res: any, subject?: Subject): Promise<any> {
+    let resources = _.cloneDeep(res);
+    let orgOwnerAttributes = [];
+    if (!_.isArray(resources)) {
+      resources = [resources];
+    }
+    const urns = this.cfg.get('authorization:urns');
+    for (let resource of resources) {
+      if (!resource.meta) {
+        resource.meta = {};
+      }
+      if (subject && subject.id) {
+        orgOwnerAttributes.push(
+          {
+            id: urns.ownerIndicatoryEntity,
+            value: urns.user
+          },
+          {
+            id: urns.ownerInstance,
+            value: subject.id
+          });
+      } else if (subject && subject.token) {
+        // when no subjectID is provided find the subjectID using findByToken
+        const user = await this.userService.findByToken({ request: { token: subject.token } }, {});
+        if (user && user.payload && user.payload.id) {
+          orgOwnerAttributes.push(
+            {
+              id: urns.ownerIndicatoryEntity,
+              value: urns.user
+            },
+            {
+              id: urns.ownerInstance,
+              value: user.payload.id
+            });
+        }
+      }
+      resource.meta.owner = orgOwnerAttributes;
+    }
+    return resources;
   }
 
 }
