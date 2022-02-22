@@ -54,13 +54,6 @@ export const validateStrLen = (string: string, minLength: number,
   }
 };
 
-// validateAtSymbol checks if the string contains the "@" symbol
-// returns false if a symbol is present
-export const validateAtSymbol = (string: string): boolean => {
-  const regexp = new RegExp('^(?!.*@).+');
-  return !!string.match(regexp);
-};
-
 // validateEmail checks if the string input is a valid email
 export const validateEmail = (string: string, logger: Logger): boolean => {
   const regexp = new RegExp(/^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/);

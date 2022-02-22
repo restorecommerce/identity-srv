@@ -22,7 +22,7 @@ import {
 import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common';
 import {
   validateFirstChar, validateSymbolRepeat, validateAllChar,
-  validateStrLen, validateAtSymbol, validateEmail
+  validateStrLen, validateEmail
 } from './validation';
 import { TokenService } from './token_service';
 import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base';
@@ -974,9 +974,9 @@ export class UserService extends ServiceBase {
 
   // validUsername validates user names using regular expressions
   private validUsername(username: string, minLength: number, maxLength: number, logger: Logger) {
-    if (validateAtSymbol(username) == false) {
-      // false means that the username contains "@"
+    if (username.includes('@')) {
       validateEmail(username, logger);
+      return;
     }
     validateStrLen(username, minLength, maxLength, logger);
     validateFirstChar(username, logger);
