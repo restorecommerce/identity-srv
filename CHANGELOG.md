@@ -1,3 +1,7 @@
+## 0.2.23 (February 22nd, 2022)
+
+- add token generation to code exchange flow
+
 ## 0.2.22 (February 21st, 2022)
 
 - fix oauth service to append token instead of updating entier user object

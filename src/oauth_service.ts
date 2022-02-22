@@ -8,6 +8,7 @@ import { AuthZAction, Decision, Subject, DecisionResponse, Operation } from '@re
 import { checkAccessRequest } from './utils';
 import * as _ from 'lodash';
 import * as uuid from 'uuid';
+import * as jose from 'jose';
 
 export const accountResolvers: { [key: string]: (access_token: string) => Promise<string> } = {
   google: async access_token => {
@@ -169,6 +170,20 @@ export class OAuthService {
       return { user: { response } };
     }
 
+    const token = new jose.UnsecuredJWT({})
+      .setIssuedAt()
+      .setExpirationTime('30d')
+      .encode();
+
+    const authToken = {
+      name: uuid.v4().replace(/-/g, ''),
+      expires_in: Date.now() + (1000 * 60 * 60 * 24 * 30), // 1 Month
+      token,
+      type: 'access_token',
+      interactive: true,
+      last_login: Date.now()
+    };
+
     const accessToken = {
       name: call.request.service + '-access_token',
       expires_in: Date.now() + (data['result']['expires_in'] * 1000),
@@ -192,13 +207,15 @@ export class OAuthService {
       await this.userService.updateUserTokens(user.id, accessToken, expiredTokenList);
       // append refresh token on user entity
       await this.userService.updateUserTokens(user.id, refreshToken);
+      // append auth token on user entity
+      await this.userService.updateUserTokens(user.id, authToken);
       this.logger.info('Token updated successfully on user entity', { id: user.id });
     } catch (err) {
       this.logger.error('Error Updating Token', err);
       return { user: { status: { code: err.code, message: err.message } } };
     }
 
-    return { email, user: { payload: user, status: { code: 200, message: 'success' } } };
+    return { email, user: { payload: user, status: { code: 200, message: 'success' } }, token: authToken };
   }
 
   /**
