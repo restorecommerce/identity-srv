@@ -170,8 +170,17 @@ export class OAuthService {
       return { user: { response } };
     }
 
-    const token = new jose.UnsecuredJWT({})
-      .setIssuedAt()
+    const userCopy = {
+      ...user
+    };
+
+    delete userCopy['tokens'];
+    delete userCopy['password_hash'];
+    delete userCopy['data'];
+
+    const token = new jose.UnsecuredJWT({
+      user: userCopy
+    }).setIssuedAt()
       .setExpirationTime('30d')
       .encode();
 

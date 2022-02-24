@@ -1,3 +1,7 @@
+## 0.2.24 (February 24th, 2022)
+
+- insert user data into jwt
+
 ## 0.2.23 (February 22nd, 2022)
 
 - add token generation to code exchange flow
