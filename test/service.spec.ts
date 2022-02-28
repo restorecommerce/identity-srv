@@ -480,8 +480,6 @@ describe('testing identity-srv', () => {
             'something@ex..ample.com',
             'a\b@c',
             'someone@somewhere.com.',
-            '\'\'test\blah\'\'@example.com',
-            '\'testblah\'@example.com',
             'test@test.com_',
             'test@test_com',
             'test@some:test.com',
