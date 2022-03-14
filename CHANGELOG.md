@@ -1,3 +1,7 @@
+## 0.2.26 (March 14th, 2022)
+
+- supress empty filters
+
 ## 0.2.25 (March 14th, 2022)
 
 - fix to apply acs filters

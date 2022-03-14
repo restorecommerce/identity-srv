@@ -229,7 +229,7 @@ export const getACSFilters = (accessResponse: PolicySetRQResponse, resource: str
   const resourceFilterMap = accessResponse?.filters;
   const resourceFilter = resourceFilterMap?.filter((e) => e?.resource === resource);
   // for a given entity there should be one filter map
-  if (resourceFilter && resourceFilter.length === 1 && resourceFilter[0].filters) {
+  if (resourceFilter && resourceFilter.length === 1 && resourceFilter[0].filters && resourceFilter[0].filters[0]?.filter.length > 0) {
     acsFilters = resourceFilter[0].filters;
   }
   return acsFilters;
