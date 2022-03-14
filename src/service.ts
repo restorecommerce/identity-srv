@@ -347,6 +347,14 @@ export class UserService extends ServiceBase {
       return { operation_status: acsResponse.operation_status };
     }
 
+    const acsFilters = getACSFilters(acsResponse, 'user');
+    if (acsResponse && acsResponse.filters && acsFilters) {
+      if (!readRequest.filters) {
+        readRequest.filters = [];
+      }
+      readRequest.filters.push(acsFilters);
+    }
+
     if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
       readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
       readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
@@ -2417,7 +2425,7 @@ export class UserService extends ServiceBase {
           }];
           let result = await super.read({ request: { filters } });
           // update owner info
-          if (result.items.length === 1) {
+          if (result?.items?.length === 1) {
             let item = result.items[0].payload;
             resource.meta.owner = item.meta.owner;
           } else if (result.items.length === 0) {

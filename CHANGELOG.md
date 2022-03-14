@@ -1,3 +1,7 @@
+## 0.2.25 (March 14th, 2022)
+
+- fix to apply acs filters
+
 ## 0.2.24 (February 24th, 2022)
 
 - insert user data into jwt
