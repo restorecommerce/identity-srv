@@ -1,3 +1,7 @@
+## 0.2.27 (March 14th, 2022)
+
+- fix to override ACS filters if ACS custom query filters exist
+
 ## 0.2.26 (March 14th, 2022)
 
 - supress empty filters

@@ -348,17 +348,20 @@ export class UserService extends ServiceBase {
     }
 
     const acsFilters = getACSFilters(acsResponse, 'user');
-    if (acsResponse && acsResponse.filters && acsFilters) {
+    let aqlCustomQuery = false;
+    if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
+      readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
+      readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
+      aqlCustomQuery = true;
+    }
+
+    if (acsResponse && acsResponse.filters && acsFilters && !aqlCustomQuery) {
       if (!readRequest.filters) {
         readRequest.filters = [];
       }
       readRequest.filters.push(acsFilters);
     }
 
-    if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
-      readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
-      readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
-    }
     if (acsResponse.decision === Decision.PERMIT) {
       return await super.read({ request: readRequest });
     }
