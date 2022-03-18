@@ -348,18 +348,16 @@ export class UserService extends ServiceBase {
     }
 
     const acsFilters = getACSFilters(acsResponse, 'user');
-    let aqlCustomQuery = false;
-    if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
-      readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
-      readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
-      aqlCustomQuery = true;
-    }
-
-    if (acsResponse && acsResponse.filters && acsFilters && !aqlCustomQuery) {
+    if (acsResponse && acsResponse.filters && acsFilters) {
       if (!readRequest.filters) {
         readRequest.filters = [];
       }
       readRequest.filters.push(acsFilters);
+    }
+
+    if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
+      readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
+      readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
@@ -1543,6 +1541,7 @@ export class UserService extends ServiceBase {
                   }
                 }
               }
+              console.log('Role Assoc Eqaul should be set to false here.........', roleAssocEqual);
               if (!roleAssocEqual || !tokensEqual || (updatedRoleAssocs.length != redisRoleAssocs.length)) {
                 // flush token subject cache
                 await this.tokenRedisClient.del(tokenValue);
