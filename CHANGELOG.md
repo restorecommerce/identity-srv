@@ -1,3 +1,7 @@
+## 0.2.29 (March 24th, 2022)
+
+- fix undefined token names
+
 ## 0.2.28 (March 18th, 2022)
 
 - updated acs-client (includes the check to override ACS filters if ACS custom query filters exist)

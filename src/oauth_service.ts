@@ -83,13 +83,14 @@ export class OAuthService {
   }
 
   async exchangeCode(call: Call<ExchangeCodeRequest>, context: any): Promise<any> {
-    if (!(call.request.service in this.clients)) {
-      throw new Error('Unknown service: ' + call.request.service);
+    const oauthService = call.request.service;
+    if (!(oauthService in this.clients)) {
+      throw new Error('Unknown service: ' + oauthService);
     }
 
-    const data: any = await new Promise((resolve, reject) => this.clients[call.request.service].getOAuthAccessToken(call.request.code, {
+    const data: any = await new Promise((resolve, reject) => this.clients[oauthService].getOAuthAccessToken(call.request.code, {
       grant_type: 'authorization_code',
-      redirect_uri: this.cfg.get('oauth:redirect_uri_base') + call.request.service,
+      redirect_uri: this.cfg.get('oauth:redirect_uri_base') + oauthService,
     }, (err, access_token, refresh_token, result) => {
       if (err) {
         reject(err);
@@ -106,7 +107,7 @@ export class OAuthService {
       throw err;
     });
 
-    const email = await accountResolvers[call.request.service](data['access_token']);
+    const email = await accountResolvers[oauthService](data['access_token']);
 
     const users = await this.userService.superRead({
       request: {
@@ -139,7 +140,7 @@ export class OAuthService {
 
     let expiredTokenList = [];
     const resultTokens = (user.tokens || []).filter(t => {
-      return t.name !== call.request.service + '-access_token' && t.name !== call.request.service + '-refresh_token';
+      return t.name !== oauthService + '-access_token' && t.name !== oauthService + '-refresh_token';
     });
 
     if (resultTokens && resultTokens.length > 0) {
@@ -194,7 +195,7 @@ export class OAuthService {
     };
 
     const accessToken = {
-      name: call.request.service + '-access_token',
+      name: oauthService + '-access_token',
       expires_in: Date.now() + (data['result']['expires_in'] * 1000),
       token: data['access_token'],
       type: 'access_token',
@@ -203,7 +204,7 @@ export class OAuthService {
     };
 
     const refreshToken = {
-      name: call.request.service + '-refresh_token',
+      name: oauthService + '-refresh_token',
       expires_in: Date.now() + (1000 * 60 * 60 * 24 * 30 * 6), // 6 months
       token: data['refresh_token'],
       type: 'refresh_token',
