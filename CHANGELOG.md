@@ -1,3 +1,7 @@
+## 0.2.30 (March 24th, 2022)
+
+- add oauth scope to config
+
 ## 0.2.29 (March 24th, 2022)
 
 - fix undefined token names

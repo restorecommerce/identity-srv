@@ -71,7 +71,7 @@ export class OAuthService {
       links: Object.entries(this.clients).reduce((result, entry) => {
         result[entry[0]] = entry[1].getAuthorizeUrl({
           redirect_uri: this.cfg.get('oauth:redirect_uri_base') + entry[0],
-          scope: 'email',
+          scope: this.cfg.get('oauth:services:' + entry[0] + ':scope'),
           response_type: 'code',
           state: nonce,
           prompt: 'consent',
