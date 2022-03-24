@@ -1,3 +1,7 @@
+## 0.2.31 (March 24th, 2022)
+
+- manual push to trigger workflow
+
 ## 0.2.30 (March 24th, 2022)
 
 - add oauth scope to config
