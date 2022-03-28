@@ -182,12 +182,12 @@ export class OAuthService {
     const token = new jose.UnsecuredJWT({
       user: userCopy
     }).setIssuedAt()
-      .setExpirationTime('30d')
+      .setExpirationTime((Date.now() / 1000) + (data['result']['expires_in']))
       .encode();
 
     const authToken = {
       name: uuid.v4().replace(/-/g, ''),
-      expires_in: Date.now() + (1000 * 60 * 60 * 24 * 30), // 1 Month
+      expires_in: Date.now() + (data['result']['expires_in'] * 1000),
       token,
       type: 'access_token',
       interactive: true,
