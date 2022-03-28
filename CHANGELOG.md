@@ -1,3 +1,7 @@
+## 0.2.31 (March 28th, 2022)
+
+- expire auth token at the same time as access token
+
 ## 0.2.31 (March 24th, 2022)
 
 - manual push to trigger workflow
