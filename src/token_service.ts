@@ -248,9 +248,9 @@ export class TokenService {
         // delete user token here
         if (payload && payload.value) {
           payload = unmarshallProtobufAny(payload);
-          const userData = await this.userService.find({ request: { id: payload.accountId, subject } }, {});
-          if (userData && userData.items && userData.items.length > 0) {
-            let user = userData.items[0].payload;
+          const userData = await this.userService.findByToken({ request: { token: id} }, {});
+          if (userData?.payload) {
+            let user = userData.payload;
             // check if the token is existing if not update it
             let updateToken = false;
             let currentTokenList = [];
