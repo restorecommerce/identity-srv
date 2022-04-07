@@ -1,3 +1,7 @@
+## 0.2.34 (April 7th, 2022)
+
+- fix logout response message
+
 ## 0.2.33 (April 7th, 2022)
 
 - lookup user by token instead of user service find api in token destroy method
