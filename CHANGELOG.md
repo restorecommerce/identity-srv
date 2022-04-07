@@ -1,4 +1,8 @@
-## 0.2.31 (March 28th, 2022)
+## 0.2.33 (April 7th, 2022)
+
+- lookup user by token instead of user service find api in token destroy method
+
+## 0.2.32 (March 28th, 2022)
 
 - expire auth token at the same time as access token
 
