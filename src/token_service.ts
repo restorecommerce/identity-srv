@@ -250,7 +250,7 @@ export class TokenService {
           payload = unmarshallProtobufAny(payload);
           const userData = await this.userService.findByToken({ request: { token: id} }, {});
           if (userData?.payload) {
-            let user = userData.payload;
+            user = userData.payload;
             // check if the token is existing if not update it
             let updateToken = false;
             let currentTokenList = [];
