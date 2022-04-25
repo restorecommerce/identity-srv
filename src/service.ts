@@ -361,7 +361,22 @@ export class UserService extends ServiceBase {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
-      return await super.read({ request: readRequest });
+      let users = await super.read({ request: readRequest });
+      let roles = await this.roleService.read({ request: { subject } }, ctx);
+      let rolesList = roles?.items?.map(e => e.payload);
+      users?.items?.forEach(userObj => {
+        let userRoles = [];
+        if (userObj.payload) {
+          userObj?.payload?.role_associations?.forEach(roleAssoc => {
+            let role = rolesList?.filter(r => r.id === roleAssoc?.role);
+            if (role && role.length === 1) {
+              userRoles.push(role[0]);
+            }
+          });
+          userObj.payload.role = userRoles;
+        }
+      });
+      return users;
     }
   }
 
@@ -1541,7 +1556,6 @@ export class UserService extends ServiceBase {
                   }
                 }
               }
-              console.log('Role Assoc Eqaul should be set to false here.........', roleAssocEqual);
               if (!roleAssocEqual || !tokensEqual || (updatedRoleAssocs.length != redisRoleAssocs.length)) {
                 // flush token subject cache
                 await this.tokenRedisClient.del(tokenValue);

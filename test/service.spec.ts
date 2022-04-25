@@ -305,6 +305,14 @@ describe('testing identity-srv', () => {
           const readResult = await userService.read({ filters });
           should.exist(readResult);
           should.exist(readResult.items);
+          // validate role
+          if (readResult.items[0].payload.role) {
+            readResult.items[0].payload.role[0].id.should.equal('user-r-id');
+            readResult.items[0].payload.role[0].assignable_by_roles[0].should.equal('admin-r-id');
+            readResult.items[0].payload.role[0].name.should.equal('normal_user');
+            readResult.items[0].payload.role[0].description.should.equal('Normal user');
+            delete readResult.items[0].payload.role;
+          }
           readResult.items[0].payload.should.deepEqual(result);
           await topic.removeListener('registered', listener);
         });
@@ -526,7 +534,7 @@ describe('testing identity-srv', () => {
         });
       });
 
-      describe('calling createUsers', function createUser(): void {
+     describe('calling createUsers', function createUser(): void {
         const testuser2: any = {
           id: 'testuser2',
           // name: 'test.user2',
