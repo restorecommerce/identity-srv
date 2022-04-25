@@ -1,3 +1,7 @@
+## 0.2.35 (April 25th, 2022)
+
+- updated user read rpc to return roles as well
+
 ## 0.2.34 (April 7th, 2022)
 
 - fix logout response message
