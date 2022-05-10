@@ -200,7 +200,7 @@ export class OAuthService {
 
     const authToken = {
       name: uuid.v4().replace(/-/g, ''),
-      expires_in: Date.now() + (data['result']['expires_in'] * 1000),
+      expires_in: Date.now() + (1000 * 60 * 60 * 24 * 30 * 6), // 6 months
       token,
       type: 'access_token',
       interactive: true,
@@ -312,7 +312,6 @@ export class OAuthService {
 
     const accessTokens: any[] = tokens.filter(t => t.name.endsWith('access_token'));
     for (let accessToken of accessTokens) {
-      console.log(accessToken.expires_in, '>', Date.now(), accessToken.expires_in > Date.now());
       if (accessToken.expires_in > Date.now()) {
         return {token: accessToken.token};
       }
@@ -324,7 +323,6 @@ export class OAuthService {
 
     let data;
     for (const refreshToken of refreshTokens) {
-      console.log(refreshToken.expires_in, '<', Date.now(), refreshToken.expires_in < Date.now());
       if (refreshToken.expires_in < Date.now()) {
         toRemove.push(refreshToken);
         continue;
@@ -365,8 +363,6 @@ export class OAuthService {
       interactive: true,
       last_login: Date.now()
     };
-
-    console.log('REMOVING', toRemove);
 
     try {
       // append access token on user entity
