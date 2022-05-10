@@ -1,3 +1,7 @@
+## 0.2.37 (May 10th, 2022)
+
+- expire auth tokens after 6 months
+
 ## 0.2.36 (May 10th, 2022)
 
 - added oauth getToken support
