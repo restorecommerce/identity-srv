@@ -1,3 +1,7 @@
+## 0.2.36 (May 10th, 2022)
+
+- added oauth getToken support
+
 ## 0.2.35 (April 25th, 2022)
 
 - updated user read rpc to return roles as well
