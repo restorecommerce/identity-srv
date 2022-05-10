@@ -23,7 +23,7 @@
     "@restorecommerce/grpc-client": "^0.3.1",
     "@restorecommerce/kafka-client": "^0.3.1",
     "@restorecommerce/logger": "^0.12.1",
-    "@restorecommerce/protos": "^0.6.8",
+    "@restorecommerce/protos": "^0.6.9",
     "@restorecommerce/resource-base-interface": "^0.2.11",
     "@restorecommerce/service-config": "^0.4.25",
     "bcryptjs": "^2.4.3",

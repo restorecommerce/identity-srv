@@ -662,6 +662,11 @@
           "transport": [
             "grpcIdentity"
           ]
+        },
+        "getToken": {
+          "transport": [
+            "grpcIdentity"
+          ]
         }
       },
       "grpc-health-v1": {
@@ -759,7 +764,8 @@
         "client_secret": "",
         "base_site": "",
         "authorize_path": "https://accounts.google.com/o/oauth2/auth",
-        "access_token_path": "https://oauth2.googleapis.com/token"
+        "access_token_path": "https://oauth2.googleapis.com/token",
+        "scope": "email"
       }
     }
   }

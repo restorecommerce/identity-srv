@@ -27,6 +27,19 @@ interface ExchangeCodeRequest {
   state: string;
 }
 
+interface GetTokenRequest {
+  subject: any;
+  service: string;
+}
+
+interface GetTokenResponse {
+  status?: {
+    code: number;
+    message: string;
+  };
+  token?: string;
+}
+
 export class OAuthService {
 
   logger: Logger;
@@ -273,6 +286,98 @@ export class OAuthService {
       resource.meta.owner = orgOwnerAttributes;
     }
     return resources;
+  }
+
+  async getToken(call: Call<GetTokenRequest>, context: any): Promise<GetTokenResponse> {
+    const oauthService = call.request.service;
+    if (!(oauthService in this.clients)) {
+      throw new Error('Unknown service: ' + oauthService);
+    }
+
+    const user = await this.userService.findByToken({request: {token: call.request.subject.token}}, {});
+    if (!user || !user.payload || !user.payload.tokens) {
+      return {status: {code: 404, message: 'user not found'}};
+    }
+
+    const tokens = user?.payload?.tokens?.filter((t: any) => t?.name?.startsWith(oauthService + '-'));
+    if (tokens.length < 2) {
+      if (tokens.length > 0) {
+        return {token: tokens[0].token};
+      } else {
+        return {status: {code: 404, message: 'user has no token for this service'}};
+      }
+    }
+
+    const toRemove = [];
+
+    const accessTokens: any[] = tokens.filter(t => t.name.endsWith('access_token'));
+    for (let accessToken of accessTokens) {
+      console.log(accessToken.expires_in, '>', Date.now(), accessToken.expires_in > Date.now());
+      if (accessToken.expires_in > Date.now()) {
+        return {token: accessToken.token};
+      }
+
+      toRemove.push(accessToken);
+    }
+
+    const refreshTokens: any[] = tokens.filter(t => t.name.endsWith('refresh_token'));
+
+    let data;
+    for (const refreshToken of refreshTokens) {
+      console.log(refreshToken.expires_in, '<', Date.now(), refreshToken.expires_in < Date.now());
+      if (refreshToken.expires_in < Date.now()) {
+        toRemove.push(refreshToken);
+        continue;
+      }
+
+      data = await new Promise((resolve) => this.clients[oauthService].getOAuthAccessToken(refreshToken.token, {
+        grant_type: 'refresh_token'
+      }, (err, access_token, refresh_token, result) => {
+        if (err) {
+          this.logger.error('Error Refreshing Token', err);
+          resolve(undefined);
+          return;
+        }
+
+        resolve({
+          access_token,
+          refresh_token,
+          result
+        });
+      }));
+
+      if (data) {
+        break;
+      } else {
+        toRemove.push(refreshToken);
+      }
+    }
+
+    if (!data) {
+      return {status: {code: 400, message: 'refresh token has expired'}};
+    }
+
+    const newAccessToken = {
+      name: oauthService + '-access_token',
+      expires_in: Date.now() + (data['result']['expires_in'] * 1000),
+      token: data['access_token'],
+      type: 'access_token',
+      interactive: true,
+      last_login: Date.now()
+    };
+
+    console.log('REMOVING', toRemove);
+
+    try {
+      // append access token on user entity
+      await this.userService.updateUserTokens(user.payload.id, newAccessToken, toRemove);
+      this.logger.info('Token updated successfully on user entity', {id: user.payload.id});
+    } catch (err) {
+      this.logger.error('Error Updating Token', err);
+      return {status: {code: err.code, message: err.message}};
+    }
+
+    return { token: newAccessToken.token };
   }
 
 }
