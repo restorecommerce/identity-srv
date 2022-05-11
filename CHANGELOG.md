@@ -1,3 +1,7 @@
+## 0.2.38 (May 11th, 2022)
+
+- correctly remove outdated tokens
+
 ## 0.2.37 (May 10th, 2022)
 
 - expire auth tokens after 6 months
