@@ -151,17 +151,10 @@ export class OAuthService {
     }
     tokenTechUser.scope = user.default_scope;
 
-    let expiredTokenList = [];
     const resultTokens = (user.tokens || []).filter(t => {
-      return t.name !== oauthService + '-access_token' && t.name !== oauthService + '-refresh_token';
+      return t.name === oauthService + '-access_token' || t.name === oauthService + '-refresh_token';
     });
 
-    if (resultTokens && resultTokens.length > 0) {
-      // remove expired tokens
-      expiredTokenList = resultTokens.filter(t => {
-        return t.expires_in < Math.round(new Date().getTime() / 1000);
-      });
-    }
     if (!(call.request as any).id) {
       (call.request as any).id = uuid.v4().replace(/-/g, '');
     }
@@ -227,9 +220,15 @@ export class OAuthService {
 
     try {
       // append access token on user entity
-      await this.userService.updateUserTokens(user.id, accessToken, expiredTokenList);
+      // remove expired tokens
+      await this.userService.updateUserTokens(user.id, accessToken, resultTokens.filter(t => {
+        return t.expires_in < Date.now();
+      }));
       // append refresh token on user entity
-      await this.userService.updateUserTokens(user.id, refreshToken);
+      // remove all previous refresh tokens
+      await this.userService.updateUserTokens(user.id, refreshToken, resultTokens.filter(t => {
+        return t.expires_in > Date.now() && t.name === oauthService + '-refresh_token';
+      }));
       // append auth token on user entity
       await this.userService.updateUserTokens(user.id, authToken);
       this.logger.info('Token updated successfully on user entity', { id: user.id });
