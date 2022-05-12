@@ -188,7 +188,7 @@ export class OAuthService {
     const token = new jose.UnsecuredJWT({
       user: userCopy
     }).setIssuedAt()
-      .setExpirationTime((Date.now() / 1000) + (data['result']['expires_in']))
+      .setExpirationTime((Date.now() / 1000) + (60 * 60 * 24 * 30 * 6))
       .encode();
 
     const authToken = {
