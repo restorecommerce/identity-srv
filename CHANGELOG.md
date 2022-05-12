@@ -1,3 +1,7 @@
+## 0.2.39 (May 11th, 2022)
+
+- expire jwt token after 6 month
+
 ## 0.2.38 (May 11th, 2022)
 
 - correctly remove outdated tokens
