@@ -1,7 +1,7 @@
 import { Logger } from 'winston';
 import { OAuth2 } from 'oauth';
 import { Call } from './interface';
-import fetch from 'node-fetch';
+import { fetch } from './utils';
 import { UserService } from './service';
 import { FilterOperation } from '@restorecommerce/resource-base-interface';
 import { AuthZAction, Decision, Subject, DecisionResponse, Operation } from '@restorecommerce/acs-client';

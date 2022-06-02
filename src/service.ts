@@ -1,7 +1,7 @@
 import * as _ from 'lodash';
 import * as uuid from 'uuid';
 import * as kafkaClient from '@restorecommerce/kafka-client';
-import fetch from 'node-fetch';
+import { fetch } from './utils';
 import { ServiceBase, ResourcesAPIBase, FilterOperation } from '@restorecommerce/resource-base-interface';
 import {
   DocumentMetadata,
@@ -2111,7 +2111,6 @@ export class UserService extends ServiceBase {
             headers = this.setAuthenticationHeaders(hbsUser.token);
           }
         }
-
         response = await fetch(hbsTemplates.registrationSubjectTpl, { headers });
         this.registrationSubjectTpl = await response.text();
 

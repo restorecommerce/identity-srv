@@ -234,3 +234,12 @@ export const getACSFilters = (accessResponse: PolicySetRQResponse, resource: str
   }
   return acsFilters;
 };
+
+// node-fetch is now ESM only module
+// prevent TypeScript rewrite of async import() to require() in CJS projects
+const _importDynamic = new Function('modulePath', 'return import(modulePath)');
+
+export async function fetch(...args) {
+  const { default: fetch } = await _importDynamic('node-fetch');
+  return fetch(...args);
+}
