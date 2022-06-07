@@ -1,8 +1,8 @@
 = Identity Service
 
-https://travis-ci.org/restorecommerce/identity-srv?branch=master[image:http://img.shields.io/travis/restorecommerce/identity-srv/master.svg?style=flat-square[Build Status]]
-https://david-dm.org/restorecommerce/identity-srv[image:https://img.shields.io/david/restorecommerce/identity-srv.svg?style=flat-square[Dependencies]]
-https://coveralls.io/github/restorecommerce/identity-srv?branch=master[image:http://img.shields.io/coveralls/restorecommerce/identity-srv/master.svg?style=flat-square[Coverage Status]]
+https://travis-ci.org/restorecommerce/identity-srv?branch=master[image:https://img.shields.io/travis/restorecommerce/identity-srv/master.svg?style=flat-square[Build Status]]
+https://depfu.com/repos/github/restorecommerce/identity-srv?branch=master[image:https://img.shields.io/depfu/dependencies/github/restorecommerce/identity-srv?style=flat-square[Dependencies]]
+https://coveralls.io/github/restorecommerce/identity-srv?branch=master[image:http://img.shields.io/coveralls/github/restorecommerce/identity-srv/master.svg?style=flat-square[Coverage Status]]
 
 A microservice for identity management.
 
