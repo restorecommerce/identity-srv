@@ -151,14 +151,13 @@ interface MethodWithOutput {
   output: any
 };
 
-// const PROTO_PATH: string = './test/protos/io/restorecommerce/access_control.proto';
+const PROTO_PATH: string = 'node_modules/@restorecommerce/protos/io/restorecommerce/access_control.proto';
 const PKG_NAME: string = 'io.restorecommerce.access_control';
 const SERVICE_NAME: string = 'Service';
 
-const filePath = path.resolve('./node_modules/@restorecommerce/protos/', 'io/restorecommerce/access_control.proto');
 const pkgDef: grpc.GrpcObject = grpc.loadPackageDefinition(
-  proto_loader.loadSync(filePath, {
-    includeDirs: ['./node_modules/@restorecommerce/protos/'],
+  proto_loader.loadSync(PROTO_PATH, {
+    includeDirs: ['node_modules/@restorecommerce/protos'],
     keepCase: true,
     longs: String,
     enums: String,
@@ -189,10 +188,20 @@ const startGrpcMockServer = async (methodWithOutput: MethodWithOutput[]) => {
       callback(null, response);
     }
   };
-
-  mockServer.addService('./node_modules/@restorecommerce/protos/io/restorecommerce/access_control.proto', PKG_NAME, SERVICE_NAME, implementations);
-  await mockServer.start();
-  logger.info('Mock ACS Server started on port 50061');
+  try {
+    mockServer.addService(PROTO_PATH, PKG_NAME, SERVICE_NAME, implementations, {
+      includeDirs: ['node_modules/@restorecommerce/protos/'],
+      keepCase: true,
+      longs: String,
+      enums: String,
+      defaults: true,
+      oneofs: true
+    });
+    await mockServer.start();
+    logger.info('Mock ACS Server started on port 50061');
+  } catch (err) {
+    logger.error('Error starting mock ACS server', err);
+  }
 };
 
 const stopGrpcMockServer = async () => {
@@ -224,7 +233,7 @@ describe('testing identity-srv', () => {
       collection: true
     });
     // stop mock acs-srv
-    // stopGrpcMockServer();
+    stopGrpcMockServer();
     this.timeout(60000);
     await worker.stop();
     await events.stop();
