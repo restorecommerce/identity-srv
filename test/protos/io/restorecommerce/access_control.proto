@@ -65,8 +65,15 @@ enum Effect {
   DENY = 1;
 }
 
+message OperationStatus {
+  uint32 code = 1;
+  string message = 2;
+}
+
 message ReverseQuery {
  repeated PolicySetRQ policy_sets = 1;
+ // repeated Attribute obligation = 2;
+ // OperationStatus operation_status = 3;
 }
 
 message PolicySetRQ {
