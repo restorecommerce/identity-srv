@@ -10,7 +10,6 @@ import * as grpc from '@grpc/grpc-js';
 import { updateConfig } from '@restorecommerce/acs-client';
 import { FilterOperation } from '@restorecommerce/resource-base-interface';
 import { User } from '../src/interface';
-import * as path from 'path';
 
 /*
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
@@ -331,7 +330,7 @@ describe('testing identity-srv', () => {
           userRolePolicySetRQ.policy_sets[0].policies[1].rules[0] = permitRoleRule;
           // start mock acs-srv - needed for read operation since acs-client makes a req to acs-srv
           // to get applicable policies although acs-lookup is disabled
-          startGrpcMockServer([{ method: 'WhatIsAllowed', output: userRolePolicySetRQ },
+          await startGrpcMockServer([{ method: 'WhatIsAllowed', output: userRolePolicySetRQ },
           { method: 'IsAllowed', output: { decision: 'PERMIT' } }]);
           const filters = [{
             filter: [{

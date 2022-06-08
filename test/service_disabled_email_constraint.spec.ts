@@ -5,7 +5,9 @@ import * as kafkaClient from '@restorecommerce/kafka-client';
 import { Worker } from '../src/worker';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { Topic } from '@restorecommerce/kafka-client/lib/events/provider/kafka';
-import { createMockServer } from 'grpc-mock';
+import { GrpcMockServer, ProtoUtils } from '@alenon/grpc-mock-server';
+import * as proto_loader from '@grpc/proto-loader';
+import * as grpc from '@grpc/grpc-js';
 import { updateConfig } from '@restorecommerce/acs-client';
 import { FilterOperation } from '@restorecommerce/resource-base-interface';
 
@@ -23,7 +25,6 @@ let logger;
 let events;
 let topic: Topic;
 let roleService: any;
-let mockServer: any;
 
 /* eslint-disable */
 async function start(): Promise<void> {
@@ -115,25 +116,67 @@ let userPolicySetRQ = {
     }]
 };
 
-const startGrpcMockServer = async (rules: serverRule[]) => {
-  // Create a mock ACS server to expose isAllowed and whatIsAllowed
-  mockServer = createMockServer({
-    protoPath: 'test/protos/io/restorecommerce/access_control.proto',
-    packageName: 'io.restorecommerce.access_control',
-    serviceName: 'Service',
-    options: {
-      keepCase: true
+interface MethodWithOutput {
+  method: string,
+  output: any
+};
+
+const PROTO_PATH: string = 'node_modules/@restorecommerce/protos/io/restorecommerce/access_control.proto';
+const PKG_NAME: string = 'io.restorecommerce.access_control';
+const SERVICE_NAME: string = 'Service';
+
+const pkgDef: grpc.GrpcObject = grpc.loadPackageDefinition(
+  proto_loader.loadSync(PROTO_PATH, {
+    includeDirs: ['node_modules/@restorecommerce/protos'],
+    keepCase: true,
+    longs: String,
+    enums: String,
+    defaults: true,
+    oneofs: true
+  })
+);
+
+const proto: any = ProtoUtils.getProtoFromPkgDefinition(
+  PKG_NAME,
+  pkgDef
+);
+
+const mockServer = new GrpcMockServer('localhost:50061');
+
+const startGrpcMockServer = async (methodWithOutput: MethodWithOutput[]) => {
+  // create mock implementation based on the method name and output
+  const implementations = {
+    isAllowed: (call: any, callback: any) => {
+      const isAllowedResponse = methodWithOutput.filter(e => e.method === 'IsAllowed');
+      const response: any = new proto.Response.constructor(isAllowedResponse[0].output);
+      callback(null, response);
     },
-    rules
-  });
-  mockServer.listen('0.0.0.0:50061');
-  logger.info('ACS Server started on port 50061');
+    whatIsAllowed: (call: any, callback: any) => {
+      // check the request object and provide UserPolicies / RolePolicies
+      const whatIsAllowedResponse = methodWithOutput.filter(e => e.method === 'WhatIsAllowed');
+      const response: any = new proto.ReverseQuery.constructor(whatIsAllowedResponse[0].output);
+      callback(null, response);
+    }
+  };
+  try {
+    mockServer.addService(PROTO_PATH, PKG_NAME, SERVICE_NAME, implementations, {
+      includeDirs: ['node_modules/@restorecommerce/protos/'],
+      keepCase: true,
+      longs: String,
+      enums: String,
+      defaults: true,
+      oneofs: true
+    });
+    await mockServer.start();
+    logger.info('Mock ACS Server started on port 50061');
+  } catch (err) {
+    logger.error('Error starting mock ACS server', err);
+  }
 };
 
 const stopGrpcMockServer = async () => {
-  await mockServer.close(() => {
-    logger.info('Server closed successfully');
-  });
+  await mockServer.stop();
+  logger.info('Mock ACS Server closed successfully');
 };
 
 describe('testing identity-srv', () => {
@@ -270,8 +313,8 @@ describe('testing identity-srv', () => {
           userPolicySetRQ.policy_sets[0].policies[0].rules[0] = permitUserRule;
           // start mock acs-srv - needed for read operation since acs-client makes a req to acs-srv
           // to get applicable policies although acs-lookup is disabled
-          await startGrpcMockServer([{ method: 'WhatIsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: userPolicySetRQ },
-          { method: 'IsAllowed', input: '\{.*\:\{.*\:.*\}\}', output: { decision: 'PERMIT' } }]);
+          await startGrpcMockServer([{ method: 'WhatIsAllowed', output: userPolicySetRQ },
+          { method: 'IsAllowed', output: { decision: 'PERMIT' } }]);
           // read by email
           const getResult = await userService.read({
             filters: [{
