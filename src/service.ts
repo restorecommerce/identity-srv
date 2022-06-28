@@ -1854,7 +1854,8 @@ export class UserService extends ServiceBase {
       return returnOperationStatus(400, `Invalid identifier provided for unregistering, multiple users found for identifier ${identifier}`);
     }
 
-    const acsResources = await this.createMetadata(users.items, AuthZAction.DELETE, subject);
+    let resources = users.items.map((e) => e.payload);
+    const acsResources = await this.createMetadata(resources, AuthZAction.DELETE, subject);
     let acsResponse: DecisionResponse;
     try {
       if (!context) { context = {}; };
