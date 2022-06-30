@@ -1,3 +1,7 @@
+## 0.3.0 (June 30th, 2022)
+
+- up deps
+
 ## 0.2.39 (May 11th, 2022)
 
 - expire jwt token after 6 month
