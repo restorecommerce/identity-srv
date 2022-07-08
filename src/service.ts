@@ -167,10 +167,17 @@ export class UserService extends ServiceBase {
       if (!techUser && filters) {
         acsFilterObj = filters;
       }
-      if (!_.isEmpty(acsFilterObj)) {
-        _.merge(filterStructure, acsFilterObj);
+
+      if (acsFilterObj) {
+        if (_.isArray(acsFilterObj)) {
+          for (let acsFilter of acsFilterObj) {
+            filterStructure.filters.push(acsFilter);
+          }
+        } else {
+          filterStructure.filters.push(acsFilterObj);
+        }
       }
-      readRequest.filters = filterStructure;
+      readRequest.filters = filterStructure.filters;
       if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
         readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
         readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
@@ -352,7 +359,13 @@ export class UserService extends ServiceBase {
       if (!readRequest.filters) {
         readRequest.filters = [];
       }
-      readRequest.filters.push(acsFilters);
+      if (_.isArray(acsFilters)) {
+        for (let acsFilter of acsFilters) {
+          readRequest.filters.push(acsFilter);
+        }
+      } else {
+        readRequest.filters.push(acsFilters);
+      }
     }
 
     if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
