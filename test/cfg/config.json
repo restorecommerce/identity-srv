@@ -29,7 +29,7 @@
   "logger": {
     "console": {
       "handleExceptions": false,
-      "level": "crit",
+      "level": "silly",
       "colorize": true,
       "prettyPrint": true
     }
@@ -94,69 +94,19 @@
   },
   "client": {
     "user": {
-      "address": "localhost:50051",
-      "proto": {
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "protoPath": "io/restorecommerce/user.proto",
-        "services": {
-          "user": {
-            "packageName": "io.restorecommerce.user",
-            "serviceName": "Service"
-          }
-        }
-      }
+      "address": "localhost:50051"
     },
     "role": {
-      "address": "localhost:50051",
-      "proto": {
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "protoPath": "io/restorecommerce/role.proto",
-        "services": {
-          "role": {
-            "packageName": "io.restorecommerce.role",
-            "serviceName": "Service"
-          }
-        }
-      }
+      "address": "localhost:50051"
     },
     "reflection": {
-      "address": "localhost:50051",
-      "proto": {
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "protoPath": "grpc/reflection/v1alpha/reflection.proto",
-        "services": {
-          "reflection": {
-            "packageName": "grpc.reflection.v1alpha",
-            "serviceName": "ServerReflection"
-          }
-        }
-      }
+      "address": "localhost:50051"
     },
     "commandinterface": {
-      "address": "localhost:50051",
-      "proto": {
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "protoPath": "io/restorecommerce/commandinterface.proto",
-        "services": {
-          "commandinterface": {
-            "packageName": "io.restorecommerce.commandinterface",
-            "serviceName": "Service"
-          }
-        }
-      }
+      "address": "localhost:50051"
     },
     "acs-srv": {
-      "address": "localhost:50061",
-      "proto": {
-        "protoRoot": "node_modules/@restorecommerce/protos/",
-        "protoPath": "io/restorecommerce/access_control.proto",
-        "services": {
-          "acs-srv": {
-            "packageName": "io.restorecommerce.access_control",
-            "serviceName": "Service"
-          }
-        }
-      }
+      "address": "localhost:50061"
     }
   },
   "database": {
@@ -198,192 +148,84 @@
       },
       "latestOffset": true,
       "userModified": {
-        "protos": [
-          "io/restorecommerce/user.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.User"
       },
       "userCreated": {
-        "protos": [
-          "io/restorecommerce/user.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.User"
       },
       "userDeleted": {
-        "protos": [
-          "io/restorecommerce/user.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.User"
       },
       "roleCreated": {
-        "protos": [
-          "io/restorecommerce/role.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.role.Role"
       },
       "roleModified": {
-        "protos": [
-          "io/restorecommerce/role.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.role.Role"
       },
       "roleDeleted": {
-        "protos": [
-          "io/restorecommerce/role.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.role.Deleted"
       },
       "authentication_logCreated": {
-        "protos": [
-          "io/restorecommerce/authentication_log.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.authentication_log.AuthenticationLog"
       },
       "authentication_logModified": {
-        "protos": [
-          "io/restorecommerce/authentication_log.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.authentication_log.AuthenticationLog"
       },
       "authentication_logDeleted": {
-        "protos": [
-          "io/restorecommerce/authentication_log.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.authentication_log.Deleted"
       },
       "registered": {
-        "protos": [
-          "io/restorecommerce/user.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.User"
       },
       "activated": {
-        "protos": [
-          "io/restorecommerce/user.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.Activate"
       },
       "passwordChanged": {
-        "protos": [
-          "io/restorecommerce/user.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.PasswordChanged"
       },
       "passwordChangeRequested": {
-        "protos": [
-          "io/restorecommerce/user.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.PasswordChangeRequested"
       },
       "emailChangeRequested": {
-        "protos": [
-          "io/restorecommerce/user.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.EmailChangeRequested"
       },
       "emailChangeConfirmed": {
-        "protos": [
-          "io/restorecommerce/user.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.EmailChangeConfirmed"
       },
       "unregistered": {
-        "protos": [
-          "io/restorecommerce/user.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.user.Deleted"
       },
       "restoreCommand": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
       },
       "restoreResponse": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
       },
       "healthCheckCommand": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
       },
       "healthCheckResponse": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
       },
       "versionCommand": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
       },
       "versionResponse": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
       },
       "resetCommand": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
       },
       "resetResponse": {
-        "protos": [
-          "io/restorecommerce/commandinterface.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
       },
       "renderRequest": {
-        "protos": [
-          "io/restorecommerce/rendering.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.rendering.RenderRequest"
       },
       "renderResponse": {
-        "protos": [
-          "io/restorecommerce/rendering.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.rendering.RenderResponse"
       },
       "sendEmail": {
-        "protos": [
-          "io/restorecommerce/notification.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "messageObject": "io.restorecommerce.notification.Notification"
       },
       "topics": {
@@ -412,289 +254,10 @@
     "enableEvents": "true"
   },
   "server": {
-    "services": {
-      "io-restorecommerce-user-srv": {
-        "activate": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "changePassword": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "requestEmailChange": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "confirmEmailChange": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "confirmUserInvitation": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "requestPasswordChange": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "confirmPasswordChange": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "sendInvitationEmail": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "sendActivationEmail": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "find": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "register": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "unregister": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "login": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "findByRole": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "create": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "read": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "delete": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "update": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "upsert": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "populateRoleAssocCache": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        }
-      },
-      "io-restorecommerce-role-srv": {
-        "read": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "create": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "update": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "upsert": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "delete": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        }
-      },
-      "io-restorecommerce-authentication-log-srv": {
-        "read": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "create": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "update": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "upsert": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "delete": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        }
-      },
-      "io-restorecommerce-token-srv": {
-        "upsert": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "find": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "findByUid": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "findByUserCode": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "destroy": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "revokeByGrantId": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "consume": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        }
-      },
-      "io-restorecommerce-identity-reflection": {
-        "serverReflectionInfo": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        }
-      },
-      "io-restorecommerce-identity-cis": {
-        "reconfigure": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "reset": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "restore": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "check": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "version": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        }
-      },
-      "io-restorecommerce-oauth-srv": {
-        "availableServices": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "generateLinks": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "exchangeCode": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        }
-      },
-      "grpc-health-v1": {
-        "check": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        },
-        "watch": {
-          "transport": [
-            "grpcIdentity"
-          ]
-        }
-      }
-    },
     "transports": [
       {
         "name": "grpcIdentity",
         "provider": "grpc",
-        "services": {
-          "io-restorecommerce-user-srv": "io.restorecommerce.user.Service",
-          "io-restorecommerce-role-srv": "io.restorecommerce.role.Service",
-          "io-restorecommerce-authentication-log-srv": "io.restorecommerce.authentication_log.Service",
-          "io-restorecommerce-token-srv": "io.restorecommerce.token.Service",
-          "io-restorecommerce-identity-reflection": "grpc.reflection.v1alpha.ServerReflection",
-          "io-restorecommerce-identity-cis": "io.restorecommerce.commandinterface.Service",
-          "io-restorecommerce-oauth-srv": "io.restorecommerce.oauth.Service",
-          "grpc-health-v1": "grpc.health.v1.Health"
-        },
-        "protos": [
-          "io/restorecommerce/user.proto",
-          "io/restorecommerce/role.proto",
-          "io/restorecommerce/authentication_log.proto",
-          "io/restorecommerce/token.proto",
-          "grpc/reflection/v1alpha/reflection.proto",
-          "io/restorecommerce/commandinterface.proto",
-          "io/restorecommerce/oauth.proto",
-          "grpc/health/v1/health.proto"
-        ],
-        "protoRoot": "node_modules/@restorecommerce/protos/",
         "addr": "localhost:50051"
       }
     ]

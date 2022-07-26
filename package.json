@@ -23,9 +23,9 @@
     "@restorecommerce/grpc-client": "^0.4.5",
     "@restorecommerce/kafka-client": "^0.4.3",
     "@restorecommerce/logger": "^0.13.0",
-    "@restorecommerce/protos": "^0.7.2",
     "@restorecommerce/resource-base-interface": "^0.2.15",
     "@restorecommerce/service-config": "^0.4.26",
+    "@restorecommerce/rc-grpc-clients": "^0.5.6",
     "bcryptjs": "^2.4.3",
     "cross-env": "^7.0.3",
     "jose": "^4.8.3",
@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@alenon/grpc-mock-server": "^3.0.8",
+    "@restorecommerce/protos": "^0.7.2",
     "@types/mocha": "^9.1.1",
     "@types/node": "^18.0.3",
     "@types/oauth": "^0.9.1",

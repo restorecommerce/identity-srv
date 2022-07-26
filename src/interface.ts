@@ -1,5 +1,5 @@
 import { BaseDocument, FilterOp } from '@restorecommerce/resource-base-interface/lib/core/interfaces';
-import { Subject, Decision, PolicySetRQ } from '@restorecommerce/acs-client';
+import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
 
 export type TUser = User | FindUser | ActivateUser;
 export interface Call<TUser> {

@@ -1,6 +1,6 @@
 import * as should from 'should';
 import * as _ from 'lodash';
-import { GrpcClient } from '@restorecommerce/grpc-client';
+import { createChannel, createClient } from '@restorecommerce/grpc-client';
 import { Events, Topic } from '@restorecommerce/kafka-client';
 import { Worker } from '../src/worker';
 import { createServiceConfig } from '@restorecommerce/service-config';
@@ -8,8 +8,15 @@ import { GrpcMockServer, ProtoUtils } from '@alenon/grpc-mock-server';
 import * as proto_loader from '@grpc/proto-loader';
 import * as grpc from '@grpc/grpc-js';
 import { updateConfig } from '@restorecommerce/acs-client';
-import { FilterOperation } from '@restorecommerce/resource-base-interface';
-import { User } from '../src/interface';
+import {
+  ServiceDefinition as UserServiceDefinition,
+  ServiceClient as UserServiceClient, User, DeepPartial
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
+import {
+  ServiceDefinition as RoleServiceDefinition,
+  ServiceClient as RoleServiceClient
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
+import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
 
 /*
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
@@ -23,7 +30,7 @@ let logger;
 // For event listeners
 let events: Events;
 let topic: Topic;
-let roleService: any;
+let roleService: RoleServiceClient;
 
 /* eslint-disable */
 async function start(): Promise<void> {
@@ -51,11 +58,17 @@ async function connect(clientCfg: string, resourceName: string): Promise<any> { 
   let topicLable = `${resourceName}.resource`;
   topic = await events.topic(cfg.get(`events:kafka:topics:${topicLable}:topic`));
 
-  client = new GrpcClient(cfg.get(clientCfg), logger);
+  const channel = createChannel(cfg.get(clientCfg).address);
   if (resourceName.startsWith('user')) {
-    return client.user;
+    return createClient({
+      ...cfg.get(clientCfg),
+      logger
+    }, UserServiceDefinition, channel) as any;
   } else if (resourceName.startsWith('role')) {
-    return client.role;
+    return createClient({
+      ...cfg.get(clientCfg),
+      logger
+    }, RoleServiceDefinition, channel) as any;
   }
 }
 
@@ -219,11 +232,22 @@ describe('testing identity-srv', () => {
     // enable login with only name
     cfg.set('service:loginIdentifierProperty', ['name']);
     updateConfig(cfg);
+
+    roleService = await connect('client:role', 'role');
+
+    // drop all roles and users
+    await roleService.delete({
+      collection: true
+    });
+    const userService: UserServiceClient = await connect('client:user', 'user');
+    await userService.delete({
+      collection: true
+    });
   });
 
   after(async function stopServer(): Promise<void> {
     // delete user and roles collection
-    let userService = await connect('client:user', 'user');
+    const userService: UserServiceClient = await connect('client:user', 'user');
     await userService.delete({
       collection: true
     });
@@ -240,10 +264,6 @@ describe('testing identity-srv', () => {
 
   describe('testing Role service', () => {
     describe('with test client', () => {
-      before(async function connectRoleService(): Promise<void> {
-        roleService = await connect('client:role', 'role');
-      });
-
       it('should create roles', async () => {
         const roles = [
           {
@@ -288,7 +308,8 @@ describe('testing identity-srv', () => {
 
   describe('testing User service with email constraint (default)', () => {
     describe('with test client with email constraint (default)', () => {
-      let userService, testUserID, upserUserID, user, testUserName;
+      let userService: UserServiceClient;
+      let testUserID, upserUserID, user, testUserName;
       before(async function connectUserService(): Promise<void> {
         userService = await connect('client:user', 'user');
         user = {
@@ -335,7 +356,7 @@ describe('testing identity-srv', () => {
           const filters = [{
             filter: [{
               field: 'id',
-              operation: FilterOperation.eq,
+              operation: Filter_Operation.eq,
               value: result.id
             }]
           }];
@@ -891,75 +912,75 @@ describe('testing identity-srv', () => {
           });
           should.exist(result.items);
           const pwHashA = result.items[0].payload.password_hash;
-          result = await (userService.changePassword({
+          const changeResult = await (userService.changePassword({
             identifier: testUserName,
             password: 'notsecure',
             new_password: 'newPassword'
           }));
-          should.exist(result);
-          should.exist(result.operation_status);
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          should.exist(changeResult);
+          should.exist(changeResult.operation_status);
+          changeResult.operation_status.code.should.equal(200);
+          changeResult.operation_status.message.should.equal('success');
           await topic.$wait(offset);
 
-          result = await (userService.find({
+          const findResult = await (userService.find({
             id: testUserID,
           }));
-          const pwHashB = result.items[0].payload.password_hash;
+          const pwHashB = findResult.items[0].payload.password_hash;
           pwHashB.should.not.be.null();
           pwHashA.should.not.equal(pwHashB);
           await topic.removeListener('passwordChanged', listener);
         });
 
         it('should generate a UUID when requesting a password change', async function requestPasswordChange(): Promise<void> {
-          let result = await userService.find({
+          const findResult = await userService.find({
             id: testUserID,
           });
-          should.exist(result);
-          should.exist(result.items);
-          const activationCode = result.items[0].payload.activation_code;
+          should.exist(findResult);
+          should.exist(findResult.items);
+          const activationCode = findResult.items[0].payload.activation_code;
           activationCode.should.be.length(0);
 
-          result = await userService.requestPasswordChange({
+          const changeResult = await userService.requestPasswordChange({
             identifier: user.name
           });
-          should.exist(result);
-          should.exist(result.operation_status);
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          should.exist(changeResult);
+          should.exist(changeResult.operation_status);
+          changeResult.operation_status.code.should.equal(200);
+          changeResult.operation_status.message.should.equal('success');
 
-          result = await (userService.find({
+          const find2Result = await (userService.find({
             id: testUserID,
           }));
-          const upUser = result.items[0].payload;
+          const upUser = find2Result.items[0].payload;
           upUser.activation_code.should.not.be.empty();
         });
 
         it('should confirm a password change by providing the UUID', async function requestPasswordChange(): Promise<void> {
-          let result = await userService.find({
+          const result = await userService.find({
             id: testUserID,
           });
           should.exist(result);
           should.exist(result.items);
           const activationCode = result.items[0].payload.activation_code;
           activationCode.should.not.be.null();
-          const pwHashA = result.items[0].password_hash;
+          const pwHashA = (result.items[0] as any).password_hash;
 
-          result = await userService.confirmPasswordChange({
+          const changeResult = await userService.confirmPasswordChange({
             identifier: user.name,
             password: 'newPassword2',
             activation_code: activationCode
           });
 
-          should.exist(result);
-          should.exist(result.operation_status);
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          should.exist(changeResult);
+          should.exist(changeResult.operation_status);
+          changeResult.operation_status.code.should.equal(200);
+          changeResult.operation_status.message.should.equal('success');
 
-          result = await (userService.find({
+          const findResult = await (userService.find({
             id: testUserID,
           }));
-          const upUser = result.items[0].payload;
+          const upUser = findResult.items[0].payload;
           upUser.activation_code.should.be.empty();
           upUser.password_hash.should.not.equal(pwHashA);
         });
@@ -991,26 +1012,26 @@ describe('testing identity-srv', () => {
           should.exist(result);
           should.exist(result.items);
           const email_old = result.items[0].payload.email;
-          result = await (userService.requestEmailChange({
+          const changeResult = await (userService.requestEmailChange({
             identifier: testUserName,
             new_email: 'newmail@newmail.com',
           }));
-          should.exist(result);
-          should.exist(result.operation_status);
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          should.exist(changeResult);
+          should.exist(changeResult.operation_status);
+          changeResult.operation_status.code.should.equal(200);
+          changeResult.operation_status.message.should.equal('success');
 
           await topic.$wait(offset);
           const filters = [{
             filter: [{
               field: 'id',
-              operation: FilterOperation.eq,
+              operation: Filter_Operation.eq,
               value: testUserID
             }]
           }];
-          result = await (userService.read({ filters }));
+          const readResult = await (userService.read({ filters }));
 
-          const dbUser: User = result.items[0].payload;
+          const dbUser = readResult.items[0].payload;
           validate(dbUser);
           await topic.removeListener('emailChangeRequested', listener);
         });
@@ -1033,25 +1054,25 @@ describe('testing identity-srv', () => {
           should.exist(result);
           should.exist(result.items);
           const activationCode = result.items[0].payload.activation_code;
-          result = await (userService.confirmEmailChange({
+          const changeResult = await (userService.confirmEmailChange({
             activation_code: activationCode,
             identifier: user.name
           }));
-          should.exist(result);
-          should.exist(result.operation_status);
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          should.exist(changeResult);
+          should.exist(changeResult.operation_status);
+          changeResult.operation_status.code.should.equal(200);
+          changeResult.operation_status.message.should.equal('success');
 
           await topic.$wait(offset);
           const filters = [{
             filter: [{
               field: 'id',
-              operation: FilterOperation.eq,
+              operation: Filter_Operation.eq,
               value: testUserID
             }]
           }];
-          result = await (userService.read({ filters }));
-          const dbUser: User = result.items[0].payload;
+          const readResult = await (userService.read({ filters }));
+          const dbUser = readResult.items[0].payload;
           validate(dbUser);
           dbUser.new_email.should.be.empty();
           dbUser.activation_code.should.be.empty();
@@ -1216,7 +1237,8 @@ describe('testing identity-srv', () => {
       });
 
       describe('calling sendInvitationEmail', function sendInvitationEmail(): void {
-        let sampleUser, invitingUser;
+        let sampleUser: DeepPartial<User>;
+        let invitingUser: DeepPartial<User>;
         before(async () => {
           sampleUser = {
             id: '345testuser2id',

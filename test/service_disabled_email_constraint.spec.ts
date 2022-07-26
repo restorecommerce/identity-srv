@@ -1,6 +1,6 @@
 import * as should from 'should';
 import * as _ from 'lodash';
-import { GrpcClient } from '@restorecommerce/grpc-client';
+import { createClient, createChannel } from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import { Worker } from '../src/worker';
 import { createServiceConfig } from '@restorecommerce/service-config';
@@ -9,7 +9,15 @@ import { GrpcMockServer, ProtoUtils } from '@alenon/grpc-mock-server';
 import * as proto_loader from '@grpc/proto-loader';
 import * as grpc from '@grpc/grpc-js';
 import { updateConfig } from '@restorecommerce/acs-client';
-import { FilterOperation } from '@restorecommerce/resource-base-interface';
+import {
+  ServiceDefinition as UserServiceDefinition,
+  ServiceClient as UserServiceClient, UserType
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
+import {
+  ServiceDefinition as RoleServiceDefinition,
+  ServiceClient as RoleServiceClient
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
+import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
 
 const Events = kafkaClient.Events;
 
@@ -24,7 +32,7 @@ let logger;
 // For event listeners
 let events;
 let topic: Topic;
-let roleService: any;
+let roleService: RoleServiceClient;
 
 /* eslint-disable */
 async function start(): Promise<void> {
@@ -48,11 +56,17 @@ async function connect(clientCfg: string, resourceName: string): Promise<any> { 
   let topicLable = `${resourceName}.resource`;
   topic = await events.topic(cfg.get(`events:kafka:topics:${topicLable}:topic`));
 
-  const grpcClient = new GrpcClient(cfg.get(clientCfg), logger);
+  const channel = createChannel(cfg.get(clientCfg).address);
   if (resourceName.startsWith('user')) {
-    return grpcClient.user;
+    return createClient({
+      ...cfg.get(clientCfg),
+      logger
+    }, UserServiceDefinition, channel) as any;
   } else if (resourceName.startsWith('role')) {
-    return grpcClient.role;
+    return createClient({
+      ...cfg.get(clientCfg),
+      logger
+    }, RoleServiceDefinition, channel) as any;
   }
 }
 
@@ -188,6 +202,17 @@ describe('testing identity-srv', () => {
     cfg.set('authorization:enabled', false);
     cfg.set('authorization:enforce', false);
     updateConfig(cfg);
+
+    roleService = await connect('client:role', 'role');
+
+    // drop all roles and users
+    await roleService.delete({
+      collection: true
+    });
+    const userService: UserServiceClient = await connect('client:user', 'user');
+    await userService.delete({
+      collection: true
+    });
   });
 
   after(async function stopServer(): Promise<void> {
@@ -195,10 +220,10 @@ describe('testing identity-srv', () => {
     await roleService.delete({
       collection: true
     });
-    let userService = await connect('client:user', 'user');
+    const userService: UserServiceClient = await connect('client:user', 'user');
     await userService.delete({
       collection: true
-    });
+    }).then();
     await stopGrpcMockServer();
     this.timeout(60000);
     worker && await worker.stop();
@@ -206,16 +231,6 @@ describe('testing identity-srv', () => {
   });
 
   describe('testing Role service', () => {
-    let role: any;
-
-    before(async function connectRoleService(): Promise<void> {
-      roleService = await connect('client:role', 'role');
-    });
-
-    after(async function stopRoleService(): Promise<void> {
-      // service stopped using worker thread
-    });
-
     describe('with test client', () => {
 
       it('should create roles', async () => {
@@ -259,7 +274,8 @@ describe('testing identity-srv', () => {
   });
 
   describe('testing User service with disabled email constraint', () => {
-    let userService, testUserID, user, testUserName;
+    let userService: UserServiceClient;
+    let testUserID, user, testUserName;
     before(async function connectUserService(): Promise<void> {
       userService = await connect('client:user', 'user');
       user = {
@@ -320,7 +336,7 @@ describe('testing identity-srv', () => {
             filters: [{
               filter: [{
                 field: 'email',
-                operation: FilterOperation.eq,
+                operation: Filter_Operation.eq,
                 value: data.email
               }]
             }]
@@ -410,12 +426,12 @@ describe('testing identity-srv', () => {
           result.operation_status.code.should.equal(200);
           result.operation_status.message.should.equal('success');
         });
-        it('Shoul create a tech user without password and delete it', async () => {
+        it('Should create a tech user without password and delete it', async () => {
           // techUser with no password
           let techUser = Object.assign(testusersTemplate,
             {
               id: 'techUserID1', name: 'techUserName', email: 'techuser@techuser',
-              user_type: 'TECHNICAL_USER',
+              user_type: UserType.TECHNICAL_USER,
               role_associations: [{
                 id: 'user-r-role-assoc-id',
                 role: 'user-r-id',
@@ -447,7 +463,7 @@ describe('testing identity-srv', () => {
           let techUser = Object.assign(testusersTemplate, {
             id: 'techUserID1',
             name: 'techUserName', password: 'Test1!Test1!',
-            email: 'techuser@techuser', user_type: 'TECHNICAL_USER',
+            email: 'techuser@techuser', user_type: UserType.TECHNICAL_USER,
             role_associations: [{
               id: 'user-r-role-assoc-id',
               role: 'user-r-id',

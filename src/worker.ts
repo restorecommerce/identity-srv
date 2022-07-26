@@ -1,6 +1,6 @@
 import { createServiceConfig } from '@restorecommerce/service-config';
 import * as _ from 'lodash';
-import { Events } from '@restorecommerce/kafka-client';
+import { Events, registerProtoMeta } from '@restorecommerce/kafka-client';
 import { createLogger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { Logger } from 'winston';
@@ -10,16 +10,50 @@ import { createClient, RedisClientType} from 'redis';
 import { AuthenticationLogService } from './authlog_service';
 import { TokenService } from './token_service';
 import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base';
-import { Database } from 'arangojs';
 import 'source-map-support/register';
 import { OAuthService } from './oauth_service';
+import { ServiceDefinition as OAuthServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/oauth';
+import { BindConfig } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc';
+import { HealthDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/health/v1/health';
+import {
+  ServiceDefinition as UserServiceDefinition,
+  protoMetadata as userMeta
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
+import {
+  ServiceDefinition as RoleServiceDefinition,
+  protoMetadata as roleMeta
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
+import {
+  ServiceDefinition as AuthLogServiceDefinition,
+  protoMetadata as authenticationLogMeta
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/authentication_log';
+import {
+  ServiceDefinition as TokenServiceDefinition,
+  protoMetadata as tokenMeta
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token';
+import {
+  ServiceDefinition as CommandInterfaceServiceDefinition,
+  protoMetadata as commandInterfaceMeta
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/commandinterface';
+import {
+  protoMetadata as renderingMeta
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rendering';
+
+registerProtoMeta(
+  userMeta,
+  roleMeta,
+  authenticationLogMeta,
+  tokenMeta,
+  commandInterfaceMeta,
+  renderingMeta
+);
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
 const CONTRACT_CANCELLED = 'contractCancelled';
 
 class UserCommandInterface extends chassis.CommandInterface {
   constructor(server: chassis.Server, cfg: any, logger: any, events: Events, redisClient: RedisClientType<any, any>) {
-    super(server, cfg, logger, events, redisClient);
+    super(server, cfg, logger, events as any, redisClient as any);
   }
 
   makeResourcesRestoreSetup(db: any, resource: string): any {
@@ -145,7 +179,7 @@ export class Worker {
     logger.verbose('Setting up topics');
     const events = new Events(cfg.get('events:kafka'), logger);
     await events.start();
-    this.offsetStore = new chassis.OffsetStore(events, cfg, logger);
+    this.offsetStore = new chassis.OffsetStore(events as any, cfg, logger);
 
     // Enable events firing for resource api using config
     let isEventsEnabled = cfg.get('events:enableEvents');
@@ -217,28 +251,53 @@ export class Worker {
     const oauthServices = cfg.get('oauth:services');
     if(oauthServices) {
       const oauthService = new OAuthService(cfg, logger, this.userService);
-      await server.bind(serviceNamesCfg.oauth, oauthService);
+      await server.bind(serviceNamesCfg.oauth, {
+        service: OAuthServiceDefinition,
+        implementation: oauthService
+      } as BindConfig<OAuthServiceDefinition>);
     }
 
-    await server.bind(serviceNamesCfg.user, this.userService);
-    await server.bind(serviceNamesCfg.role, this.roleService);
-    await server.bind(serviceNamesCfg.authenticationLog, authLogService);
-    await server.bind(serviceNamesCfg.token, tokenService);
-    await server.bind(serviceNamesCfg.cis, cis);
+    await server.bind(serviceNamesCfg.user, {
+      service: UserServiceDefinition,
+      implementation: this.userService
+    } as BindConfig<UserServiceDefinition>);
 
-    // Add reflection service
-    const reflectionServiceName = serviceNamesCfg.reflection;
-    const transportName = cfg.get(`server:services:${reflectionServiceName}:serverReflectionInfo:transport:0`);
-    const transport = server.transport[transportName];
-    const reflectionService = new chassis.grpc.ServerReflection(transport.$builder, server.config);
-    await server.bind(reflectionServiceName, reflectionService);
+    await server.bind(serviceNamesCfg.role, {
+      service: RoleServiceDefinition,
+      implementation: this.roleService
+    } as BindConfig<RoleServiceDefinition>);
 
-    await server.bind(serviceNamesCfg.health, new chassis.Health(cis, {
-      logger,
-      cfg,
-      dependencies: ['acs-srv'],
-      readiness: async () => !!await ((db as Arango).db as Database).version()
-    }));
+    await server.bind(serviceNamesCfg.authenticationLog, {
+      service: AuthLogServiceDefinition,
+      implementation: authLogService
+    } as BindConfig<AuthLogServiceDefinition>);
+
+    await server.bind(serviceNamesCfg.token, {
+      service: TokenServiceDefinition,
+      implementation: tokenService
+    } as BindConfig<TokenServiceDefinition>);
+
+    await server.bind(serviceNamesCfg.cis, {
+      service: CommandInterfaceServiceDefinition,
+      implementation: cis
+    } as BindConfig<CommandInterfaceServiceDefinition>);
+
+    // TODO Add reflection service
+    // const reflectionServiceName = serviceNamesCfg.reflection;
+    // const transportName = cfg.get(`server:services:${reflectionServiceName}:serverReflectionInfo:transport:0`);
+    // const transport = server.transport[transportName];
+    // const reflectionService = new chassis.grpc.ServerReflection(transport.$builder, server.config);
+    // await server.bind(reflectionServiceName, reflectionService);
+
+    await server.bind(serviceNamesCfg.health, {
+      service: HealthDefinition,
+      implementation: new chassis.Health(cis, {
+        logger,
+        cfg,
+        dependencies: ['acs-srv'],
+        readiness: async () => !!await (db as Arango).db.version()
+      })
+    } as BindConfig<HealthDefinition>);
 
     // Start server
     await server.start();

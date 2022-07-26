@@ -1,14 +1,29 @@
 import { Logger } from 'winston';
 import { OAuth2 } from 'oauth';
-import { Call } from './interface';
-import { fetch } from './utils';
+import { checkAccessRequest, fetch } from './utils';
 import { UserService } from './service';
-import { FilterOperation } from '@restorecommerce/resource-base-interface';
-import { AuthZAction, Decision, Subject, DecisionResponse, Operation } from '@restorecommerce/acs-client';
-import { checkAccessRequest } from './utils';
+import { AuthZAction, Operation } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
 import * as uuid from 'uuid';
 import * as jose from 'jose';
+import {
+  DeepPartial,
+  ExchangeCodeResponse,
+  GenerateLinksResponse,
+  ServiceServiceImplementation,
+  ServicesResponse
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/oauth';
+import { Empty } from '@restorecommerce/rc-grpc-clients/dist/generated/google/protobuf/empty';
+import { WithRequestID } from '../../chassis-srv/src/microservice/transport/provider/grpc/middlewares';
+import { createMetadata } from './common';
+import { FindByTokenRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
+import {
+  Filter_Operation,
+  ReadRequest
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
+import {
+  Response_Decision
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
 
 export const accountResolvers: { [key: string]: (access_token: string) => Promise<string> } = {
   google: async access_token => {
@@ -40,7 +55,7 @@ interface GetTokenResponse {
   token?: string;
 }
 
-export class OAuthService {
+export class OAuthService implements ServiceServiceImplementation<WithRequestID> {
 
   logger: Logger;
   cfg: any;
@@ -72,13 +87,13 @@ export class OAuthService {
     }
   }
 
-  async availableServices(call: any, context: any): Promise<any> {
+  async availableServices(request: Empty, context): Promise<DeepPartial<ServicesResponse>> {
     return {
       services: Object.keys(this.clients)
     };
   }
 
-  async generateLinks(call: any, context: any): Promise<any> {
+  async generateLinks(request: Empty, context): Promise<DeepPartial<GenerateLinksResponse>> {
     const nonce = 'nonce'; // TODO Generate, store and compare unique nonce
     return {
       links: Object.entries(this.clients).reduce((result, entry) => {
@@ -95,13 +110,13 @@ export class OAuthService {
     };
   }
 
-  async exchangeCode(call: Call<ExchangeCodeRequest>, context: any): Promise<any> {
-    const oauthService = call.request.service;
+  async exchangeCode(request: ExchangeCodeRequest, context): Promise<DeepPartial<ExchangeCodeResponse>> {
+    const oauthService = request.service;
     if (!(oauthService in this.clients)) {
       throw new Error('Unknown service: ' + oauthService);
     }
 
-    const data: any = await new Promise((resolve, reject) => this.clients[oauthService].getOAuthAccessToken(call.request.code, {
+    const data: any = await new Promise((resolve, reject) => this.clients[oauthService].getOAuthAccessToken(request.code, {
       grant_type: 'authorization_code',
       redirect_uri: this.cfg.get('oauth:redirect_uri_base') + oauthService,
     }, (err, access_token, refresh_token, result) => {
@@ -122,21 +137,19 @@ export class OAuthService {
 
     const email = await accountResolvers[oauthService](data['access_token']);
 
-    const users = await this.userService.superRead({
-      request: {
-        filters: [
-          {
-            filter: [
-              {
-                field: 'email',
-                operation: FilterOperation.eq,
-                value: email
-              }
-            ]
-          }
-        ]
-      }
-    });
+    const users = await this.userService.superRead(ReadRequest.fromPartial({
+      filters: [
+        {
+          filter: [
+            {
+              field: 'email',
+              operation: Filter_Operation.eq,
+              value: email
+            }
+          ]
+        }
+      ]
+    }), context);
 
     if (users.total_count === 0) {
       return { email };
@@ -155,26 +168,29 @@ export class OAuthService {
       return t.name === oauthService + '-access_token' || t.name === oauthService + '-refresh_token';
     });
 
-    if (!(call.request as any).id) {
-      (call.request as any).id = uuid.v4().replace(/-/g, '');
-    }
-    let acsResponse: DecisionResponse;
-    let tokenData = call.request;
     try {
-      if (!context) { context = {}; };
-      call.request = await this.createMetadata(tokenData, tokenTechUser);
-      context.subject = tokenTechUser;
-      context.resources = call.request;
-      acsResponse = await checkAccessRequest(context, [{ resource: 'token', id: (call.request as any).id }], AuthZAction.MODIFY,
-        Operation.isAllowed);
+      const acsResponse = await checkAccessRequest(
+        {
+          ...context,
+          subject: tokenTechUser,
+          resources: await createMetadata(request, this.cfg.get('authorization:urns'), this.userService, tokenTechUser)
+        },
+        [{ resource: 'token', id: context.id }], AuthZAction.MODIFY, Operation.isAllowed
+      );
+
+      if (acsResponse.decision != Response_Decision.PERMIT) {
+        return {
+          user: {
+            status: {
+              code: acsResponse.operation_status.code,
+              message: acsResponse.operation_status.message
+            }
+          }
+        };
+      }
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv for token upsert', err);
       return { user: { status: { code: err.code, message: err.message } } };
-    }
-
-    if (acsResponse.decision != Decision.PERMIT) {
-      const response = { status: { code: acsResponse.operation_status.code, message: acsResponse.operation_status.message } };
-      return { user: { response } };
     }
 
     const userCopy = {
@@ -240,60 +256,13 @@ export class OAuthService {
     return { email, user: { payload: user, status: { code: 200, message: 'success' } }, token: authToken };
   }
 
-  /**
-   * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
-   * @param reaources list of resources
-   * @param entity entity name
-   * @param action resource action
-   */
-  async createMetadata(res: any, subject?: Subject): Promise<any> {
-    let resources = _.cloneDeep(res);
-    let orgOwnerAttributes = [];
-    if (!_.isArray(resources)) {
-      resources = [resources];
-    }
-    const urns = this.cfg.get('authorization:urns');
-    for (let resource of resources) {
-      if (!resource.meta) {
-        resource.meta = {};
-      }
-      if (subject && subject.id) {
-        orgOwnerAttributes.push(
-          {
-            id: urns.ownerIndicatoryEntity,
-            value: urns.user
-          },
-          {
-            id: urns.ownerInstance,
-            value: subject.id
-          });
-      } else if (subject && subject.token) {
-        // when no subjectID is provided find the subjectID using findByToken
-        const user = await this.userService.findByToken({ request: { token: subject.token } }, {});
-        if (user && user.payload && user.payload.id) {
-          orgOwnerAttributes.push(
-            {
-              id: urns.ownerIndicatoryEntity,
-              value: urns.user
-            },
-            {
-              id: urns.ownerInstance,
-              value: user.payload.id
-            });
-        }
-      }
-      resource.meta.owner = orgOwnerAttributes;
-    }
-    return resources;
-  }
-
-  async getToken(call: Call<GetTokenRequest>, context: any): Promise<GetTokenResponse> {
-    const oauthService = call.request.service;
+  async getToken(request: GetTokenRequest, context): Promise<DeepPartial<GetTokenResponse>> {
+    const oauthService = request.service;
     if (!(oauthService in this.clients)) {
       throw new Error('Unknown service: ' + oauthService);
     }
 
-    const user = await this.userService.findByToken({request: {token: call.request.subject.token}}, {});
+    const user = await this.userService.findByToken(FindByTokenRequest.fromPartial({token: request.subject.token}), context);
     if (!user || !user.payload || !user.payload.tokens) {
       return {status: {code: 404, message: 'user not found'}};
     }

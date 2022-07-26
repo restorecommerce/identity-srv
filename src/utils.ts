@@ -1,16 +1,28 @@
 import {
-  AuthZAction, Decision, accessRequest, Subject, DecisionResponse, Operation, PolicySetRQResponse, Filters
+  AuthZAction, accessRequest, DecisionResponse, Operation, PolicySetRQResponse
 } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
 import { createServiceConfig } from '@restorecommerce/service-config';
-import { GrpcClient } from '@restorecommerce/grpc-client';
+import { createClient, createChannel } from '@restorecommerce/grpc-client';
 import { createLogger } from '@restorecommerce/logger';
 import * as bcrypt from 'bcryptjs';
-import { FilterOperation, OperatorType } from '@restorecommerce/resource-base-interface';
+import {
+  DeepPartial,
+  FilterOp, FilterOp_Operator,
+  Filter_Operation
+} from '@restorecommerce/rc-grpc-clients/dist/generated/io/restorecommerce/resource_base';
+import {
+  ServiceDefinition as UserServiceDefinition,
+  ServiceClient as UserServiceClient
+} from '@restorecommerce/rc-grpc-clients/dist/generated/io/restorecommerce/user';
+import {
+  Response_Decision
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
+import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
 
 // Create a ids client instance
-let idsClientInstance;
-const getUserServiceClient = async () => {
+let idsClientInstance: UserServiceClient;
+const getUserServiceClient = (): UserServiceClient => {
   if (!idsClientInstance) {
     const cfg = createServiceConfig(process.cwd());
     // identity-srv client to resolve subject ID by token
@@ -22,8 +34,11 @@ const getUserServiceClient = async () => {
     };
     const logger = createLogger(loggerCfg);
     if (grpcIDSConfig) {
-      const idsClient = new GrpcClient(grpcIDSConfig, logger);
-      idsClientInstance = idsClient.user;
+      const channel = createChannel(grpcIDSConfig.address);
+      idsClientInstance = createClient({
+        ...grpcIDSConfig,
+        logger
+      }, UserServiceDefinition, channel);
     }
   }
   return idsClientInstance;
@@ -87,7 +102,7 @@ export async function checkAccessRequest(ctx: GQLClientContext, resource: Resour
     result = await accessRequest(subject, resource, action, ctx, operation, 'arangoDB', useCache);
   } catch (err) {
     return {
-      decision: Decision.DENY,
+      decision: Response_Decision.DENY,
       operation_status: {
         code: err.code || 500,
         message: err.details || err.message,
@@ -117,20 +132,20 @@ export const marshallProtobufAny = (msg: any): any => {
 
 export const unmarshallProtobufAny = (msg: any): any => JSON.parse(msg.value.toString());
 
-export const getDefaultFilter = (identifier) => {
+export const getDefaultFilter = (identifier): DeepPartial<FilterOp[]> => {
   return [{
     filter: [
       {
         field: 'name',
-        operation: FilterOperation.eq,
+        operation: Filter_Operation.eq,
         value: identifier
       },
       {
         field: 'email',
-        operation: FilterOperation.eq,
+        operation: Filter_Operation.eq,
         value: identifier
       }],
-    operator: OperatorType.or
+    operator: FilterOp_Operator.or
   }];
 };
 
@@ -138,7 +153,7 @@ export const getNameFilter = (userName) => {
   return [{
     filter: [{
       field: 'name',
-      operation: FilterOperation.eq,
+      operation: Filter_Operation.eq,
       value: userName
     }]
   }];
@@ -149,17 +164,17 @@ export const getLoginIdentifierFilter = (loginIdentifiers, value) => {
     return [{
       filter: [{
         field: loginIdentifiers,
-        operation: FilterOperation.eq,
+        operation: Filter_Operation.eq,
         value
       }]
     }];
   } else if (_.isArray(loginIdentifiers)) {
-    let filters = [{ filter: [], operator: OperatorType.or }];
+    let filters = [{ filter: [], operator: FilterOp_Operator.or }];
     for (let identifier of loginIdentifiers) {
       filters[0].filter.push(
         {
           field: identifier,
-          operation: FilterOperation.eq,
+          operation: Filter_Operation.eq,
           value
         });
     }
@@ -224,7 +239,7 @@ export const returnStatusArray = (codeIdMsgObj: CodeIdMsgObj[]) => {
  * @param accessResponse ACS response
  * @param enitity enitity name
  */
-export const getACSFilters = (accessResponse: PolicySetRQResponse, resource: string): Filters[] => {
+export const getACSFilters = (accessResponse: PolicySetRQResponse, resource: string): FilterOp[] => {
   let acsFilters = [];
   const resourceFilterMap = accessResponse?.filters;
   const resourceFilter = resourceFilterMap?.filter((e) => e?.resource === resource);
