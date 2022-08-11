@@ -251,6 +251,11 @@ export class TokenService {
           const userData = await this.userService.findByToken({ request: { token: id} }, {});
           if (userData?.payload) {
             user = userData.payload;
+            // search user by ID from DB
+            const dbUserData = await this.userService.find({ request: { id: user?.id, subject } }, {});
+            if (dbUserData?.items?.length > 0) {
+              user = dbUserData.items[0].payload;
+            }
             // check if the token is existing if not update it
             let updateToken = false;
             let currentTokenList = [];
