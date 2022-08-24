@@ -246,7 +246,7 @@ export class TokenService implements ServiceServiceImplementation {
           if (userData?.payload) {
             user = userData.payload;
             // search user by ID from DB
-            const dbUserData = await this.userService.find({ request: { id: user?.id, subject } }, {});
+            const dbUserData = await this.userService.find(FindRequest.fromPartial({ id: user?.id, subject: request.subject }), context);
             if (dbUserData?.items?.length > 0) {
               user = dbUserData.items[0].payload;
             }
@@ -362,7 +362,7 @@ export class TokenService implements ServiceServiceImplementation {
 
     let subject = request.subject;
     let tokens = await this.userService.tokenRedisClient.get(request.grant_id) as any;
-    if(tokens) {
+    if (tokens) {
       this.logger.debug('Found grant_id in redis cache');
       tokens = JSON.parse(tokens);
     }
