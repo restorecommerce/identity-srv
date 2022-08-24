@@ -8,7 +8,7 @@ import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/
  */
 export const createMetadata = async (res: any, urns: any, userService: UserService, subject?: Subject): Promise<any> => {
   let resources = _.cloneDeep(res);
-  if (Array.isArray(resources)) {
+  if (!Array.isArray(resources)) {
     resources = [resources];
   }
 
