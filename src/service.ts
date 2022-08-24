@@ -315,7 +315,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             value: token
           }]
         }];
-        let users = await super.read(ReadRequest.fromPartial({filters}), context);
+        let users = await super.read(ReadRequest.fromPartial({ filters }), context);
         if (users.total_count === 0) {
           logger.debug('No user found for provided token value', { token });
           return { status: { code: 401, message: 'No user found for provided token value' } };
@@ -399,7 +399,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     const acsFilters = getACSFilters(acsResponse, 'user');
-    const readRequest = ReadRequest.fromPartial({});
+    const readRequest = ReadRequest.fromPartial({ filters: request.filters });
     if (acsResponse && acsResponse.filters && acsFilters) {
       if (!readRequest.filters) {
         readRequest.filters = [];
@@ -432,7 +432,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
   }
 
-  superRead(request: ReadRequest, context): Promise<DeepPartial<UserListResponse>>  {
+  superRead(request: ReadRequest, context): Promise<DeepPartial<UserListResponse>> {
     return super.read(request, context);
   }
 
@@ -2815,7 +2815,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
           value: roleID
         }]
       }];
-      const result = await super.read(ReadRequest.fromPartial({filters}), {});
+      const result = await super.read(ReadRequest.fromPartial({ filters }), {});
 
       if (!result || !result.items || result.total_count == 0) {
         return false;
