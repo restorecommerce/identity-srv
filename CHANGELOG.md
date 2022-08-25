@@ -1,3 +1,8 @@
+## 0.3.3 (August 25th, 2022)
+
+- migrated to fully-typed grpc-client and server
+- up deps
+
 ## 0.3.3 (August 11th, 2022)
 
 - fix token destroy api to update user reading from DB (instead of cache findByToken)

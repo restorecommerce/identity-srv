@@ -14,7 +14,7 @@ import {
   ServicesResponse
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/oauth';
 import { Empty } from '@restorecommerce/rc-grpc-clients/dist/generated/google/protobuf/empty';
-import { WithRequestID } from '@restorecommerce/chassis-srv/src/microservice/transport/provider/grpc/middlewares';
+import { WithRequestID } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc/middlewares';
 import { createMetadata } from './common';
 import { FindByTokenRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import {
