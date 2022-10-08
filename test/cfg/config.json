@@ -41,7 +41,7 @@
     "db-indexes": {
       "db-offsetStore": 0,
       "db-subject": 4,
-      "db-access-token": 5
+      "db-findByToken": 5
     }
   },
   "obfuscateAuthNErrorReason": false,

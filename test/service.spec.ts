@@ -17,6 +17,7 @@ import {
   ServiceClient as RoleServiceClient
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
 import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
+import { createClient as RedisCreateClient, RedisClientType } from 'redis';
 
 /*
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
@@ -26,6 +27,8 @@ let cfg: any;
 let worker: Worker;
 let client;
 let logger;
+let redisClient: RedisClientType;
+let tokenRedisClient: RedisClientType;
 
 // For event listeners
 let events: Events;
@@ -1362,6 +1365,17 @@ describe('testing identity-srv', () => {
         let subject = {
           id: 'admin_user_id',
           scope: 'orgA',
+          token: 'admin-token'
+        };
+
+        let subjectResolved = {
+          id: 'admin_user_id',
+          scope: 'orgA',
+          token: 'admin-token',
+          tokens: [{
+            token: 'admin-token',
+            expires_in: 0
+          }],
           role_associations: [
             {
               role: 'admin-r-id',
@@ -1391,6 +1405,39 @@ describe('testing identity-srv', () => {
             }
           ]
         };
+        const hrScopeskey = `cache:${subject.id}:${subject.token}:hrScopes`;
+        const subjectKey = `cache:${subject.id}:subject`;
+        before(async () => {
+          // set redis client
+          // since its not possible to mock findByToken as it is same service, storing the token value with subject
+          // HR scopes resolved to db-subject redis store and token to findByToken redis store
+          const redisConfig = cfg.get('redis');
+          redisConfig.database = cfg.get('redis:db-indexes:db-subject') || 0;
+          redisClient = RedisCreateClient(redisConfig);
+          redisClient.on('error', (err) => logger.error('Redis Client Error', err));
+          await redisClient.connect();
+
+          // for findByToken
+          redisConfig.database = cfg.get('redis:db-indexes:db-findByToken') || 0;
+          tokenRedisClient = RedisCreateClient(redisConfig);
+          tokenRedisClient.on('error', (err) => logger.error('Redis client error in token cache store', err));
+          await tokenRedisClient.connect();
+
+          // store hrScopesKey and subjectKey to Redis index `db-subject`
+          await redisClient.set(subjectKey, JSON.stringify(subjectResolved));
+          await redisClient.set(hrScopeskey, JSON.stringify(subjectResolved.hierarchical_scopes));
+
+          // store user with tokens and role associations to Redis index `db-findByToken`
+          await tokenRedisClient.set('admin-token', JSON.stringify(subjectResolved));
+        });
+
+        after(async () => {
+          // delete hrScopesKey and subjectKey from Redis
+          await redisClient.del(subjectKey);
+          await redisClient.del(hrScopeskey);
+          // delete token from redis
+          await tokenRedisClient.del('admin-token');
+        });
 
         it('should allow to create a User with valid role and valid valid HR scope', async () => {
           // enable and enforce authorization
@@ -1493,7 +1540,7 @@ describe('testing identity-srv', () => {
         it('should throw an error when hierarchical do not match creator role', async () => {
           testUser.role_associations[0].role = 'user-r-id';
           // auth_context not containing valid creator role (admin-r-id)
-          subject.hierarchical_scopes = [
+          subjectResolved.hierarchical_scopes = [
             {
               id: 'mainOrg',
               role: 'user-r-id',
@@ -1508,6 +1555,8 @@ describe('testing identity-srv', () => {
               }]
             }
           ];
+          let hrScopeskey = `cache:${subject.id}:${subject.token}:hrScopes`;
+          await redisClient.set(hrScopeskey, JSON.stringify(subjectResolved.hierarchical_scopes));
           const result = await userService.create({ items: [testUser], subject });
           result.items[0].status.code.should.equal(401);
           result.items[0].status.message.should.equal('No Hierarchical Scopes could be found');
@@ -1519,7 +1568,7 @@ describe('testing identity-srv', () => {
         it('should not allow to create a User with role assocation with invalid hierarchical_scope', async () => {
           testUser.role_associations[0].role = 'user-r-id';
           // auth_context missing orgC in HR scope
-          subject.hierarchical_scopes = [
+          subjectResolved.hierarchical_scopes = [
             {
               id: 'mainOrg',
               role: 'admin-r-id',
@@ -1532,6 +1581,8 @@ describe('testing identity-srv', () => {
               }]
             }
           ];
+          let hrScopeskey = `cache:${subject.id}:${subject.token}:hrScopes`;
+          await redisClient.set(hrScopeskey, JSON.stringify(subjectResolved.hierarchical_scopes));
           const result = await userService.create({ items: [testUser], subject });
           result.items[0].status.code.should.equal(403);
           result.items[0].status.message.should.equal('the role user-r-id cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');

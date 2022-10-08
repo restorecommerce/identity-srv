@@ -165,7 +165,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       acsResponse = await checkAccessRequest(context, [{ resource: 'user' }],
         AuthZAction.READ, Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for find', err);
+      this.logger.error('Error occurred requesting access-control-srv for find', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -386,7 +386,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         resources: []
       }, [{ resource: 'user' }], AuthZAction.READ, Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for read', err);
+      this.logger.error('Error occurred requesting access-control-srv for read', { code: err.code, message: err.message, stack: err.stack });
       return {
         operation_status: {
           code: err.code,
@@ -455,7 +455,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(item => item.id) }], AuthZAction.CREATE,
         Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for create', err);
+      this.logger.error('Error occurred requesting access-control-srv for create', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -476,7 +476,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             }
           }
         } catch (err) {
-          this.logger.error('Error caught verifying user role associations', { message: err.message });
+          this.logger.error('Error caught verifying user role associations', { code: err.code, message: err.message, stack: err.stack });
           const errMessage = err.details ? err.details : err.message;
           // for unhandled promise rejection
           return returnOperationStatus(400, errMessage);
@@ -548,7 +548,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         let ctx = { subject, resources: [] };
         acsResponse = await checkAccessRequest(ctx, [{ resource: 'user' }], AuthZAction.MODIFY, Operation.whatIsAllowed);
       } catch (err) {
-        this.logger.error('Error making wahtIsAllowedACS request for verifying role associations', { message: err.message });
+        this.logger.error('Error making wahtIsAllowedACS request for verifying role associations', { code: err.code, message: err.message, stack: err.stack });
         return returnStatus(err.code, err.message, usersList[0].id);
       }
       // for apiKey no need to verifyUserRoleAssociations
@@ -585,7 +585,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }
       }
     } catch (err) {
-      this.logger.error('Error caught calling ACS:', { err });
+      this.logger.error('Error caught calling ACS', { code: err.code, message: err.message, stack: err.stack });
       return returnStatus(err.code, err.message);
     }
     // check if the assignable_by_roles contain createAccessRole
@@ -618,16 +618,18 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         return returnStatus(400, message, user.id);
       }
       let dbTargetRoles = [];
-      for (let targetRole of rolesData.items) {
-        if (targetRole.payload) {
-          dbTargetRoles.push(targetRole.payload.id);
-          if (!targetRole.payload.assignable_by_roles ||
-            !createAccessRole.some((role) => targetRole.payload.assignable_by_roles.includes(role))) {
-            const userName = user && user.name ? user.name : undefined;
-            let message = `The target role ${targetRole.payload.id} cannot be assigned to` +
-              ` user ${userName} as user role ${createAccessRole} does not have permissions`;
-            this.logger.verbose(message);
-            return returnStatus(403, message, user.id);
+      if (_.isArray(rolesData?.items) && rolesData?.items?.length > 0) {
+        for (let targetRole of rolesData.items) {
+          if (targetRole.payload) {
+            dbTargetRoles.push(targetRole.payload.id);
+            if (!targetRole.payload.assignable_by_roles ||
+              !createAccessRole.some((role) => targetRole.payload.assignable_by_roles.includes(role))) {
+              const userName = user && user.name ? user.name : undefined;
+              let message = `The target role ${targetRole.payload.id} cannot be assigned to` +
+                ` user ${userName} as user role ${createAccessRole} does not have permissions`;
+              this.logger.verbose(message);
+              return returnStatus(403, message, user.id);
+            }
           }
         }
       }
@@ -955,7 +957,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }
       }, [{ resource: 'user', id: user.id, property: ['active', 'activation_code', 'password_hash'] }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for confirmUserInvitation', err);
+      this.logger.error('Error occurred requesting access-control-srv for confirmUserInvitation', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -1066,7 +1068,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         resources: { id: user.id, active: true, activation_code: activationCode, meta: user.meta }
       }, [{ resource: 'user', id: user.id, property: ['active', 'activation_code'] }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for activate', err);
+      this.logger.error('Error occurred requesting access-control-srv for activate', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -1135,7 +1137,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         resources: { id: user.id, password: pw, new_password: newPw, meta: user.meta }
       }, [{ resource: 'user', id: user.id, property: ['password', 'new_password'] }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for changePassword', err);
+      this.logger.error('Error occurred requesting access-control-srv for changePassword', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -1233,7 +1235,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }
       }, [{ resource: 'user', id: user.id, property: ['activation_code', 'password_hash'] }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for confirmPasswordChange', err);
+      this.logger.error('Error occurred requesting access-control-srv for confirmPasswordChange', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -1285,7 +1287,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         resources: { id: user.id, identifier, new_email, meta: user.meta }
       }, [{ resource: 'user', id: user.id, property: ['identifier', 'new_email'] }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for requestEmailChange', err);
+      this.logger.error('Error occurred requesting access-control-srv for requestEmailChange', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -1346,7 +1348,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }
       }, [{ resource: 'user', id: user.id, property: ['email', 'activation_code'] }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for confirmEmailChange', err);
+      this.logger.error('Error occurred requesting access-control-srv for confirmEmailChange', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -1392,7 +1394,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY,
         Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for update', err);
+      this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -1473,7 +1475,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: user.id }], AuthZAction.MODIFY,
               Operation.isAllowed, false);
           } catch (err) {
-            this.logger.error('Error occurred requesting access-control-srv for update', err);
+            this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
             // return returnStatus(err.code, err.message);
             updateWithStatus.items.push(returnStatus(err.code, err.message, user.id));
             items = _.filter(items, (item) => item.id !== user.id);
@@ -1680,7 +1682,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         resources: acsResources
       }, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY, Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for upsert', err);
+      this.logger.error('Error occurred requesting access-control-srv for upsert', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -1850,7 +1852,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.DELETE,
         Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv unregistering user', err);
+      this.logger.error('Error occurred requesting access-control-srv unregistering user', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -1905,7 +1907,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], action,
         Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for delete', err);
+      this.logger.error('Error occurred requesting access-control-srv for delete', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -1943,7 +1945,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: orgIDs }], AuthZAction.DELETE,
         Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for deleteUsersByOrg', err);
+      this.logger.error('Error occurred requesting access-control-srv for deleteUsersByOrg', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -1973,7 +1975,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         resources: []
       }, [{ resource: 'user' }], AuthZAction.READ, Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for findByRole', err);
+      this.logger.error('Error occurred requesting access-control-srv for findByRole', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -2108,7 +2110,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           this.logger.error('An error occurred while attempting to load email templates from'
             + ' remote server. Email operations will be disabled.');
         } else {
-          this.logger.error('Unexpected error occurred while loading email templates', err.message);
+          this.logger.error('Unexpected error occurred while loading email templates', { code: err.code, message: err.message, stack: err.stack });
         }
       }
     } else {
@@ -2220,7 +2222,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       this.cfg.set('authorization:enabled', false);
       updateConfig(this.cfg);
     } catch (err) {
-      this.logger.error('Error caught disabling authorization:', err);
+      this.logger.error('Error caught disabling authorization:', { code: err.code, message: err.message, stack: err.stack });
       this.cfg.set('authorization:enabled', this.authZCheck);
     }
   }
@@ -2230,7 +2232,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       this.cfg.set('authorization:enabled', this.authZCheck);
       updateConfig(this.cfg);
     } catch (err) {
-      this.logger.error('Error caught enabling authorization:', err);
+      this.logger.error('Error caught enabling authorization', { code: err.code, message: err.message, stack: err.stack });
       this.cfg.set('authorization:enabled', this.authZCheck);
     }
   }
@@ -2532,7 +2534,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: user.id }],
         AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for sendInvitationEmail', err);
+      this.logger.error('Error occurred requesting access-control-srv for sendInvitationEmail', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -2599,7 +2601,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         resources: acsResources
       }, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.CREATE, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for creating role', err);
+      this.logger.error('Error occurred requesting access-control-srv for creating role', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -2630,7 +2632,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         resources: []
       }, [{ resource: 'role' }], AuthZAction.READ, Operation.whatIsAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for read', err);
+      this.logger.error('Error occurred requesting access-control-srv for read', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -2666,7 +2668,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         resources: acsResources
       }, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for update', err);
+      this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -2707,7 +2709,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
             acsResponse = await checkAccessRequest(context, [{ resource: 'role', id: role.id }], AuthZAction.MODIFY,
               Operation.isAllowed, false);
           } catch (err) {
-            this.logger.error('Error occurred requesting access-control-srv for update', err);
+            this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
             return returnOperationStatus(err.code, err.message);
           }
           if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -2737,7 +2739,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         resources: acsResources
       }, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for upsert', err);
+      this.logger.error('Error occurred requesting access-control-srv for upsert', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -2777,7 +2779,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         resources: acsResources
       }, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.DELETE, Operation.isAllowed);
     } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for delete', err);
+      this.logger.error('Error occurred requesting access-control-srv for delete', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
 
@@ -2925,7 +2927,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
       this.cfg.set('authorization:enabled', false);
       updateConfig(this.cfg);
     } catch (err) {
-      this.logger.error('Error caught disabling authorization:', err);
+      this.logger.error('Error caught disabling authorization', { code: err.code, message: err.message, stack: err.stack });
       this.cfg.set('authorization:enabled', this.authZCheck);
     }
   }
@@ -2935,7 +2937,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
       this.cfg.set('authorization:enabled', this.authZCheck);
       updateConfig(this.cfg);
     } catch (err) {
-      this.logger.error('Error caught enabling authorization:', err);
+      this.logger.error('Error caught enabling authorization', { code: err.code, message: err.message, stack: err.stack });
       this.cfg.set('authorization:enabled', this.authZCheck);
     }
   }

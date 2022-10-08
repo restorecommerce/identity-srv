@@ -204,7 +204,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         ...context,
         subject: request.subject,
         resources: acsResources
-      }, [{resource: 'authentication_log', id: authLogIDs }], AuthZAction.DELETE, Operation.isAllowed);
+      }, [{ resource: 'authentication_log', id: authLogIDs }], AuthZAction.DELETE, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv for authentication_log delete', err);
       return returnOperationStatus(err.code, err.message);
@@ -217,7 +217,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
     if (acsResponse.decision === Response_Decision.PERMIT) {
       if (request.collection) {
         // delete collection and return
-        const deleteResponse = await super.delete({collection: request.collection, ids: undefined}, context);
+        const deleteResponse = await super.delete({ collection: request.collection, ids: undefined, view: [], analyzer: [] }, context);
         logger.info('AuthenticationLog collection deleted:');
         return deleteResponse;
       }
@@ -238,7 +238,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         }
       }
       // delete users
-      const deleteResponse = await super.delete({ids: authLogIDs, collection: undefined}, context);
+      const deleteResponse = await super.delete({ ids: authLogIDs, collection: undefined, view: [], analyzer: [] }, context);
       logger.info('AuthenticationLogs deleted:', { authLogIDs });
       return deleteResponse;
     }
