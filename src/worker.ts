@@ -6,7 +6,7 @@ import * as chassis from '@restorecommerce/chassis-srv';
 import { Logger } from 'winston';
 import { UserService, RoleService } from './service';
 import { ACSAuthZ, initAuthZ, updateConfig, authZ as FallbackAuthZ, initializeCache } from '@restorecommerce/acs-client';
-import { createClient, RedisClientType} from 'redis';
+import { createClient, RedisClientType } from 'redis';
 import { AuthenticationLogService } from './authlog_service';
 import { TokenService } from './token_service';
 import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base';
@@ -38,6 +38,10 @@ import {
 import {
   protoMetadata as renderingMeta
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rendering';
+import {
+  protoMetadata as reflectionMeta
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/reflection/v1alpha/reflection';
+import { ServerReflectionService } from 'nice-grpc-server-reflection';
 
 registerProtoMeta(
   userMeta,
@@ -45,7 +49,8 @@ registerProtoMeta(
   authenticationLogMeta,
   tokenMeta,
   commandInterfaceMeta,
-  renderingMeta
+  renderingMeta,
+  reflectionMeta
 );
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
@@ -249,7 +254,7 @@ export class Worker {
 
     // oauth service
     const oauthServices = cfg.get('oauth:services');
-    if(oauthServices) {
+    if (oauthServices) {
       const oauthService = new OAuthService(cfg, logger, this.userService);
       await server.bind(serviceNamesCfg.oauth, {
         service: OAuthServiceDefinition,
@@ -282,12 +287,19 @@ export class Worker {
       implementation: cis
     } as BindConfig<CommandInterfaceServiceDefinition>);
 
-    // TODO Add reflection service
-    // const reflectionServiceName = serviceNamesCfg.reflection;
-    // const transportName = cfg.get(`server:services:${reflectionServiceName}:serverReflectionInfo:transport:0`);
-    // const transport = server.transport[transportName];
-    // const reflectionService = new chassis.grpc.ServerReflection(transport.$builder, server.config);
-    // await server.bind(reflectionServiceName, reflectionService);
+    // Add reflection service
+    const reflectionServiceName = serviceNamesCfg.reflection;
+    const reflectionService = chassis.buildReflectionService([
+      { descriptor: userMeta.fileDescriptor },
+      { descriptor: roleMeta.fileDescriptor },
+      { descriptor: authenticationLogMeta.fileDescriptor },
+      { descriptor: tokenMeta.fileDescriptor },
+      { descriptor: commandInterfaceMeta.fileDescriptor }
+    ]);
+    await server.bind(reflectionServiceName, {
+      service: ServerReflectionService,
+      implementation: reflectionService
+    });
 
     await server.bind(serviceNamesCfg.health, {
       service: HealthDefinition,
@@ -304,6 +316,7 @@ export class Worker {
 
     this.events = events;
     this.server = server;
+    this.logger.info('Server started successfully');
   }
 
   async stop(): Promise<any> {
