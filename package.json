@@ -20,7 +20,7 @@
     "@restorecommerce/acs-client": "^1.0.2",
     "@restorecommerce/chassis-srv": "^1.1.0",
     "@restorecommerce/cluster-service": "^1.0.0",
-    "@restorecommerce/grpc-client": "^1.0.1",
+    "@restorecommerce/grpc-client": "^1.0.2",
     "@restorecommerce/kafka-client": "^1.0.2",
     "@restorecommerce/logger": "^1.1.0",
     "@restorecommerce/rc-grpc-clients": "^1.1.0",
