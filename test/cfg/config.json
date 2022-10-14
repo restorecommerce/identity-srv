@@ -32,6 +32,49 @@
       "level": "silly",
       "colorize": true,
       "prettyPrint": true
+    },
+    "fieldOptions": {
+      "maskFields": [
+        "password", "request.password"
+      ],
+      "bufferFields": [
+        {
+          "fieldPath": "messages.[0].payload.[0].templates"
+        },
+        {
+          "fieldPath": "messages.[0].payload.[0].data"
+        },
+        {
+          "fieldPath": "messages.[0].payload.[0].options"
+        },
+        {
+          "fieldPath": "messages.[0].payload.[1].templates"
+        },
+        {
+          "fieldPath": "messages.[0].payload.[1].data"
+        },
+        {
+          "fieldPath": "messages.[0].payload.[1].options"
+        },
+        {
+          "fieldPath": "payload.[0].templates"
+        },
+        {
+          "fieldPath": "payload.[0].data"
+        },
+        {
+          "fieldPath": "payload.[0].options"
+        },
+        {
+          "fieldPath": "payload.[1].templates"
+        },
+        {
+          "fieldPath": "payload.[1].data"
+        },
+        {
+          "fieldPath": "payload.[1].options"
+        }
+      ]
     }
   },
   "redis": {

@@ -4,7 +4,8 @@
     "register": true,
     "enableEmail": true,
     "loginIdentifierProperty": [
-      "name", "email"
+      "name",
+      "email"
     ],
     "hbs_templates": {
       "registrationSubjectTpl": "http://localhost:8080/identity-srv/templates/registration_subject.hbs",
@@ -29,6 +30,32 @@
       "level": "fatal",
       "colorize": true,
       "prettyPrint": true
+    },
+    "fieldOptions": {
+      "maskFields": [
+        "password",
+        "request.password"
+      ],
+      "bufferFields": [
+        {
+          "fieldPath": "messages.[0].payload.[0].templates"
+        },
+        {
+          "fieldPath": "messages.[0].payload.[0].data"
+        },
+        {
+          "fieldPath": "messages.[0].payload.[0].options"
+        },
+        {
+          "fieldPath": "payload.[0].templates"
+        },
+        {
+          "fieldPath": "payload.[0].data"
+        },
+        {
+          "fieldPath": "payload.[0].options"
+        }
+      ]
     }
   },
   "roles": {
