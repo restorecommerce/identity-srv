@@ -1,3 +1,7 @@
+## 0.2.40 (October 14th, 2022)
+
+- fix AQL custom query for filtering multiple owner instances
+
 ## 0.2.39 (May 11th, 2022)
 
 - expire jwt token after 6 month
