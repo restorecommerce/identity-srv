@@ -1,3 +1,8 @@
+## 1.0.1 (October 26th, 2022)
+
+- included full text search
+- up deps 
+
 ## 1.0.0 (August 25th, 2022)
 
 - migrated to fully-typed grpc-client and server
