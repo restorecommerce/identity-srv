@@ -30,7 +30,7 @@
     "cross-env": "^7.0.3",
     "jose": "^4.11.0",
     "lodash": "^4.17.21",
-    "node-fetch": "^3.2.10",
+    "node-fetch": "^3.3.0",
     "oauth": "^0.10.0",
     "redis": "^4.5.0",
     "source-map-support": "^0.5.21",
