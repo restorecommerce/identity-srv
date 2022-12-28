@@ -1,3 +1,8 @@
+## 1.0.2 (December 28th, 2022)
+
+- set active flag for create api depending on the input
+- allow to change username field for update api
+
 ## 1.0.1 (October 26th, 2022)
 
 - included full text search
