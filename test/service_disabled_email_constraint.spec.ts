@@ -393,7 +393,8 @@ describe('testing identity-srv', () => {
           role_associations: [{
             role: 'user-r-id',
             attributes: []
-          }]
+          }],
+          active: true
         };
         it('should create multiple users with same email and different user names', async function createUser(): Promise<void> {
           let testUsers = [];
@@ -441,7 +442,8 @@ describe('testing identity-srv', () => {
                 name: 'techUserTOken',
                 token: 'c110091d9c54438ea50c72fb32148457',
                 scopes: ['user-r-role-assoc-id']
-              }]
+              }],
+              active: true
             });
           const result = await userService.create({ items: [techUser] });
           should.exist(result.items);
@@ -473,7 +475,8 @@ describe('testing identity-srv', () => {
               name: 'techUserTOken',
               token: 'c110091d9c54438ea50c72fb32148457',
               scopes: ['user-r-role-assoc-id']
-            }]
+            }],
+            active: true
           });
           const result = await userService.create({ items: [techUser] });
           should.exist(result.items);

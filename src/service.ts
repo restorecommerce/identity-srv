@@ -485,7 +485,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       for (let i = 0; i < usersList.length; i++) {
         let user = usersList[i];
         user.activation_code = '';
-        user.active = true;
+        // if user is inactive set activation_code
+        if (!user.active) {
+          user.activation_code = this.idGen();
+        }
         user.unauthenticated = false;
         if (user.invite) {
           user.active = false;
@@ -1452,11 +1455,15 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           continue;
         }
         let dbUser = users.items[0].payload;
+        // if user name is changed, check if the new user name is not used by any one else in application
         if (dbUser.name != user.name) {
-          // return returnStatus(400, 'User name field cannot be updated');
-          updateWithStatus.items.push(returnStatus(400, 'User name field cannot be updated', user.id));
-          request.items = _.filter(items, (item) => item.name !== user.name);
-          continue;
+          const filters = getNameFilter(user.name);
+          let users = await super.read(ReadRequest.fromPartial({ filters }), context);
+          if (users.total_count > 0) {
+            updateWithStatus.items.push(returnStatus(409, `User name ${user.name} already exists`, user.id));
+            request.items = _.filter(items, (item) => item.name !== user.name);
+            continue;
+          }
         }
         // update meta information from existing Object in case if its
         // not provided in request

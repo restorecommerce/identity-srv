@@ -606,7 +606,8 @@ describe('testing identity-srv', () => {
           role_associations: [{
             role: 'user-r-id',
             attributes: []
-          }]
+          }],
+          active: true
         };
 
         it('should not create a user with empty password', async function createUser(): Promise<void> {
@@ -1115,17 +1116,8 @@ describe('testing identity-srv', () => {
           await topic.removeListener('userModified', listener);
         });
 
-        it('should update first user successfully and give error status for second user update', async function changeEmailId(): Promise<void> {
+        it('should update first name for first user successfully and also update the second user name successfully', async function changeEmailId(): Promise<void> {
           this.timeout(3000);
-          const listener = function listener(message: any, context: any): void {
-            should.exist(message);
-
-            const newUser = message;
-            newUser.first_name.should.equal('JohnNew');
-            newUser.first_name.should.not.equal(user.first_name);
-          };
-          await topic.on('userModified', listener);
-
           // create second user
           const testuser2: any = {
             id: 'testuser2',
@@ -1137,10 +1129,10 @@ describe('testing identity-srv', () => {
             role_associations: [{
               role: 'user-r-id',
               attributes: []
-            }]
+            }],
+            active: true
           };
           const secondUser = await userService.create({ items: [testuser2] });
-          const offset = await topic.$offset(-1);
           // update both users
           const result = await userService.update({
             items: [{
@@ -1150,24 +1142,26 @@ describe('testing identity-srv', () => {
               meta
             }, {
               id: 'testuser2',
-              name: 'testNew', // should fail changing user name
+              name: 'test.newUserName', // should update second user name
               first_name: 'testNew',
               meta
             }]
           });
-          await topic.$wait(offset);
           should.exist(result);
           should.exist(result.items[0].payload);
+          // validate first user update
           result.items[0].payload.name.should.equal('test.user1');
+          result.items[0].payload.first_name.should.equal('JohnNew');
+          // validate second user update
+          result.items[1].payload.name.should.equal('test.newUserName');
+          result.items[1].payload.first_name.should.equal('testNew');
           // validate item status and overall status
           result.items[0].status.code.should.equal(200);
           result.items[0].status.message.should.equal('success');
+          result.items[1].status.code.should.equal(200);
+          result.items[1].status.message.should.equal('success');
           result.operation_status.code.should.equal(200);
           result.operation_status.message.should.equal('success');
-          await topic.removeListener('userModified', listener);
-          // Validate second User error status
-          result.items[1].status.code.should.equal(400);
-          result.items[1].status.message.should.equal('User name field cannot be updated');
           // unregister second user
           await userService.unregister({ identifier: 'testuser2' });
         });
@@ -1196,7 +1190,7 @@ describe('testing identity-srv', () => {
           result.operation_status.message.should.equal('success');
         });
 
-        it(`should not allow to update 'name' field`,
+        it(`should allow to update 'name' field`,
           async function changeEmailId(): Promise<void> {
             this.timeout(3000);
 
@@ -1207,10 +1201,11 @@ describe('testing identity-srv', () => {
               }]
             });
             should.exist(result);
-            should.not.exist(result.items[0].payload);
+            should.exist(result.items[0].payload);
             // validate item status and overall status
-            result.items[0].status.code.should.equal(400);
-            result.items[0].status.message.should.equal('User name field cannot be updated');
+            result.items[0].payload.name.should.equal('new_name');
+            result.items[0].status.code.should.equal(200);
+            result.items[0].status.message.should.equal('success');
             result.operation_status.code.should.equal(200);
             result.operation_status.message.should.equal('success');
           });
@@ -1253,7 +1248,8 @@ describe('testing identity-srv', () => {
             role_associations: [{
               role: 'user-r-id',
               attributes: []
-            }]
+            }],
+            active: true
           };
           invitingUser = {
             id: '123invitingUserId',
@@ -1265,7 +1261,8 @@ describe('testing identity-srv', () => {
             role_associations: [{
               role: 'user-r-id',
               attributes: []
-            }]
+            }],
+            active: true
           };
           await userService.create({ items: [sampleUser, invitingUser] });
         });
@@ -1303,6 +1300,26 @@ describe('testing identity-srv', () => {
           // validate item status and overall status
           result.items[0].status.code.should.equal(200);
           result.items[0].status.message.should.equal('success');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
+        });
+
+        it('should fail trying to update the user name to already existing one', async function update(): Promise<void> {
+          // sampleuser1 already exists in DB, so changing the `upseruser` name to `sampleuser1` should fail
+          let result = await userService.update({
+            items: [{
+              id: upserUserID,
+              name: 'sampleuser1',
+              email: 'upsert@restorecommerce.io',
+              password: 'testUpsert',
+              first_name: 'John',
+              last_name: 'upsert'
+            }]
+          });
+          // validate fail result
+          should.exist(result.items);
+          result.items[0].status.code.should.equal(409);
+          result.items[0].status.message.should.equal('User name sampleuser1 already exists');
           result.operation_status.code.should.equal(200);
           result.operation_status.message.should.equal('success');
         });
@@ -1359,7 +1376,8 @@ describe('testing identity-srv', () => {
               id: 'urn:restorecommerce:acs:names:roleScopingInstance',
               value: 'orgC'
             }]
-          }]
+          }],
+          active: true
         };
 
         let subject = {
