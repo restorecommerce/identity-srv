@@ -1,3 +1,7 @@
+## 0.3.3 (January 30th, 2023)
+
+- fix token upsert not to consider for expiration if expires_in is set to 0
+
 ## 0.3.3 (August 11th, 2022)
 
 - fix token destroy api to update user reading from DB (instead of cache findByToken)

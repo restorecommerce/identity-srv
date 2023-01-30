@@ -92,7 +92,7 @@ export class TokenService {
         if (user && user.tokens && user.tokens.length > 0) {
           // remove expired tokens
           expiredTokenList = (user.tokens).filter(t => {
-            return t.expires_in < Math.round(new Date().getTime() / 1000);
+            return t.expires_in != 0 && t.expires_in < Math.round(new Date().getTime() / 1000);
           });
         }
         let token_name;
@@ -112,6 +112,7 @@ export class TokenService {
         user.last_access = new Date().getTime();
         try {
           // append tokens on user entity
+          this.logger.debug('Removing expired token list', expiredTokenList);
           await this.userService.updateUserTokens(user.id, token, expiredTokenList);
           this.logger.info('Token updated successfully on user entity', { token, id: user.id });
         } catch (err) {
