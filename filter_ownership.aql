@@ -1,11 +1,11 @@
+
 let meta = node.meta
 let owner = meta.owner
 let found = (
     for o in owner
-    filter o.id == "urn:restorecommerce:acs:names:ownerIndicatoryEntity" && o.value == @entity
-    let elem = NTH(owner, POSITION(owner, o, true) + 1)
-    filter elem.id == "urn:restorecommerce:acs:names:ownerInstance" && elem.value in @instance
-    limit 1
+    filter o.id == "urn:restorecommerce:acs:names:ownerInstance" && o.value in @instance
+    let elem = NTH(owner, POSITION(owner, o, true) - 1)
+    filter elem.id == "urn:restorecommerce:acs:names:ownerIndicatoryEntity" && elem.value == @entity
     return true
 )
 filter true in found
