@@ -1,3 +1,8 @@
+## 1.0.3 (February 8th, 2023)
+
+- handle filter ownership AQL query for multiple owners
+- added null check for token value of `0` so that its not added to expired tokens list (for tech users)
+
 ## 1.0.2 (December 28th, 2022)
 
 - set active flag for create api depending on the input
