@@ -1167,8 +1167,8 @@ export class UserService extends ServiceBase {
   async requestPasswordChange(call: Call<ForgotPassword>, context: any): Promise<any> {
     const logger = this.logger;
     const identifier = call.request.identifier;
-    // check for the identifier against name or email in DB
-    const filters = getDefaultFilter(identifier);
+    // check for the identifier against name
+    const filters = getNameFilter(identifier);
     let user;
     const users = await super.read({ request: { filters } });
     if (users.total_count === 1) {
@@ -1276,8 +1276,8 @@ export class UserService extends ServiceBase {
     const new_email = request.new_email;
     const subject = call.request.subject;
     let acsResponse: DecisionResponse;
-    // check for the identifier against name or email in DB
-    const filters = getDefaultFilter(identifier);
+    // check for the identifier against name
+    const filters = getNameFilter(identifier);
     const users = await super.read({ request: { filters } }, ctx);
     if (!users || users.total_count === 0) {
       logger.debug('user does not exist', { identifier });

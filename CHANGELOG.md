@@ -1,4 +1,8 @@
-## 0.3.3 (January 30th, 2023)
+## 0.3.4-1 (February 20th, 2023)
+
+- modified request email and request password change api to lookup user by user name (since if uniqueEmailConstraint is set to false it is possible to have same email for multiple users)
+
+## 0.3.4 (January 30th, 2023)
 
 - fix token upsert not to consider for expiration if expires_in is set to 0
 
