@@ -192,6 +192,32 @@ export class UserService extends ServiceBase {
     }
   }
 
+  /**
+   * update's the last login time for provided token
+   * @param id subject id
+   * @param token token value for which the last login should be updated
+   */
+  async updateTokenLastLogin(id: string, token: string) {
+    // update last_login
+    const aql_last_login = `FOR u IN users
+    FILTER u.id == @docID
+     UPDATE u WITH { 
+      tokens: (
+          FOR tokenObj in u.tokens
+            RETURN tokenObj.token == @token
+              ? MERGE( tokenObj, {last_login: @last_login })
+              : tokenObj
+      )
+    } IN users`;
+    const bindVars_last_login = Object.assign({
+      docID: id,
+      token,
+      last_login: new Date().getTime()
+    });
+    const res_last_access = await query(this.db.db, 'users', aql_last_login, bindVars_last_login);
+    return await res_last_access.all();
+  }
+
   async updateUserTokens(id, token, expiredTokens?: any) {
     // temporary hack to update tokens on user(to fix issue when same user login multiple times simultaneously)
     // tokens get overwritten with update operation on simultaneours req
@@ -277,12 +303,6 @@ export class UserService extends ServiceBase {
           if (users.items && users.items[0] && users.items[0].payload) {
             // validate token expiry and delete if expired
             const dbToken = _.find(users.items[0].payload.tokens, { token });
-            let tokenTechUser: any = {};
-            const techUsersCfg = this.cfg.get('techUsers');
-            if (techUsersCfg && techUsersCfg.length > 0) {
-              tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
-            }
-
             if ((dbToken && dbToken.expires_in === 0) || (dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000))) {
               await this.tokenRedisClient.set(token, JSON.stringify(users.items[0].payload));
               logger.debug('Stored user data to redis cache successfully');
@@ -295,7 +315,10 @@ export class UserService extends ServiceBase {
                   }
                 }
               }
-              await this.update({ request: { items: [user], subject: tokenTechUser } }, context);
+              // await this.update({ request: { items: [user], subject: tokenTechUser } }, context);
+              await this.updateTokenLastLogin(user.id, token);
+              const updatedUser = await super.read({ request: { filters } }, context);
+              logger.debug('updated user token last login successfully', { updatedUser });
               return { payload: user, status: { code: 200, message: 'success' } };
             } else if (dbToken && dbToken.expires_in < Math.round(new Date().getTime() / 1000)) {
               logger.debug('Token expired');
@@ -1585,23 +1608,6 @@ export class UserService extends ServiceBase {
         } else {
           // set the existing hash password field
           user.password_hash = dbUser.password_hash;
-        }
-
-        // self kill token
-        const dbUserTokens = user.tokens;
-        if (dbUserTokens && dbUserTokens.length > 0) {
-          for (let dbToken of dbUserTokens) {
-            let tokenExists = _.find(user.tokens, { token: dbToken.token });
-            if (!tokenExists) {
-              await this.tokenService.destroy({
-                request: {
-                  id: dbToken.token, subject: {
-                    id: dbToken.id, token: dbToken.token
-                  }
-                }
-              }, {});
-            }
-          }
         }
       }
       let updateStatus = await super.update(call, context);

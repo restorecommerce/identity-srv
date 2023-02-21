@@ -1,3 +1,7 @@
+## 0.3.4-2 (February 20th, 2023)
+
+- removed self kill token (as its already taken care in current update api) and used AQL query for updating last login on token
+
 ## 0.3.4-1 (February 20th, 2023)
 
 - modified request email and request password change api to lookup user by user name (since if uniqueEmailConstraint is set to false it is possible to have same email for multiple users)

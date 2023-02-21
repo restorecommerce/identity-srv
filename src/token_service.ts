@@ -242,6 +242,7 @@ export class TokenService {
     }
 
     if (acsResponse.decision === Decision.PERMIT) {
+      this.logger.info('Logout user', { request: call.request });
       let response;
       let user: any = {};
       try {
@@ -249,7 +250,7 @@ export class TokenService {
         // delete user token here
         if (payload && payload.value) {
           payload = unmarshallProtobufAny(payload);
-          const userData = await this.userService.findByToken({ request: { token: id} }, {});
+          const userData = await this.userService.findByToken({ request: { token: id } }, {});
           if (userData?.payload) {
             user = userData.payload;
             // search user by ID from DB
@@ -282,12 +283,13 @@ export class TokenService {
               }
               tokenTechUser.scope = user.default_scope;
               await this.userService.update({ request: { items: [user], subject: tokenTechUser } }, {});
+              this.logger.info('Removed token successfully from destroy api', { token: id, user });
             }
           }
           if (id) {
             // flush token subject cache
             const numberOfDeletedKeys = await this.userService.tokenRedisClient.del(id);
-            this.logger.info('Subject data deleted from Reids', { noOfKeys: numberOfDeletedKeys });
+            this.logger.info('Subject data deleted from Redis', { noOfKeys: numberOfDeletedKeys });
           }
           response = {
             status: {
@@ -371,7 +373,7 @@ export class TokenService {
     let subject = call.request.subject;
     const grant_id = call.request.grant_id;
     let tokens = await this.userService.tokenRedisClient.get(grant_id) as any;
-    if(tokens) {
+    if (tokens) {
       this.logger.debug('Found grant_id in redis cache');
       tokens = JSON.parse(tokens);
     }
