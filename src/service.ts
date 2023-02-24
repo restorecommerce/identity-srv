@@ -1272,6 +1272,11 @@ export class UserService extends ServiceBase {
       }
 
       user.activation_code = '';
+      // if user is inactive activate user
+      if (!user.active) {
+        user.active = true;
+        user.unauthenticated = false;
+      }
       user.password_hash = password.hash(newPassword);
       const updateStatus = await super.update({
         request: {

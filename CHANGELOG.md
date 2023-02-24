@@ -1,3 +1,7 @@
+## 0.3.4-3 (February 24th, 2023)
+
+- activate user on confirm password change call if the user is inactive
+
 ## 0.3.4-2 (February 20th, 2023)
 
 - removed self kill token (as its already taken care in current update api) and used AQL query for updating last login on token
