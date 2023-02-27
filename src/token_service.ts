@@ -115,6 +115,7 @@ export class TokenService implements ServiceServiceImplementation {
         user.last_access = new Date().getTime();
         try {
           // append tokens on user entity
+          this.logger.debug('Removing expired token list', expiredTokenList);
           await this.userService.updateUserTokens(user.id, token, expiredTokenList);
           this.logger.info('Token updated successfully on user entity', { token, id: user.id });
         } catch (err) {
@@ -236,6 +237,7 @@ export class TokenService implements ServiceServiceImplementation {
     }
 
     if (acsResponse.decision === Response_Decision.PERMIT) {
+      this.logger.info('Logout user', { request });
       let response;
       let user: any = {};
       try {
@@ -274,12 +276,13 @@ export class TokenService implements ServiceServiceImplementation {
               }
               tokenTechUser.scope = user.default_scope;
               await this.userService.update(UserList.fromPartial({ items: [user], subject: tokenTechUser }), context);
+              this.logger.info('Removed token successfully from destroy api', { token: request.id, user });
             }
           }
           if (request.id) {
             // flush token subject cache
             const numberOfDeletedKeys = await this.userService.tokenRedisClient.del(request.id);
-            this.logger.info('Subject data deleted from Reids', { noOfKeys: numberOfDeletedKeys });
+            this.logger.info('Subject deleted from Redis', { noOfKeys: numberOfDeletedKeys });
           }
           response = {
             status: {
