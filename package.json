@@ -28,7 +28,7 @@
     "@restorecommerce/service-config": "^1.0.3",
     "bcryptjs": "^2.4.3",
     "cross-env": "^7.0.3",
-    "jose": "^4.11.1",
+    "jose": "^4.13.2",
     "lodash": "^4.17.21",
     "node-fetch": "^3.3.0",
     "oauth": "^0.10.0",
