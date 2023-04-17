@@ -1603,6 +1603,14 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           // set the existing hash password field
           user.password_hash = dbUser.password_hash;
         }
+        if (!user.active) {
+          for (let token of user.tokens) {
+            const tokenValue = token.token;
+            await this.tokenRedisClient.del(tokenValue);
+            this.logger.info('Redis token deleted successfully', { token: tokenValue });
+          }
+          user.tokens = [];
+        }
       }
       let updateStatus = await super.update(request, context);
       updateStatus.items.push(...updateWithStatus.items);
