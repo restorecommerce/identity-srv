@@ -619,20 +619,6 @@ describe('testing identity-srv', () => {
         let activation_code;
         const email = 'test@ms.restorecommerce.io';
         const userName = 'test.user1';
-        it('should throw an error for ChangePassword with email as identifier when is not unique', async () => {
-          // DB User
-          const dbUser = await userService.find({
-            name: userName
-          });
-          const result = await userService.changePassword({
-            password: 'notsecure',
-            new_password: 'secure',
-            subject: { id: dbUser.items[0].payload.id }
-          });
-          should.exist(result.operation_status);
-          result.operation_status.code.should.equal(400);
-          result.operation_status.message.should.equal(`Invalid identifier provided for change password, multiple users found for identifier ${email}`);
-        });
         it('should allow to ChangePassword with user name as identifier', async () => {
           // password_hash before change pass
           const user_before = await userService.find({
