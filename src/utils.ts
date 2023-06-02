@@ -1,5 +1,5 @@
 import {
-  AuthZAction, accessRequest, DecisionResponse, Operation, PolicySetRQResponse
+  AuthZAction, accessRequest, DecisionResponse, Operation, PolicySetRQResponse, ACSClientContext
 } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
 import { createServiceConfig } from '@restorecommerce/service-config';
@@ -12,8 +12,8 @@ import {
   Filter_Operation
 } from '@restorecommerce/rc-grpc-clients/dist/generated/io/restorecommerce/resource_base';
 import {
-  ServiceDefinition as UserServiceDefinition,
-  ServiceClient as UserServiceClient
+  UserServiceDefinition,
+  UserServiceClient
 } from '@restorecommerce/rc-grpc-clients/dist/generated/io/restorecommerce/user';
 import {
   Response_Decision
@@ -82,7 +82,7 @@ export interface GQLClientContext {
  * @param entity The entity type to check access against
  */
 /* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
-export async function checkAccessRequest(ctx: GQLClientContext, resource: Resource[], action: AuthZAction,
+export async function checkAccessRequest(ctx: ACSClientContext, resource: Resource[], action: AuthZAction,
   operation: Operation, useCache = true): Promise<DecisionResponse | PolicySetRQResponse> {
   let subject = ctx.subject;
   let dbSubject;
@@ -134,7 +134,7 @@ export const unmarshallProtobufAny = (msg: any): any => JSON.parse(msg.value.toS
 
 export const getDefaultFilter = (identifier): DeepPartial<FilterOp[]> => {
   return [{
-    filter: [
+    filters: [
       {
         field: 'name',
         operation: Filter_Operation.eq,
@@ -151,7 +151,7 @@ export const getDefaultFilter = (identifier): DeepPartial<FilterOp[]> => {
 
 export const getNameFilter = (userName) => {
   return [{
-    filter: [{
+    filters: [{
       field: 'name',
       operation: Filter_Operation.eq,
       value: userName
@@ -162,16 +162,16 @@ export const getNameFilter = (userName) => {
 export const getLoginIdentifierFilter = (loginIdentifiers, value) => {
   if (typeof loginIdentifiers === 'string') {
     return [{
-      filter: [{
+      filters: [{
         field: loginIdentifiers,
         operation: Filter_Operation.eq,
         value
       }]
     }];
   } else if (_.isArray(loginIdentifiers)) {
-    let filters = [{ filter: [], operator: FilterOp_Operator.or }];
+    let filters = [{ filters: [], operator: FilterOp_Operator.or }];
     for (let identifier of loginIdentifiers) {
-      filters[0].filter.push(
+      filters[0].filters.push(
         {
           field: identifier,
           operation: Filter_Operation.eq,
@@ -244,7 +244,7 @@ export const getACSFilters = (accessResponse: PolicySetRQResponse, resource: str
   const resourceFilterMap = accessResponse?.filters;
   const resourceFilter = resourceFilterMap?.filter((e) => e?.resource === resource);
   // for a given entity there should be one filter map
-  if (resourceFilter && resourceFilter.length === 1 && resourceFilter[0].filters && resourceFilter[0].filters[0]?.filter.length > 0) {
+  if (resourceFilter && resourceFilter.length === 1 && resourceFilter[0].filters && resourceFilter[0].filters[0]?.filters?.length > 0) {
     acsFilters = resourceFilter[0].filters;
   }
   return acsFilters;

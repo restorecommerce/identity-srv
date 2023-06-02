@@ -11,7 +11,7 @@ import { Topic } from '@restorecommerce/kafka-client';
 import { checkAccessRequest, returnOperationStatus } from './utils';
 import * as _ from 'lodash';
 import {
-  ServiceServiceImplementation,
+  AuthenticationLogServiceImplementation,
   AuthenticationLogListResponse,
   AuthenticationLogList
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/authentication_log';
@@ -24,7 +24,7 @@ import {
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
 
-export class AuthenticationLogService extends ServiceBase<AuthenticationLogListResponse, AuthenticationLogList> implements ServiceServiceImplementation {
+export class AuthenticationLogService extends ServiceBase<AuthenticationLogListResponse, AuthenticationLogList> implements AuthenticationLogServiceImplementation {
 
   logger: Logger;
   cfg: any;
@@ -58,7 +58,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         ...context,
         subject: request.subject,
         resources: []
-      }, [{ resource: 'authentication_log' }], AuthZAction.READ, Operation.whatIsAllowed);
+      }, [{ resource: 'authentication_log' }], AuthZAction.READ, Operation.whatIsAllowed) as PolicySetRQResponse;
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv for authentication_log read', err);
       return returnOperationStatus(err.code, err.message);
@@ -109,7 +109,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         // read the role from DB and check if it exists
         const auth_log = items[i];
         const filters = [{
-          filter: [{
+          filters: [{
             field: 'id',
             operation: Filter_Operation.eq,
             value: auth_log.id,
@@ -125,10 +125,10 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         if (!auth_log.meta) {
           auth_log.meta = authLogDB.payload.meta;
         } else if (auth_log.meta && _.isEmpty(auth_log.meta.owner)) {
-          auth_log.meta.owner = authLogDB.payload.meta.owner;
+          auth_log.meta.owner = authLogDB.payload.meta.owners;
         }
         // check for ACS if owner information is changed
-        if (!_.isEqual(auth_log.meta.owner, authLogDB.payload.meta.owner)) {
+        if (!_.isEqual(auth_log.meta.owner, authLogDB.payload.meta.owners)) {
           let acsResponse: DecisionResponse;
           try {
             if (!context) { context = {}; };
@@ -217,7 +217,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
     if (acsResponse.decision === Response_Decision.PERMIT) {
       if (request.collection) {
         // delete collection and return
-        const deleteResponse = await super.delete({ collection: request.collection, ids: undefined, view: [], analyzer: [] }, context);
+        const deleteResponse = await super.delete({ collection: request.collection, ids: undefined, views: [], analyzers: [] }, context);
         logger.info('AuthenticationLog collection deleted:');
         return deleteResponse;
       }
@@ -225,7 +225,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
       // Check each user exist if one of the user does not exist throw an error
       for (let authLogID of authLogIDs) {
         const filters = [{
-          filter: [{
+          filters: [{
             field: 'id',
             operation: Filter_Operation.eq,
             value: authLogID
@@ -238,7 +238,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         }
       }
       // delete users
-      const deleteResponse = await super.delete({ ids: authLogIDs, collection: undefined, view: [], analyzer: [] }, context);
+      const deleteResponse = await super.delete({ ids: authLogIDs, collection: undefined, views: [], analyzers: [] }, context);
       logger.info('AuthenticationLogs deleted:', { authLogIDs });
       return deleteResponse;
     }
@@ -276,7 +276,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
       }
       if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
         const filters = [{
-          filter: [{
+          filters: [{
             field: 'id',
             operation: Filter_Operation.eq,
             value: resource.id
@@ -286,7 +286,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         // update owner info
         if (result.items.length === 1) {
           let item = result.items[0].payload;
-          resource.meta.owner = item.meta.owner;
+          resource.meta.owner = item.meta.owners;
         } else if (result.items.length === 0 && !resource.meta.owner) {
           let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
           ownerAttributes.push(

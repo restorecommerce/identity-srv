@@ -12,27 +12,27 @@ import { TokenService } from './token_service';
 import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base';
 import 'source-map-support/register';
 import { OAuthService } from './oauth_service';
-import { ServiceDefinition as OAuthServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/oauth';
+import { OAuthServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/oauth';
 import { BindConfig } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc';
 import { HealthDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/health/v1/health';
 import {
-  ServiceDefinition as UserServiceDefinition,
+  UserServiceDefinition,
   protoMetadata as userMeta
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import {
-  ServiceDefinition as RoleServiceDefinition,
+  RoleServiceDefinition,
   protoMetadata as roleMeta
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
 import {
-  ServiceDefinition as AuthLogServiceDefinition,
+  AuthenticationLogServiceDefinition,
   protoMetadata as authenticationLogMeta
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/authentication_log';
 import {
-  ServiceDefinition as TokenServiceDefinition,
+  TokenServiceDefinition,
   protoMetadata as tokenMeta
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token';
 import {
-  ServiceDefinition as CommandInterfaceServiceDefinition,
+  CommandInterfaceServiceDefinition,
   protoMetadata as commandInterfaceMeta
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/commandinterface';
 import {
@@ -273,9 +273,9 @@ export class Worker {
     } as BindConfig<RoleServiceDefinition>);
 
     await server.bind(serviceNamesCfg.authenticationLog, {
-      service: AuthLogServiceDefinition,
+      service: AuthenticationLogServiceDefinition,
       implementation: authLogService
-    } as BindConfig<AuthLogServiceDefinition>);
+    } as BindConfig<AuthenticationLogServiceDefinition>);
 
     await server.bind(serviceNamesCfg.token, {
       service: TokenServiceDefinition,

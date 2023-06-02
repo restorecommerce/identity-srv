@@ -10,7 +10,7 @@ import {
   DeepPartial,
   ExchangeCodeResponse,
   GenerateLinksResponse,
-  ServiceServiceImplementation,
+  OAuthServiceImplementation,
   ServicesResponse
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/oauth';
 import { Empty } from '@restorecommerce/rc-grpc-clients/dist/generated/google/protobuf/empty';
@@ -55,7 +55,7 @@ interface GetTokenResponse {
   token?: string;
 }
 
-export class OAuthService implements ServiceServiceImplementation<WithRequestID> {
+export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
   logger: Logger;
   cfg: any;
@@ -140,7 +140,7 @@ export class OAuthService implements ServiceServiceImplementation<WithRequestID>
     const users = await this.userService.superRead(ReadRequest.fromPartial({
       filters: [
         {
-          filter: [
+          filters: [
             {
               field: 'email',
               operation: Filter_Operation.eq,

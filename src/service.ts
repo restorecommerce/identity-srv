@@ -50,7 +50,7 @@ import {
   RequestPasswordChangeRequest,
   SendActivationEmailRequest,
   SendInvitationEmailRequest,
-  ServiceServiceImplementation as UserServiceServiceImplementation,
+  UserServiceImplementation,
   UnregisterRequest,
   User,
   UserList,
@@ -62,7 +62,7 @@ import {
 import {
   RoleList,
   RoleListResponse,
-  ServiceServiceImplementation as RoleServiceServiceImplementation
+  RoleServiceImplementation
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
 import {
   DeleteRequest,
@@ -85,7 +85,7 @@ import {
   Subject
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
 
-export class UserService extends ServiceBase<UserListResponse, UserList> implements UserServiceServiceImplementation {
+export class UserService extends ServiceBase<UserListResponse, UserList> implements UserServiceImplementation {
 
   db: Arango;
   topics: any;
@@ -163,7 +163,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       context.subject = subject;
       context.resources = [];
       acsResponse = await checkAccessRequest(context, [{ resource: 'user' }],
-        AuthZAction.READ, Operation.whatIsAllowed);
+        AuthZAction.READ, Operation.whatIsAllowed) as PolicySetRQResponse;
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv for find', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
@@ -335,7 +335,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         // when not set in redis
         // regex filter search field for token array
         const filters = [{
-          filter: [{
+          filters: [{
             field: 'tokens[*].token',
             operation: Filter_Operation.in,
             value: token
@@ -407,7 +407,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         ...context,
         subject: request.subject,
         resources: []
-      }, [{ resource: 'user' }], AuthZAction.READ, Operation.whatIsAllowed);
+      }, [{ resource: 'user' }], AuthZAction.READ, Operation.whatIsAllowed) as PolicySetRQResponse;
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv for read', { code: err.code, message: err.message, stack: err.stack });
       return {
@@ -422,7 +422,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     const acsFilters = getACSFilters(acsResponse, 'user');
-    const readRequest = ReadRequest.fromPartial({ filters: request.filters });
+    const readRequest = ReadRequest.fromPartial({
+      offset: request.offset, limit: request.limit,
+      sorts: request.sorts, filters: request.filters, fields: request.fields, locales_limiter: request.locales_limiter,
+      custom_arguments: request.custom_arguments, custom_queries: request.custom_queries, search: request.search
+    });
     if (acsResponse && acsResponse.filters && acsFilters) {
       if (!readRequest.filters) {
         readRequest.filters = [];
@@ -448,7 +452,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               userRoles.push(role[0]);
             }
           });
-          userObj.payload.role = userRoles;
+          userObj.payload.roles = userRoles;
         }
       });
       return users;
@@ -588,9 +592,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         if (policiesList && policiesList.length > 0) {
           for (let policy of policiesList) {
             for (let rule of policy.rules) {
-              if (rule.effect === Effect.PERMIT && rule.target && rule.target.subject) {
+              if (rule.effect === Effect.PERMIT && rule.target && rule.target.subjects) {
                 // check if the rule subject has any scoping Entity
-                const ruleSubjectAttrs = rule.target.subject;
+                const ruleSubjectAttrs = rule.target.subjects;
                 for (let ruleAttr of ruleSubjectAttrs) {
                   if (ruleAttr.id === this.cfg.get('authorization:urns:role')) {
                     // rule's role which give's user the acess to create User
@@ -1140,19 +1144,23 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    */
   async changePassword(request: ChangePasswordRequest, context): Promise<DeepPartial<OperationStatusObj>> {
     const logger = this.logger;
-    const identifier = request.identifier;
-
     const pw = request.password;
     const newPw = request.new_password;
     let subject = request.subject;
-    // check for the identifier against name or email in DB
-    const filters = getDefaultFilter(identifier);
-    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+    const users = await super.read(ReadRequest.fromPartial({
+      filters: [{
+        filters: [{
+          field: 'id',
+          operation: Filter_Operation.eq,
+          value: subject?.id
+        }]
+      }]
+    }), context);
     if (!users || users.total_count === 0) {
-      logger.debug('user does not exist', { identifier });
+      logger.debug('user does not exist', { identifier: subject.id });
       return returnOperationStatus(404, 'user does not exist');
     } else if (users.total_count > 1) {
-      return returnOperationStatus(400, `Invalid identifier provided for change password, multiple users found for identifier ${identifier}`);
+      return returnOperationStatus(400, `Invalid identifier provided for change password, multiple users found for identifier ${subject.id}`);
     }
     const user = users.items[0].payload;
     let acsResponse: DecisionResponse;
@@ -1182,7 +1190,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         items: [user]
       }), context);
       if (updateStatus?.items[0]?.status?.message === 'success') {
-        logger.info('password changed for user', { identifier });
+        logger.info('password changed for user', { identifier: subject.id });
         await this.topics['user.resource'].emit('passwordChanged', user);
       }
       return { operation_status: updateStatus?.items[0]?.status };
@@ -1469,7 +1477,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           continue;
         }
         const filters = [{
-          filter: [{
+          filters: [{
             field: 'id',
             operation: Filter_Operation.eq,
             value: user.id
@@ -1497,11 +1505,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         // not provided in request
         if (!user.meta) {
           user.meta = dbUser.meta as Meta;
-        } else if (user.meta && _.isEmpty(user.meta.owner)) {
-          user.meta.owner = dbUser.meta.owner as Attribute[];
+        } else if (user.meta && _.isEmpty(user.meta.owners)) {
+          user.meta.owners = dbUser.meta.owners as Attribute[];
         }
         // check for ACS if owner information is changed
-        if (!_.isEqual(user.meta.owner, dbUser.meta.owner)) {
+        if (!_.isEqual(user.meta.owners, dbUser.meta.owners)) {
           let acsResponse: DecisionResponse;
           try {
             if (!context) { context = {}; };
@@ -1624,7 +1632,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     for (let user of usersList) {
       const userID = user.id;
       const filters = [{
-        filter: [{
+        filters: [{
           field: 'id',
           operation: Filter_Operation.eq,
           value: user.id
@@ -1969,7 +1977,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       context.subject = subject;
       context.resources = { id: orgIDs };
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: orgIDs }], AuthZAction.DELETE,
-        Operation.isAllowed);
+        Operation.isAllowed) as PolicySetRQResponse;
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv for deleteUsersByOrg', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
@@ -1999,7 +2007,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         ...context,
         subject,
         resources: []
-      }, [{ resource: 'user' }], AuthZAction.READ, Operation.whatIsAllowed);
+      }, [{ resource: 'user' }], AuthZAction.READ, Operation.whatIsAllowed) as PolicySetRQResponse;
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv for findByRole', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
@@ -2010,7 +2018,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     if (acsResponse.decision === Response_Decision.PERMIT) {
       const filters = [{
-        filter: [{
+        filters: [{
           field: 'name',
           operation: Filter_Operation.eq,
           value: role
@@ -2018,7 +2026,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }];
       const result = await this.roleService.read(ReadRequest.fromPartial({
         filters,
-        field: [{
+        fields: [{
           name: 'id',
           include: true
         }],
@@ -2338,7 +2346,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     let roleID;
     const roleName = this.cfg.get('roles:normalUser');
     const filters = [{
-      filter: [{
+      filters: [{
         field: 'name',
         operation: Filter_Operation.eq,
         value: roleName
@@ -2370,7 +2378,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const OWNER_SCOPING_INSTANCE = this.cfg.get('urns:ownerInstance');
 
     const meta: Meta = Meta.fromPartial({
-      owner: !!user.meta && !_.isEmpty(user.meta.owner) ? user.meta.owner : [
+      owners: !!user.meta && !_.isEmpty(user.meta.owners) ? user.meta.owners : [
         {
           id: OWNER_INDICATOR_ENTITY,
           value: USER_URN
@@ -2421,7 +2429,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }
         if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
           const filters = [{
-            filter: [{
+            filters: [{
               field: 'id',
               operation: Filter_Operation.eq,
               value: resource.id
@@ -2431,7 +2439,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           // update owner info
           if (result?.items?.length === 1) {
             let item = result.items[0].payload;
-            resource.meta.owner = item.meta.owner;
+            resource.meta.owner = item.meta.owners;
           } else if (result.items.length === 0) {
             if (_.isEmpty(resource.id)) {
               resource.id = uuid.v4().replace(/-/g, '');
@@ -2586,7 +2594,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   }
 }
 
-export class RoleService extends ServiceBase<RoleListResponse, RoleList> implements RoleServiceServiceImplementation {
+export class RoleService extends ServiceBase<RoleListResponse, RoleList> implements RoleServiceImplementation {
 
   logger: Logger;
   redisClient: RedisClientType<any, any>;
@@ -2656,7 +2664,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         ...context,
         subject,
         resources: []
-      }, [{ resource: 'role' }], AuthZAction.READ, Operation.whatIsAllowed);
+      }, [{ resource: 'role' }], AuthZAction.READ, Operation.whatIsAllowed) as PolicySetRQResponse;
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv for read', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
@@ -2707,7 +2715,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         // read the role from DB and check if it exists
         const role = items[i];
         const filters = [{
-          filter: [{
+          filters: [{
             field: 'id',
             operation: Filter_Operation.eq,
             value: role.id
@@ -2722,11 +2730,11 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         // not provided in request
         if (!role.meta) {
           role.meta = rolesDB.meta as Meta;
-        } else if (role.meta && _.isEmpty(role.meta.owner)) {
-          role.meta.owner = rolesDB.meta.owner as Attribute[];
+        } else if (role.meta && _.isEmpty(role.meta.owners)) {
+          role.meta.owners = rolesDB.meta.owners as Attribute[];
         }
         // check for ACS if owner information is changed
-        if (!_.isEqual(role.meta.owner, rolesDB.meta.owner)) {
+        if (!_.isEqual(role.meta.owners, rolesDB.meta.owners)) {
           let acsResponse: DecisionResponse;
           try {
             if (!context) { context = {}; };
@@ -2837,7 +2845,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     for (let roleAssociation of role_associations) {
       const roleID = roleAssociation.role;
       const filters = [{
-        filter: [{
+        filters: [{
           field: 'id',
           operation: Filter_Operation.eq,
           value: roleID
@@ -2885,7 +2893,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
       }
       if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
         const filters = [{
-          filter: [{
+          filters: [{
             field: 'id',
             operation: Filter_Operation.eq,
             value: resource.id
@@ -2897,7 +2905,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         // update owner info
         if (result.items.length === 1) {
           let item = result.items[0].payload;
-          resource.meta.owner = item.meta.owner;
+          resource.meta.owner = item.meta.owners;
         } else if (result.items.length === 0) {
           if (_.isEmpty(resource.id)) {
             resource.id = uuid.v4().replace(/-/g, '');

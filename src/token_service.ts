@@ -8,7 +8,7 @@ import { createMetadata } from './common';
 import {
   DeepPartial, GrantId,
   Identifier,
-  ServiceServiceImplementation,
+  TokenServiceImplementation,
   TokenData
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token';
 import { Any } from '@restorecommerce/rc-grpc-clients/dist/generated-server/google/protobuf/any';
@@ -31,7 +31,7 @@ const marshallProtobufAny = (msg: any): Any => {
   }
 };
 
-export class TokenService implements ServiceServiceImplementation {
+export class TokenService implements TokenServiceImplementation {
   logger: Logger;
   cfg: any;
   authZ: ACSAuthZ;
