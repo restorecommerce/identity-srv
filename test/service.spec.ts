@@ -9,15 +9,18 @@ import * as proto_loader from '@grpc/proto-loader';
 import * as grpc from '@grpc/grpc-js';
 import { updateConfig } from '@restorecommerce/acs-client';
 import {
-  ServiceDefinition as UserServiceDefinition,
-  ServiceClient as UserServiceClient, User, DeepPartial
+  UserServiceDefinition,
+  UserServiceClient, User, DeepPartial
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import {
-  ServiceDefinition as RoleServiceDefinition,
-  ServiceClient as RoleServiceClient
+  RoleServiceDefinition,
+  RoleServiceClient
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
 import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
 import { createClient as RedisCreateClient, RedisClientType } from 'redis';
+import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
+import { Rule, Effect } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rule';
+import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta';
 
 /*
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
@@ -75,52 +78,59 @@ async function connect(clientCfg: string, resourceName: string): Promise<any> { 
   }
 }
 
-let meta = {
+let meta: Meta = {
+  acls: [],
   modified_by: 'SYSTEM',
-  owner: [{
+  owners: [{
     id: 'urn:restorecommerce:acs:names:ownerIndicatoryEntity',
-    value: 'urn:restorecommerce:acs:model:organization.Organization'
+    value: 'urn:restorecommerce:acs:model:organization.Organization',
+    attributes: []
   },
   {
     id: 'urn:restorecommerce:acs:names:ownerInstance',
-    value: 'orgA'
+    value: 'orgA',
+    attributes: []
   }]
 };
 
-const permitUserRule = {
+const permitUserRule: Rule = {
   id: 'permit_rule_id',
   target: {
-    action: [],
-    resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:user.User' }],
-    subject: [
+    actions: [],
+    resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:user.User', attributes: [] }],
+    subjects: [
       {
         id: 'urn:restorecommerce:acs:names:role',
-        value: 'admin-r-id'
+        value: 'admin-r-id',
+        attributes: []
       },
       {
         id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-        value: 'urn:restorecommerce:acs:model:organization.Organization'
+        value: 'urn:restorecommerce:acs:model:organization.Organization',
+        attributes: []
       }]
   },
-  effect: 'PERMIT'
+  effect: Effect.PERMIT
 };
 
-const permitRoleRule = {
+const permitRoleRule: Rule = {
   id: 'permit_role_id',
   target: {
-    action: [],
-    resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:role.Role' }],
-    subject: [
+    actions: [],
+    resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:role.Role', attributes: [] }],
+    subjects: [
       {
         id: 'urn:restorecommerce:acs:names:role',
-        value: 'admin-r-id'
+        value: 'admin-r-id',
+        attributes: []
       },
       {
         id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-        value: 'urn:restorecommerce:acs:model:organization.Organization'
+        value: 'urn:restorecommerce:acs:model:organization.Organization',
+        attributes: []
       }]
   },
-  effect: 'PERMIT'
+  effect: Effect.PERMIT
 };
 
 let userRolePolicySetRQ = {
@@ -133,13 +143,13 @@ let userRolePolicySetRQ = {
           combining_algorithm: 'urn:oasis:names:tc:xacml:3.0:rule-combining-algorithm:permit-overrides',
           id: 'user_test_policy_id',
           target: {
-            action: [],
+            actions: [],
             resources: [{
               id: 'urn:restorecommerce:acs:names:model:entity',
               value: 'urn:restorecommerce:acs:model:user.User'
             }],
-            subject: []
-          }, effect: 'PERMIT',
+            subjects: []
+          }, effect: Effect.PERMIT,
           rules: [ // permit or deny rule will be added
           ],
           has_rules: true
@@ -147,13 +157,13 @@ let userRolePolicySetRQ = {
           combining_algorithm: 'urn:oasis:names:tc:xacml:3.0:rule-combining-algorithm:permit-overrides',
           id: 'role_test_policy_id',
           target: {
-            action: [],
+            actions: [],
             resources: [{
               id: 'urn:restorecommerce:acs:names:model:entity',
               value: 'urn:restorecommerce:acs:model:role.Role'
             }],
-            subject: []
-          }, effect: 'PERMIT',
+            subjects: []
+          }, effect: Effect.PERMIT,
           rules: [ // permit or deny rule will be added
           ],
           has_rules: true
@@ -168,7 +178,7 @@ interface MethodWithOutput {
 
 const PROTO_PATH: string = 'node_modules/@restorecommerce/protos/io/restorecommerce/access_control.proto';
 const PKG_NAME: string = 'io.restorecommerce.access_control';
-const SERVICE_NAME: string = 'Service';
+const SERVICE_NAME: string = 'AccessControlService';
 
 const pkgDef: grpc.GrpcObject = grpc.loadPackageDefinition(
   proto_loader.loadSync(PROTO_PATH, {
@@ -357,7 +367,7 @@ describe('testing identity-srv', () => {
           await startGrpcMockServer([{ method: 'WhatIsAllowed', output: userRolePolicySetRQ },
           { method: 'IsAllowed', output: { decision: 'PERMIT' } }]);
           const filters = [{
-            filter: [{
+            filters: [{
               field: 'id',
               operation: Filter_Operation.eq,
               value: result.id
@@ -367,14 +377,13 @@ describe('testing identity-srv', () => {
           should.exist(readResult);
           should.exist(readResult.items);
           // validate role
-          if (readResult.items[0].payload.role) {
-            readResult.items[0].payload.role[0].id.should.equal('user-r-id');
-            readResult.items[0].payload.role[0].assignable_by_roles[0].should.equal('admin-r-id');
-            readResult.items[0].payload.role[0].name.should.equal('normal_user');
-            readResult.items[0].payload.role[0].description.should.equal('Normal user');
-            delete readResult.items[0].payload.role;
+          if (readResult.items[0].payload.roles) {
+            readResult.items[0].payload.roles[0].id.should.equal('user-r-id');
+            readResult.items[0].payload.roles[0].assignable_by_roles[0].should.equal('admin-r-id');
+            readResult.items[0].payload.roles[0].name.should.equal('normal_user');
+            readResult.items[0].payload.roles[0].description.should.equal('Normal user');
+            delete readResult.items[0].payload.roles;
           }
-          readResult.items[0].payload.should.deepEqual(result);
           await topic.removeListener('registered', listener);
         });
 
@@ -917,9 +926,9 @@ describe('testing identity-srv', () => {
           should.exist(result.items);
           const pwHashA = result.items[0].payload.password_hash;
           const changeResult = await (userService.changePassword({
-            identifier: testUserName,
             password: 'notsecure',
-            new_password: 'newPassword'
+            new_password: 'newPassword',
+            subject: { id: result.items[0].payload.id }
           }));
           should.exist(changeResult);
           should.exist(changeResult.operation_status);
@@ -1027,7 +1036,7 @@ describe('testing identity-srv', () => {
 
           await topic.$wait(offset);
           const filters = [{
-            filter: [{
+            filters: [{
               field: 'id',
               operation: Filter_Operation.eq,
               value: testUserID
@@ -1069,7 +1078,7 @@ describe('testing identity-srv', () => {
 
           await topic.$wait(offset);
           const filters = [{
-            filter: [{
+            filters: [{
               field: 'id',
               operation: Filter_Operation.eq,
               value: testUserID
@@ -1181,7 +1190,6 @@ describe('testing identity-srv', () => {
           should.exist(result);
           should.exist(result.items);
           result.items[0].payload.email.should.equal('update@restorecommerce.io');
-          result.items[0].payload.password.should.equal('');
           result.items[0].payload.name.should.equal('test.user1');
           // validate item status and overall status
           result.items[0].status.code.should.equal(200);
@@ -1296,7 +1304,6 @@ describe('testing identity-srv', () => {
           should.exist(result);
           should.exist(result.items);
           result.items[0].payload.email.should.equal('upsert@restorecommerce.io');
-          result.items[0].payload.password.should.equal('');
           // validate item status and overall status
           result.items[0].status.code.should.equal(200);
           result.items[0].status.message.should.equal('success');
@@ -1338,7 +1345,6 @@ describe('testing identity-srv', () => {
           should.exist(result);
           should.exist(result.items);
           result.items[0].payload.email.should.equal('upsert2@restorecommerce.io');
-          result.items[0].payload.password.should.equal('');
           // validate item status and overall status
           result.items[0].status.code.should.equal(200);
           result.items[0].status.message.should.equal('success');

@@ -9,7 +9,7 @@ pid/
 .directory
 .nyc_output
 .idea
-
+launch.json
 !setupTopics.js
 
 lib

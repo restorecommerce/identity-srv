@@ -1,5 +1,5 @@
 let meta = node.meta
-let owner = meta.owner
+let owner = meta.owners
 let found = (
     for o in owner
     filter o.id == "urn:restorecommerce:acs:names:ownerInstance" && o.value in @instance

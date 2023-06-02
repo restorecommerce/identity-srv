@@ -10,12 +10,12 @@ import * as proto_loader from '@grpc/proto-loader';
 import * as grpc from '@grpc/grpc-js';
 import { updateConfig } from '@restorecommerce/acs-client';
 import {
-  ServiceDefinition as UserServiceDefinition,
-  ServiceClient as UserServiceClient, UserType
+  UserServiceDefinition,
+  UserServiceClient, UserType
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import {
-  ServiceDefinition as RoleServiceDefinition,
-  ServiceClient as RoleServiceClient
+  RoleServiceDefinition,
+  RoleServiceClient
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
 import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
 
@@ -334,7 +334,7 @@ describe('testing identity-srv', () => {
           // read by email
           const getResult = await userService.read({
             filters: [{
-              filter: [{
+              filters: [{
                 field: 'email',
                 operation: Filter_Operation.eq,
                 value: data.email
@@ -620,10 +620,14 @@ describe('testing identity-srv', () => {
         const email = 'test@ms.restorecommerce.io';
         const userName = 'test.user1';
         it('should throw an error for ChangePassword with email as identifier when is not unique', async () => {
+          // DB User
+          const dbUser = await userService.find({
+            name: userName
+          });
           const result = await userService.changePassword({
-            identifier: email,
             password: 'notsecure',
-            new_password: 'secure'
+            new_password: 'secure',
+            subject: { id: dbUser.items[0].payload.id }
           });
           should.exist(result.operation_status);
           result.operation_status.code.should.equal(400);
@@ -637,9 +641,9 @@ describe('testing identity-srv', () => {
           const prev_pass_hash = user_before.items[0].payload.password_hash;
           should.exist(prev_pass_hash);
           const result = await userService.changePassword({
-            identifier: userName,
             password: 'notsecure',
-            new_password: 'secure'
+            new_password: 'secure',
+            subject: { id: user_before.items[0].payload.id }
           });
           should.exist(result.operation_status);
           result.operation_status.code.should.equal(200);

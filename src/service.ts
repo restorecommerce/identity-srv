@@ -15,7 +15,7 @@ import {
   returnStatus,
   unmarshallProtobufAny
 } from './utils';
-import { ResourcesAPIBase, ServiceBase } from '@restorecommerce/resource-base-interface';
+import { ResourcesAPIBase, ServiceBase, FilterValueType } from '@restorecommerce/resource-base-interface';
 import { Logger } from 'winston';
 import {
   ACSAuthZ,
@@ -68,7 +68,7 @@ import {
   DeleteRequest,
   DeleteResponse,
   Filter_Operation,
-  FilterOp,
+  Filter_ValueType,
   FilterOp_Operator,
   ReadRequest
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
@@ -84,6 +84,7 @@ import {
   RoleAssociation,
   Subject
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
+import { FilterOp } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/filter';
 
 export class UserService extends ServiceBase<UserListResponse, UserList> implements UserServiceImplementation {
 
@@ -175,12 +176,12 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const logger = this.logger;
       const filterStructure: any = {
         filters: [{
-          filter: []
+          filters: []
         }]
       };
       if (id) {
         // Object.assign(filterStructure, { id: { $eq: id } });
-        filterStructure.filters[0].filter.push({
+        filterStructure.filters[0].filters.push({
           field: 'id',
           operation: Filter_Operation.eq,
           value: id
@@ -188,7 +189,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
       if (name) {
         // Object.assign(filterStructure, { name: { $eq: name } });
-        filterStructure.filters[0].filter.push({
+        filterStructure.filters[0].filters.push({
           field: 'name',
           operation: Filter_Operation.eq,
           value: name
@@ -196,13 +197,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
       if (email) {
         // Object.assign(filterStructure, { email: { $eq: email } });
-        filterStructure.filters[0].filter.push({
+        filterStructure.filters[0].filters.push({
           field: 'email',
           operation: Filter_Operation.eq,
           value: email
         });
       }
-      if (filterStructure.filters[0].filter.length > 1) {
+      if (filterStructure.filters[0].filters.length > 1) {
         filterStructure.filters[0].operator = FilterOp_Operator.or;
       }
 
@@ -631,10 +632,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // read all target roles at once and check for each role's assign_by_role
       // contains createAccessRole
       const filters = [{
-        filter: [{
+        filters: [{
           field: 'id',
           operation: Filter_Operation.in,
-          value: targetUserRoleIds // TODO This should be impossible accordg to protobuf definitions!
+          value: JSON.stringify(targetUserRoleIds),
+          type: FilterValueType.ARRAY
         }]
       }];
       let rolesData = await this.roleService.read({
@@ -864,7 +866,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     let filters;
     if (this.uniqueEmailConstraint) {
       filters = [{
-        filter: [{
+        filters: [{
           field: 'name',
           operation: Filter_Operation.eq,
           value: user.name
@@ -1032,7 +1034,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const emailAddress = split[1];
 
     const filters = [{
-      filter: [{
+      filters: [{
         field: 'email',
         operation: Filter_Operation.eq,
         value: emailAddress
@@ -1757,7 +1759,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         if (this.uniqueEmailConstraint) {
 
           filters = [{
-            filter: [{
+            filters: [{
               field: 'name',
               operation: Filter_Operation.eq,
               value: user.name
@@ -2490,7 +2492,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   private async makeUserForInvitationData(user, invited_by_user_identifier): Promise<any> {
     let invitedByUser;
     const filters = [{
-      filter: [
+      filters: [
         {
           field: 'name',
           operation: Filter_Operation.eq,
