@@ -1,3 +1,12 @@
+## 1.1.0 (June 2nd, 2023)
+
+- up deps for optional fields and pulralized protos and libs.
+- fix requestPasswordChange and requestEmailChange to lookup by user name (instead of both user name and email, since if uniqueEmailConstraint is set to false in config it is possible to have multiple users with same email for different user names)
+- removed self kill token (as its already taken care in current update api) and used AQL query for updating last login on token
+- activate user on confirm password change call if the user is inactive
+- fix unit test for request email and request password change test
+- remove tokens if user not active
+
 ## 1.0.3 (February 8th, 2023)
 
 - handle filter ownership AQL query for multiple owners
