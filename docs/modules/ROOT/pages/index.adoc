@@ -92,11 +92,11 @@ A User resource.
 [width="100%",cols="20%,16%,20%,44%",options="header",]
 |==============================================================================================================================================
 |Field |Type |Label |Description
-|id |string |required |User ID, unique, key
-|meta |https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] |required |Meta info
+|id |string |optional |User ID, unique, key
+|meta |https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] |optional |Meta info
 |name |string |required |Username
-|first_name |string |required |User’s first name
-|last_name |string |required |User’s last name
+|first_name |string |optional |User’s first name
+|last_name |string |optional |User’s last name
 |email |string |required |Email address
 |new_email |string |optional |Property in which the email is stored upon an email change request until its confirmation
 |active |bool |optional |Value is `true` if the user was successfully activated
@@ -124,7 +124,7 @@ A User resource.
 [width="100%",cols="20%,16%,20%,44%",options="header",]
 |========================================================================================================================
 |Field |Type |Label |Description
-|role |string |required |Role ID
+|role |string |optional |Role ID
 |attributes | https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/attribute.proto#L5[`io.restorecommerce.attribute.Attribute`] [] |optional |Attributes associated with the User’s role
 |id |string |optional |role association identifier (referred in Tokens list)
 |========================================================================================================================
@@ -169,12 +169,12 @@ A User resource.
 [width="100%",cols="20%,16%,20%,44%",options="header",]
 |======================================================================================================================================
 |Field |Type |Label |Description
-|id |string |required |user id of the authenticated user
-|scope |string |required |target scope of user
-|role_associations |`io.restorecommerce.user.RoleAssociation`[] |required |A list of roles with their associated attributes
+|id |string |optional |user id of the authenticated user
+|scope |string |optional |target scope of user
+|role_associations |`io.restorecommerce.user.RoleAssociation`[] |optional |A list of roles with their associated attributes
 |hierarchical_scopes |`io.restorecommerce.user.HierarchicalScope`[] |optional |A list of hierarchical scopes of the authenticated user
 |unauthenticated | bool |optional | for unauthenticated users
-|token | string |required | token value
+|token | string |optional | token value
 |======================================================================================================================================
 
 `io.restorecommerce.user.HierarchicalScope`
@@ -182,7 +182,7 @@ A User resource.
 [width="100%",cols="20%,16%,20%,44%",options="header",]
 |========================================================================================================
 |Field |Type |Label |Description
-|id |string |required |role scoping instance / root node value of Organization
+|id |string |optional |role scoping instance / root node value of Organization
 |role |`io.restorecommerce.role.Role.id` |optional |role identifier associated with role scoping instance
 |children |`io.restorecommerce.user.HierarchicalScope`[] |optional |hierarchical organizational tree
 |========================================================================================================
@@ -192,7 +192,7 @@ A User resource.
 
 The microservice exposes the below CRUD operations for creating or modifying User resources.
 
-`io.restorecommerce.user.Service`
+`io.restorecommerce.user.UserService`
 
 [width="100%",cols="23%,25%,27%,25%",options="header",]
 |=========================================================================================================================
@@ -252,8 +252,8 @@ configuration value. If disabled, the only endpoint for user creation is `Create
 |Field |Type |Label |Description
 |guest |bool |optional |Guest user, default value is `false`
 |name |string |required |Username
-|first_name |string |required |User’s first name
-|last_name |string |required |User’s last name
+|first_name |string |optional |User’s first name
+|last_name |string |optional |User’s last name
 |email |string |required |User email ID
 |password |string |required |User password
 |timezone |string |optional |The User’s timezone setting (defaults to `Europe/Berlin')
@@ -289,7 +289,6 @@ Requests are performed providing `io.restorecommerce.user.ChangePasswordRequest`
 [cols=",,,",options="header",]
 |==========================================================================================================================
 |Field |Type |Label |Description
-|identifier |string |required |User name or User email
 |password |string |required |old password
 |new_password |string |required |new password
 |subject |`io.restorecommerce.auth.Subject` |required |Subject details
@@ -429,9 +428,9 @@ A simplified version of `read`, which only filters users by a username, email an
 [cols=",,,",options="header",]
 |==========================================================================================================================
 |Field |Type |Label |Description
-|id |string |required |User ID
-|name |string |required |User name
-|email |string |required |User EmailID
+|id |string |optional |User ID
+|name |string |optional |User name
+|email |string |optional |User EmailID
 |subject |`io.restorecommerce.auth.Subject` |required |Subject details
 |==========================================================================================================================
 
@@ -480,7 +479,7 @@ as input and response is `google.protobuf.Empty` message.
 |==========================================================================================================================
 |Field |Type |Label |Description
 |identifier |string |required |User name or email
-|subject |`io.restorecommerce.auth.Subject` |optional |Subject details
+|subject |`io.restorecommerce.auth.Subject` |required |Subject details
 |==========================================================================================================================
 
 [#api_role]
@@ -495,7 +494,7 @@ A list of Role resources.
 |Field |Type |Label |Description
 |items |`io.restorecommerce.role.RoleList`[] |required |List of Roles
 |total_count |number |optional |number of Roles
-|subject |`io.restorecommerce.auth.Subject` |optional |subject details
+|subject |`io.restorecommerce.auth.Subject` |required |subject details
 |==========================================================================================================================
 
 `io.restorecommerce.role.Role`
@@ -503,11 +502,11 @@ A list of Role resources.
 [width="100%",cols="20%,16%,20%,44%",options="header",]
 |==============================================================================================================================================
 |Field |Type |Label |Description
-|id |string |required |Role identifier
+|id |string |optional |Role identifier
 |name |string |required |specifies the Role of the User
 |description |string |optional |Role description
 |assignable_by_roles |string[] |optional |role identifier’s who can assign this role
-|meta |https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] |required |Meta info
+|meta |https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/meta.proto[`io.restorecommerce.meta.Meta`] |optional |Meta info
 |==============================================================================================================================================
 
 [#api_role_crud]
@@ -515,7 +514,7 @@ A list of Role resources.
 
 The microservice exposes the below CRUD operations for creating or modifying Role resources.
 
-`io.restorecommerce.role.Service`
+`io.restorecommerce.role.RoleService`
 
 [width="100%",cols="23%,25%,27%,25%",options="header",]
 |=========================================================================================================================
@@ -540,9 +539,9 @@ A Token resource.
 [width="100%",cols="20%,16%,20%,44%",options="header",]
 |==========================================================================================================================
 |Field |Type |Label |Description
-|name |string |required |Token name
+|name |string |optional |Token name
 |expires_in |number |optional |expiration date for token
-|token |string |required |token value
+|token |string |optional |token value
 |scopes | string []|optional |identifier for RoleAssociation `io.restorecommerce.auth.RoleAssociation.id`
 |type | string |optional |token type ex: access_token, refresh_token etc
 |last_login | number |optional |epoch time of user last logged in
@@ -554,7 +553,7 @@ A Token resource.
 
 The microservice exposes the below operations for upsert, find and delete Token resources.
 
-`io.restorecommerce.token.Service`
+`io.restorecommerce.token.TokenService`
 
 [#api_upsert_token]
 ==== `Upsert`
@@ -568,8 +567,8 @@ in https://github.com/restorecommerce/identity-srv/blob/master/cfg/config.json#L
 [width="100%",cols="20%,16%,20%,44%",options="header",]
 |==============================================================================================================================================
 |Field |Type |Label |Description
-|id |string |required |Token identifier
-|payload |string |required |Token payload (id_token)
+|id |string |optional |Token identifier
+|payload |string |optional |Token payload (id_token)
 |expires_in |double |optional |Token expiration time in epoch
 |type |string |optional |Token type
 |subject |`io.restorecommerce.auth.Subject` |required |Subject details
@@ -587,9 +586,9 @@ protobuf message as input and response is `google.protobuf.Any` message containi
 [width="100%",cols="20%,16%,20%,44%",options="header",]
 |==============================================================================================================================================
 |Field |Type |Label |Description
-|id |string |required |Token identifier
+|id |string |optional |Token identifier
 |type |string |optional |Token type
-|subject |`io.restorecommerce.auth.Subject` |required |Subject details
+|subject |`io.restorecommerce.auth.Subject` |optional |Subject details
 |==============================================================================================================================================
 
 [#api_destroy_token]
