@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@alenon/grpc-mock-server": "^3.0.20",
-    "@restorecommerce/protos": "^3.1.0",
+    "@restorecommerce/protos": "^3.1.1",
     "@types/mocha": "^10.0.1",
     "@types/node": "^20.2.5",
     "@types/oauth": "^0.9.1",
