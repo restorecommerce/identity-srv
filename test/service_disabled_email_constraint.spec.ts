@@ -137,7 +137,7 @@ interface MethodWithOutput {
 
 const PROTO_PATH: string = 'node_modules/@restorecommerce/protos/io/restorecommerce/access_control.proto';
 const PKG_NAME: string = 'io.restorecommerce.access_control';
-const SERVICE_NAME: string = 'Service';
+const SERVICE_NAME: string = 'AccessControlService';
 
 const pkgDef: grpc.GrpcObject = grpc.loadPackageDefinition(
   proto_loader.loadSync(PROTO_PATH, {

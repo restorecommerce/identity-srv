@@ -1,3 +1,7 @@
+## 1.1.2 (June 19th, 2023)
+
+- updated dependencies
+
 ## 1.1.1 (June 2nd, 2023)
 
 - up acs-client
