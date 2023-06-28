@@ -1,3 +1,7 @@
+## 1.1.4 (June 28th, 2023)
+
+- bump package and package lock version
+
 ## 1.1.3 (June 28th, 2023)
 
 - updated dependencies
