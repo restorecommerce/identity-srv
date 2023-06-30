@@ -86,7 +86,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
       return returnOperationStatus(400, 'No items were provided for update');
     }
 
-    // update owner information
+    // update owners information
     let items = await this.createMetadata(request.items, AuthZAction.MODIFY, request.subject);
     let acsResponse: DecisionResponse;
     try {
@@ -124,11 +124,11 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         // not provided in request
         if (!auth_log.meta) {
           auth_log.meta = authLogDB.payload.meta;
-        } else if (auth_log.meta && _.isEmpty(auth_log.meta.owner)) {
-          auth_log.meta.owner = authLogDB.payload.meta.owners;
+        } else if (auth_log.meta && _.isEmpty(auth_log.meta.owners)) {
+          auth_log.meta.owners = authLogDB.payload.meta.owners;
         }
-        // check for ACS if owner information is changed
-        if (!_.isEqual(auth_log.meta.owner, authLogDB.payload.meta.owners)) {
+        // check for ACS if owners information is changed
+        if (!_.isEqual(auth_log.meta.owners, authLogDB.payload.meta.owners)) {
           let acsResponse: DecisionResponse;
           try {
             if (!context) { context = {}; };
@@ -245,7 +245,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
   }
 
   /**
-   * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
+   * reads meta data from DB and updates owners information in resource if action is UPDATE / DELETE
    * @param reaources list of resources
    * @param entity entity name
    * @param action resource action
@@ -258,15 +258,15 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
     }
     const urns = this.cfg.get('authorization:urns');
     if (subject && subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
-      // add user and subject scope as default owner
+      // add user and subject scope as default owners
       orgOwnerAttributes.push(
         {
           id: urns.ownerIndicatoryEntity,
-          value: urns.organization
-        },
-        {
-          id: urns.ownerInstance,
-          value: subject.scope
+          value: urns.organization,
+          attributes: [{
+            id: urns.ownerInstance,
+            value: subject.scope
+          }]
         });
     }
 
@@ -283,35 +283,35 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
           }]
         }];
         let result = await super.read(ReadRequest.fromPartial({ filters }), context);
-        // update owner info
+        // update owners info
         if (result.items.length === 1) {
           let item = result.items[0].payload;
-          resource.meta.owner = item.meta.owners;
-        } else if (result.items.length === 0 && !resource.meta.owner) {
+          resource.meta.owners = item.meta.owners;
+        } else if (result.items.length === 0 && !resource.meta.owners) {
           let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
           ownerAttributes.push(
             {
               id: urns.ownerIndicatoryEntity,
-              value: urns.user
-            },
-            {
-              id: urns.ownerInstance,
-              value: subject.id
+              value: urns.user,
+              attributes: [{
+                id: urns.ownerInstance,
+                value: subject.id
+              }]
             });
-          resource.meta.owner = ownerAttributes;
+          resource.meta.owners = ownerAttributes;
         }
-      } else if (action === AuthZAction.CREATE && !resource.meta.owner) {
+      } else if (action === AuthZAction.CREATE && !resource.meta.owners) {
         let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
         ownerAttributes.push(
           {
             id: urns.ownerIndicatoryEntity,
-            value: urns.user
-          },
-          {
-            id: urns.ownerInstance,
-            value: subject.id
+            value: urns.user,
+            attributes: [{
+              id: urns.ownerInstance,
+              value: subject.id
+            }]
           });
-        resource.meta.owner = ownerAttributes;
+        resource.meta.owners = ownerAttributes;
       }
     }
     return resources;

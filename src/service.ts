@@ -68,12 +68,10 @@ import {
   DeleteRequest,
   DeleteResponse,
   Filter_Operation,
-  Filter_ValueType,
   FilterOp_Operator,
   ReadRequest
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
 import { OperationStatusObj } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/status';
-import { Identifier } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token';
 import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta';
 import { Attribute } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/attribute';
 import { Effect } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rule';
@@ -428,14 +426,14 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       sorts: request.sorts, filters: request.filters, fields: request.fields, locales_limiter: request.locales_limiter,
       custom_arguments: request.custom_arguments, custom_queries: request.custom_queries, search: request.search
     });
-    if (acsResponse && acsResponse.filters && acsFilters) {
+    if (acsResponse?.filters && acsFilters) {
       if (!readRequest.filters) {
         readRequest.filters = [];
       }
       readRequest.filters.push(...acsFilters);
     }
 
-    if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
+    if (acsResponse?.custom_query_args?.length > 0) {
       readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
       readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
     }
@@ -473,7 +471,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
     let subject = request.subject;
-    // update meta data for owner information
+    // update meta data for owners information
     const acsResources = await this.createMetadata(usersList, AuthZAction.CREATE, subject);
     let acsResponse: DecisionResponse;
     try {
@@ -510,30 +508,31 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           return returnOperationStatus(400, errMessage);
         }
       }
-      for (let i = 0; i < usersList.length; i++) {
-        let user = usersList[i];
-        user.activation_code = '';
-        // if user is inactive set activation_code
-        if (!user.active) {
-          user.activation_code = this.idGen();
-        }
-        user.unauthenticated = false;
-        if (user.invite) {
-          user.active = false;
-          user.activation_code = this.idGen();
-          user.unauthenticated = true;
-        }
-        insertedUsers.items.push(await this.createUser(user, context));
+      if (usersList?.length > 0) {
+        for (let user of usersList) {
+          user.activation_code = '';
+          // if user is inactive set activation_code
+          if (!user.active) {
+            user.activation_code = this.idGen();
+          }
+          user.unauthenticated = false;
+          if (user.invite) {
+            user.active = false;
+            user.activation_code = this.idGen();
+            user.unauthenticated = true;
+          }
+          insertedUsers.items.push(await this.createUser(user, context));
 
-        if (this.emailEnabled && user.invite) {
-          await this.fetchHbsTemplates();
-          // send render request for user Invitation
-          const renderRequest = this.makeInvitationEmailData(user);
-          await this.topics.rendering.emit('renderRequest', renderRequest);
+          if (this.emailEnabled && user.invite) {
+            await this.fetchHbsTemplates();
+            // send render request for user Invitation
+            const renderRequest = this.makeInvitationEmailData(user);
+            await this.topics.rendering.emit('renderRequest', renderRequest);
+          }
         }
       }
       insertedUsers.operation_status = returnCodeMessage(200, 'success');
-      if (insertedUsers.items && insertedUsers.items.length > 0) {
+      if (insertedUsers?.items?.length > 0) {
         insertedUsers.total_count = insertedUsers.items.length;
       }
       return insertedUsers;
@@ -643,7 +642,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         filters,
         subject
       } as any, context);
-      if (rolesData && rolesData.total_count === 0) {
+      if (rolesData?.total_count === 0) {
         let message = `One or more of the target role IDs are invalid ${targetUserRoleIds},` +
           ` no such role exist in system`;
         this.logger.verbose(message);
@@ -742,8 +741,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         if (userRole) {
           let userRoleAttr = userRoleAssoc.attributes;
           let userScope;
-          if (userRoleAttr && userRoleAttr[1] && userRoleAttr[1].value) {
-            userScope = userRoleAttr[1].value;
+          for (let roleScopeInstObj of userRoleAttr) {
+            if(roleScopeInstObj.id === this.cfg.get('urns:roleScopingInstance')) {
+              userScope = roleScopeInstObj.value;
+            }
           }
           // validate the userRole and userScope with hrScopes
           if (userRole && hrScopes && !_.isEmpty(hrScopes)) {
@@ -769,8 +770,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                   // check if the target scope matches
                   let creatorScope;
                   let creatorRoleAttr = role.attributes;
-                  if (creatorRoleAttr && creatorRoleAttr[1] && creatorRoleAttr[1].value) {
-                    creatorScope = creatorRoleAttr[1].value;
+                  for (let roleScopeInstObj of creatorRoleAttr) {
+                    if(roleScopeInstObj.id === this.cfg.get('urns:roleScopingInstance')) {
+                      creatorScope = roleScopeInstObj.value;
+                    }
                   }
                   if (creatorScope && creatorScope === userScope) {
                     validUserRoleAssoc = true;
@@ -922,6 +925,15 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     if (!register) {
       this.logger.info('Endpoint register has been disabled');
       return returnStatus(412, 'Endpoint register has been disabled');
+    }
+    if (!user.email) {
+      return returnStatus(400, 'argument email is empty', user.id);
+    }
+    if (!user.name) {
+      return returnStatus(400, 'argument name is empty', user.id);
+    }
+    if (!user.password) {
+      return returnStatus(400, 'argument password is empty', user.id);
     }
     // Create User
     const userActivationRequired: Boolean = this.isUserActivationRequired();
@@ -1425,7 +1437,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
     let items = request.items;
     let subject = request.subject;
-    // update meta data for owner information
+    // update meta data for owners information
     const acsResources = await this.createMetadata(request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
@@ -1510,7 +1522,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         } else if (user.meta && _.isEmpty(user.meta.owners)) {
           user.meta.owners = dbUser.meta.owners as Attribute[];
         }
-        // check for ACS if owner information is changed
+        // check for ACS if owners information is changed
         if (!_.isEqual(user.meta.owners, dbUser.meta.owners)) {
           let acsResponse: DecisionResponse;
           try {
@@ -2399,7 +2411,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   }
 
   /**
-   * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
+   * reads meta data from DB and updates owners information in resource if action is UPDATE / DELETE
    * @param reaources list of resources
    * @param entity entity name
    * @param action resource action
@@ -2412,15 +2424,15 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
     const urns = this.cfg.get('authorization:urns');
     if (subject && subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
-      // add user and subject scope as default owner
+      // add user and subject scope as default owners
       orgOwnerAttributes.push(
         {
           id: urns.ownerIndicatoryEntity,
-          value: urns.organization
-        },
-        {
-          id: urns.ownerInstance,
-          value: subject.scope
+          value: urns.organization,
+          attributes: [{
+            id: urns.ownerInstance,
+            value: subject.scope
+          }]
         });
     }
 
@@ -2438,40 +2450,40 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             }]
           }];
           let result = await super.read(ReadRequest.fromPartial({ filters }), {});
-          // update owner info
+          // update owners info
           if (result?.items?.length === 1) {
             let item = result.items[0].payload;
-            resource.meta.owner = item.meta.owners;
+            resource.meta.owners = item.meta.owners;
           } else if (result.items.length === 0) {
             if (_.isEmpty(resource.id)) {
               resource.id = uuid.v4().replace(/-/g, '');
             }
             let ownerAttributes;
-            if (!resource.meta.owner) {
+            if (!resource.meta.owners) {
               ownerAttributes = _.cloneDeep(orgOwnerAttributes);
             } else {
-              ownerAttributes = resource.meta.owner;
+              ownerAttributes = resource.meta.owners;
             }
             ownerAttributes.push(
               {
                 id: urns.ownerIndicatoryEntity,
-                value: urns.user
-              },
-              {
-                id: urns.ownerInstance,
-                value: resource.id
+                value: urns.user,
+                attributes: [{
+                  id: urns.ownerInstance,
+                  value: resource.id
+                }]
               });
-            resource.meta.owner = ownerAttributes;
+            resource.meta.owners = ownerAttributes;
           }
         } else if (action === AuthZAction.CREATE) {
           if (_.isEmpty(resource.id)) {
             resource.id = uuid.v4().replace(/-/g, '');
           }
           let ownerAttributes;
-          if (!resource.meta.owner) {
+          if (!resource.meta.owners) {
             ownerAttributes = _.cloneDeep(orgOwnerAttributes);
           } else {
-            ownerAttributes = resource.meta.owner;
+            ownerAttributes = resource.meta.owners;
           }
           ownerAttributes.push(
             {
@@ -2482,7 +2494,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               id: urns.ownerInstance,
               value: resource.id
             });
-          resource.meta.owner = ownerAttributes;
+          resource.meta.owners = ownerAttributes;
         }
       }
     }
@@ -2694,7 +2706,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
 
     const items = request.items;
     let subject = request.subject;
-    // update owner information
+    // update owners information
     const acsResources = await this.createMetadata(request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
@@ -2735,7 +2747,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         } else if (role.meta && _.isEmpty(role.meta.owners)) {
           role.meta.owners = rolesDB.meta.owners as Attribute[];
         }
-        // check for ACS if owner information is changed
+        // check for ACS if owners information is changed
         if (!_.isEqual(role.meta.owners, rolesDB.meta.owners)) {
           let acsResponse: DecisionResponse;
           try {
@@ -2864,7 +2876,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
   }
 
   /**
-   * reads meta data from DB and updates owner information in resource if action is UPDATE / DELETE
+   * reads meta data from DB and updates owners information in resource if action is UPDATE / DELETE
    * @param reaources list of resources
    * @param entity entity name
    * @param action resource action
@@ -2877,15 +2889,15 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     }
     const urns = this.cfg.get('authorization:urns');
     if (subject && subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
-      // add user and subject scope as default owner
+      // add user and subject scope as default owners
       orgOwnerAttributes.push(
         {
           id: urns.ownerIndicatoryEntity,
-          value: urns.organization
-        },
-        {
-          id: urns.ownerInstance,
-          value: subject.scope
+          value: urns.organization,
+          attributes: [{
+            id: urns.ownerInstance,
+            value: subject.scope
+          }]
         });
     }
 
@@ -2904,55 +2916,55 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         let result = await super.read(ReadRequest.fromPartial({
           filters
         }), {});
-        // update owner info
+        // update owners info
         if (result.items.length === 1) {
           let item = result.items[0].payload;
-          resource.meta.owner = item.meta.owners;
+          resource.meta.owners = item.meta.owners;
         } else if (result.items.length === 0) {
           if (_.isEmpty(resource.id)) {
             resource.id = uuid.v4().replace(/-/g, '');
           }
           let ownerAttributes;
-          if (!resource.meta.owner) {
+          if (!resource.meta.owners) {
             ownerAttributes = _.cloneDeep(orgOwnerAttributes);
           } else {
-            ownerAttributes = resource.meta.owner;
+            ownerAttributes = resource.meta.owners;
           }
           if (subject && subject.id) {
             ownerAttributes.push(
               {
                 id: urns.ownerIndicatoryEntity,
-                value: urns.user
-              },
-              {
-                id: urns.ownerInstance,
-                value: resource.id
+                value: urns.user,
+                attributes: [{
+                  id: urns.ownerInstance,
+                  value: resource.id
+                }]
               });
           }
-          resource.meta.owner = ownerAttributes;
+          resource.meta.owners = ownerAttributes;
         }
-      } else if (action === AuthZAction.CREATE && !resource.meta.owner) {
+      } else if (action === AuthZAction.CREATE && !resource.meta.owners) {
         if (_.isEmpty(resource.id)) {
           resource.id = uuid.v4().replace(/-/g, '');
         }
         let ownerAttributes;
-        if (!resource.meta.owner) {
+        if (!resource.meta.owners) {
           ownerAttributes = _.cloneDeep(orgOwnerAttributes);
         } else {
-          ownerAttributes = resource.meta.owner;
+          ownerAttributes = resource.meta.owners;
         }
         if (subject && subject.id) {
           ownerAttributes.push(
             {
               id: urns.ownerIndicatoryEntity,
-              value: urns.user
-            },
-            {
-              id: urns.ownerInstance,
-              value: subject.id
+              value: urns.user,
+              attributes: [{
+                id: urns.ownerInstance,
+                value: subject.id
+              }]
             });
         }
-        resource.meta.owner = ownerAttributes;
+        resource.meta.owners = ownerAttributes;
       }
     }
     return resources;

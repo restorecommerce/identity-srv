@@ -21,29 +21,29 @@ export const createMetadata = async (res: any, urns: any, userService: UserServi
       orgOwnerAttributes.push(
         {
           id: urns.ownerIndicatoryEntity,
-          value: urns.user
-        },
-        {
-          id: urns.ownerInstance,
-          value: subject.id
+          value: urns.user,
+          attributes: [{
+            id: urns.ownerInstance,
+            value: subject.id
+          }]
         }
       );
     } else if (subject && subject.token) {
       // when no subjectID is provided find the subjectID using findByToken
-      const user = await userService.findByToken(FindByTokenRequest.fromPartial({token: subject.token}), context);
+      const user = await userService.findByToken(FindByTokenRequest.fromPartial({ token: subject.token }), context);
       if (user && user.payload && user.payload.id) {
         orgOwnerAttributes.push(
           {
             id: urns.ownerIndicatoryEntity,
-            value: urns.user
-          },
-          {
-            id: urns.ownerInstance,
-            value: user.payload.id
+            value: urns.user,
+            owners: [{
+              id: urns.ownerInstance,
+              value: user.payload.id
+            }]
           });
       }
     }
-    resource.meta.owner = orgOwnerAttributes;
+    resource.meta.owners = orgOwnerAttributes;
   }
 
   return resources;
