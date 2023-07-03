@@ -6,8 +6,9 @@ let foundAssoc = (
         let inAttributes = (
             for a in attributes
                 filter a.id == "urn:restorecommerce:acs:names:roleScopingEntity" && a.value == @scopingEntity
-                let elem = NTH(attributes, POSITION(attributes, a, true) + 1)
-                filter elem.id == "urn:restorecommerce:acs:names:roleScopingInstance" && elem.value in @scopingInstances
+                let nestedAttributes = a.attributes
+                for scopInst in nestedAttributes
+                    filter scopInst.id == "urn:restorecommerce:acs:names:roleScopingInstance" && scopInst.value in @scopingInstances
                 limit 1
                 return true
         )

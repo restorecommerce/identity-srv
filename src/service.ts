@@ -742,9 +742,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           let userRoleAttr = userRoleAssoc.attributes;
           let userScope;
           for (let roleScopeInstObj of userRoleAttr) {
-            if(roleScopeInstObj.id === this.cfg.get('urns:roleScopingInstance')) {
-              userScope = roleScopeInstObj.value;
-            }
+            roleScopeInstObj.attributes.filter((obj) => {
+              if(obj.id === this.cfg.get('authorization:urns:roleScopingInstance')) {
+                userScope = obj.value;
+              }
+            });
           }
           // validate the userRole and userScope with hrScopes
           if (userRole && hrScopes && !_.isEmpty(hrScopes)) {
@@ -771,9 +773,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                   let creatorScope;
                   let creatorRoleAttr = role.attributes;
                   for (let roleScopeInstObj of creatorRoleAttr) {
-                    if(roleScopeInstObj.id === this.cfg.get('urns:roleScopingInstance')) {
-                      creatorScope = roleScopeInstObj.value;
-                    }
+                    roleScopeInstObj.attributes.filter((obj) => {
+                      if(obj.id === this.cfg.get('authorization:urns:roleScopingInstance')) {
+                        creatorScope = obj.value;
+                      }
+                    });
                   }
                   if (creatorScope && creatorScope === userScope) {
                     validUserRoleAssoc = true;
@@ -1565,19 +1569,18 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                   let found = false;
                   for (let redisRoleAssoc of redisRoleAssocs) {
                     if (redisRoleAssoc.role === userRoleAssoc.role) {
-                      let i = 0;
-                      const attrLenght = userRoleAssoc.attributes.length;
                       for (let redisAttribute of redisRoleAssoc.attributes) {
+                        const redisNestedAttributes = redisAttribute.attributes;
                         for (let userAttribute of userRoleAssoc.attributes) {
-                          if (userAttribute.id === redisAttribute.id && userAttribute.value === redisAttribute.value) {
-                            i++;
+                          const userNestedAttributes = userAttribute.attributes;
+                          if (userAttribute.id === redisAttribute.id &&
+                            userAttribute.value === redisAttribute.value &&
+                            _.isEqual(redisNestedAttributes, userNestedAttributes)) {
+                            found = true;
+                            roleAssocEqual = true;
+                            break;
                           }
                         }
-                      }
-                      if (attrLenght === i) {
-                        found = true;
-                        roleAssocEqual = true;
-                        break;
                       }
                     }
                   }
@@ -1666,25 +1669,19 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             let found = false;
             for (let dbRoleAssoc of dbRoleAssocs) {
               if (dbRoleAssoc.role === userRoleAssoc.role) {
-                let i = 0;
-                let attrLength;
-                if (userRoleAssoc.attributes) {
-                  attrLength = userRoleAssoc.attributes.length;
-                } else {
-                  attrLength = 0;
-                }
                 if (dbRoleAssoc.attributes && dbRoleAssoc.attributes.length > 0) {
                   for (let dbAttribute of dbRoleAssoc.attributes) {
+                    const dbNestedAttributes = dbAttribute.attributes;
                     for (let userAttribute of userRoleAssoc.attributes) {
-                      if (userAttribute.id === dbAttribute.id && userAttribute.value === dbAttribute.value) {
-                        i++;
+                      const userNestedAttributes = userAttribute.attributes;
+                      if (userAttribute.id === dbAttribute.id &&
+                        userAttribute.value === dbAttribute.value &&
+                        _.isEqual(dbNestedAttributes, userNestedAttributes)) {
+                        found = true;
+                        break;
                       }
                     }
                   }
-                }
-                if (attrLength === i) {
-                  found = true;
-                  break;
                 }
               }
             }
@@ -2287,12 +2284,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
   private async modifyUsers(orgIds: string[], deactivate: boolean,
     context: any, subject?: any): Promise<User[]> {
-    const ROLE_SCOPING_ENTITY = this.cfg.get('urns:roleScopingEntity');
-    const ORGANIZATION_URN = this.cfg.get('urns:organization');
-    const ROLE_SCOPING_INSTANCE = this.cfg.get('urns:roleScopingInstance');
-
-    const eligibleUsers = [];
-
+    const deactivateUsers = [];
     const roleID = await this.getNormalUserRoleID(context, subject);
     for (let org of orgIds) {
       const result = await super.read(ReadRequest.fromPartial({
@@ -2311,43 +2303,20 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const users = result.items || [];
       for (let i = 0; i < users.length; i += 1) {
         const user: User = _.cloneDeep(users[i].payload);
-        const associations = _.cloneDeep(user.role_associations);
-        for (let k = associations.length - 1; k >= 0; k -= 1) {
-          const attributes = associations[k].attributes;
-          const attributesExist = attributes.length > 0;
-          if (attributesExist) {
-            for (let j = attributes.length - 1; j >= 0; j -= 1) {
-              const attribute = attributes[j];
-              if (attribute && attribute.id == ROLE_SCOPING_INSTANCE
-                && orgIds.indexOf(attribute.value) > -1) {
-                const prevAttribute = attributes[j - 1];
-                if (prevAttribute.id == ROLE_SCOPING_ENTITY
-                  && prevAttribute.value == ORGANIZATION_URN) {
-                  attributes.splice(j - 1, 2);
-                }
-              }
-            }
-            if (attributesExist && attributes.length == 0) {
-              user.role_associations.splice(k, 1);
-            }
-          }
-        }
-        if (user.role_associations.length == 0) {
-          user.active = false;
-          eligibleUsers.push(user);
-        }
+        user.active = false;
+        deactivateUsers.push(user);
       }
     }
 
     if (deactivate) {
-      await super.update(UserList.fromPartial({ items: eligibleUsers }), {});
+      await super.update(UserList.fromPartial({ items: deactivateUsers }), {});
     } else {
-      const ids = eligibleUsers.map((user) => { return user.id; });
+      const ids = deactivateUsers.map((user) => { return user.id; });
       this.logger.info('Deleting users:', { ids });
       await super.delete(DeleteRequest.fromPartial({ ids }), {});
     }
 
-    return eligibleUsers;
+    return deactivateUsers;
   }
 
   /**
@@ -2395,11 +2364,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       owners: !!user.meta && !_.isEmpty(user.meta.owners) ? user.meta.owners : [
         {
           id: OWNER_INDICATOR_ENTITY,
-          value: USER_URN
-        },
-        {
-          id: OWNER_SCOPING_INSTANCE,
-          value: userID
+          value: USER_URN,
+          attributes: [{
+            id: OWNER_SCOPING_INSTANCE,
+            value: userID
+          }]
         }
       ],
       modified_by: !!user.meta && !_.isEmpty(user.meta.modified_by) ? user.meta.modified_by : user.id
@@ -2488,11 +2457,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           ownerAttributes.push(
             {
               id: urns.ownerIndicatoryEntity,
-              value: urns.user
-            },
-            {
-              id: urns.ownerInstance,
-              value: resource.id
+              value: urns.user,
+              attributes: [{
+                id: urns.ownerInstance,
+                value: resource.id
+              }]
             });
           resource.meta.owners = ownerAttributes;
         }

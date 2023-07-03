@@ -53,7 +53,7 @@ export interface Resource {
 export interface Attribute {
   id: string;
   value: string;
-  attribute: Attribute[];
+  attributes: Attribute[];
 }
 
 export interface CtxResource {
@@ -62,7 +62,7 @@ export interface CtxResource {
     created?: number;
     modified?: number;
     modified_by?: string;
-    owner: Attribute[]; // id and owner is mandatory in ctx resource other attributes are optional
+    owners: Attribute[]; // id and owner is mandatory in ctx resource other attributes are optional
   };
   [key: string]: any;
 }

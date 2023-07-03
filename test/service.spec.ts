@@ -84,12 +84,11 @@ let meta: Meta = {
   owners: [{
     id: 'urn:restorecommerce:acs:names:ownerIndicatoryEntity',
     value: 'urn:restorecommerce:acs:model:organization.Organization',
-    attributes: []
-  },
-  {
-    id: 'urn:restorecommerce:acs:names:ownerInstance',
-    value: 'orgA',
-    attributes: []
+    attributes: [{
+      id: 'urn:restorecommerce:acs:names:ownerInstance',
+      value: 'orgA',
+      attributes: []
+    }]
   }]
 };
 
@@ -1376,11 +1375,11 @@ describe('testing identity-srv', () => {
             role: 'user-r-id',
             attributes: [{
               id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-              value: 'urn:restorecommerce:acs:model:organization.Organization'
-            },
-            {
-              id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-              value: 'orgC'
+              value: 'urn:restorecommerce:acs:model:organization.Organization',
+              attributes: [{
+                id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                value: 'orgC'
+              }]
             }]
           }],
           active: true
@@ -1405,11 +1404,11 @@ describe('testing identity-srv', () => {
               role: 'admin-r-id',
               attributes: [{
                 id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-                value: 'urn:restorecommerce:acs:model:organization.Organization'
-              },
-              {
-                id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-                value: 'mainOrg'
+                value: 'urn:restorecommerce:acs:model:organization.Organization',
+                attributes: [{
+                  id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                  value: 'mainOrg'
+                }]
               }]
             }
           ],
@@ -1486,11 +1485,11 @@ describe('testing identity-srv', () => {
             role: 'user-r-id',
             attributes: [{
               id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-              value: 'urn:restorecommerce:acs:model:organization.Organization'
-            },
-            {
-              id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-              value: 'orgB'
+              value: 'urn:restorecommerce:acs:model:organization.Organization',
+              attributes: [{
+                id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                value: 'orgB'
+              }]
             }]
           });
           const result = await userService.update({ items: [testUser], subject });
@@ -1499,8 +1498,8 @@ describe('testing identity-srv', () => {
           result.items[0].payload.id.should.equal('testuser');
           result.items[0].payload.first_name.should.equal('testFirstName');
           result.items[0].payload.last_name.should.equal('testLastName');
-          result.items[0].payload.role_associations[0].attributes[1].value.should.equal('orgC');
-          result.items[0].payload.role_associations[1].attributes[1].value.should.equal('orgB');
+          result.items[0].payload.role_associations[0].attributes[0].attributes[0].value.should.equal('orgC');
+          result.items[0].payload.role_associations[1].attributes[0].attributes[0].value.should.equal('orgB');
           // validate item status and overall status
           result.items[0].status.code.should.equal(200);
           result.items[0].status.message.should.equal('success');

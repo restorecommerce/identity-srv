@@ -74,11 +74,11 @@ let meta = {
   modified_by: 'SYSTEM',
   owner: [{
     id: 'urn:restorecommerce:acs:names:ownerIndicatoryEntity',
-    value: 'urn:restorecommerce:acs:model:organization.Organization'
-  },
-  {
-    id: 'urn:restorecommerce:acs:names:ownerInstance',
-    value: 'orgC'
+    value: 'urn:restorecommerce:acs:model:organization.Organization',
+    attributes: [{
+      id: 'urn:restorecommerce:acs:names:ownerInstance',
+      value: 'orgC'
+    }]
   }]
 };
 
