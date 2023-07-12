@@ -25,7 +25,7 @@
     "@restorecommerce/logger": "^1.2.3",
     "@restorecommerce/rc-grpc-clients": "^4.0.1",
     "@restorecommerce/resource-base-interface": "^1.2.1",
-    "@restorecommerce/service-config": "^1.0.5",
+    "@restorecommerce/service-config": "^1.0.6",
     "bcryptjs": "^2.4.3",
     "cross-env": "^7.0.3",
     "jose": "^4.14.4",
