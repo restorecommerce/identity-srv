@@ -317,8 +317,14 @@
   },
   "fieldHandlers": {
     "bufferFields": {
-      "user": "data"
-    }
+      "users": ["data"]
+    },
+    "timeStampFields": [
+      {
+        "fields": ["meta.created", "meta.modified"],
+        "entities": ["users", "roles", "authentication_logs", "Tokens"]
+      }
+    ]
   },
   "defaultRegisterUserRoles": [
     {

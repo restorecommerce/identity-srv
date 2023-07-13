@@ -32,7 +32,20 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
 
   constructor(cfg: any, db: any, authLogTopic: Topic, logger: any,
     isEventsEnabled: boolean, authZ: ACSAuthZ) {
-    super('authentication_log', authLogTopic, logger, new ResourcesAPIBase(db, 'authentication_logs'), isEventsEnabled);
+    let resourceFieldConfig;
+    if (cfg.get('fieldHandlers')) {
+      resourceFieldConfig = cfg.get('fieldHandlers');
+      resourceFieldConfig['bufferFields'] = resourceFieldConfig?.bufferFields?.authentication_logs;
+      if (cfg.get('fieldHandlers:timeStampFields')) {
+        resourceFieldConfig['timeStampFields'] = [];
+        for (let timeStampFiledConfig of cfg.get('fieldHandlers:timeStampFields')) {
+          if (timeStampFiledConfig.entities.includes('authentication_logs')) {
+            resourceFieldConfig['timeStampFields'].push(...timeStampFiledConfig.fields);
+          }
+        }
+      }
+    }
+    super('authentication_log', authLogTopic, logger, new ResourcesAPIBase(db, 'authentication_logs', resourceFieldConfig), isEventsEnabled);
     this.logger = logger;
     this.authZ = authZ;
     this.cfg = cfg;

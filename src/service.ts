@@ -112,7 +112,15 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     let resourceFieldConfig;
     if (cfg.get('fieldHandlers')) {
       resourceFieldConfig = cfg.get('fieldHandlers');
-      resourceFieldConfig['bufferField'] = resourceFieldConfig?.bufferFields?.user;
+      resourceFieldConfig['bufferFields'] = resourceFieldConfig?.bufferFields?.users;
+      if (cfg.get('fieldHandlers:timeStampFields')) {
+        resourceFieldConfig['timeStampFields'] = [];
+        for (let timeStampFiledConfig of cfg.get('fieldHandlers:timeStampFields')) {
+          if (timeStampFiledConfig.entities.includes('users')) {
+            resourceFieldConfig['timeStampFields'].push(...timeStampFiledConfig.fields);
+          }
+        }
+      }
     }
     super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users', resourceFieldConfig),
       isEventsEnabled);
@@ -359,7 +367,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               if (user && user && user.tokens && user.tokens.length > 0) {
                 for (let user_token of user.tokens) {
                   if (user_token.token === token) {
-                    user_token.last_login = new Date().getTime();
+                    user_token.last_login = new Date();
                   }
                 }
               }
@@ -481,6 +489,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(item => item.id) }], AuthZAction.CREATE,
         Operation.isAllowed);
     } catch (err) {
+      console.log('USERS LIST to be cretaed is...', JSON.stringify(usersList));
       this.logger.error('Error occurred requesting access-control-srv for create', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -743,7 +752,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           let userScope;
           for (let roleScopeInstObj of userRoleAttr) {
             roleScopeInstObj.attributes.filter((obj) => {
-              if(obj.id === this.cfg.get('authorization:urns:roleScopingInstance')) {
+              if (obj.id === this.cfg.get('authorization:urns:roleScopingInstance')) {
                 userScope = obj.value;
               }
             });
@@ -774,7 +783,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                   let creatorRoleAttr = role.attributes;
                   for (let roleScopeInstObj of creatorRoleAttr) {
                     roleScopeInstObj.attributes.filter((obj) => {
-                      if(obj.id === this.cfg.get('authorization:urns:roleScopingInstance')) {
+                      if (obj.id === this.cfg.get('authorization:urns:roleScopingInstance')) {
                         creatorScope = obj.value;
                       }
                     });
@@ -2587,7 +2596,20 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
 
   constructor(cfg: any, db: any, roleTopic: kafkaClient.Topic, logger: any,
     isEventsEnabled: boolean, authZ: ACSAuthZ) {
-    super('role', roleTopic, logger, new ResourcesAPIBase(db, 'roles'), isEventsEnabled);
+    let resourceFieldConfig;
+    if (cfg.get('fieldHandlers')) {
+      resourceFieldConfig = cfg.get('fieldHandlers');
+      resourceFieldConfig['bufferFields'] = resourceFieldConfig?.bufferFields?.roles;
+      if (cfg.get('fieldHandlers:timeStampFields')) {
+        resourceFieldConfig['timeStampFields'] = [];
+        for (let timeStampFiledConfig of cfg.get('fieldHandlers:timeStampFields')) {
+          if (timeStampFiledConfig.entities.includes('roles')) {
+            resourceFieldConfig['timeStampFields'].push(...timeStampFiledConfig.fields);
+          }
+        }
+      }
+    }
+    super('role', roleTopic, logger, new ResourcesAPIBase(db, 'roles', resourceFieldConfig), isEventsEnabled);
     this.logger = logger;
     const redisConfig = cfg.get('redis');
     redisConfig.database = cfg.get('redis:db-indexes:db-subject');

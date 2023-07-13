@@ -95,7 +95,7 @@ export class TokenService implements TokenServiceImplementation {
         if (user && user.tokens && user.tokens.length > 0) {
           // remove expired tokens
           expiredTokenList = (user.tokens).filter(t => {
-            return t.expires_in != 0 && t.expires_in < Math.round(new Date().getTime() / 1000);
+            return t.expires_in.getTime() != 0 && t.expires_in.getTime() < Math.round(new Date().getTime() / 1000);
           });
         }
         let token_name;
