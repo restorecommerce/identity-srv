@@ -209,41 +209,41 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
     const authToken = {
       name: uuid.v4().replace(/-/g, ''),
-      expires_in: new Date(Date.now() + (1000 * 60 * 60 * 24 * 30 * 6)), // 6 months
+      expires_in: Date.now() + (1000 * 60 * 60 * 24 * 30 * 6), // 6 months
       token,
       type: 'access_token',
       interactive: true,
-      last_login: new Date()
+      last_login: Date.now()
     };
 
     const accessToken = {
       name: oauthService + '-access_token',
-      expires_in: new Date(Date.now() + (data['result']['expires_in'] * 1000)),
+      expires_in: Date.now() + (data['result']['expires_in'] * 1000),
       token: data['access_token'],
       type: 'access_token',
       interactive: true,
-      last_login: new Date()
+      last_login: Date.now()
     };
 
     const refreshToken = {
       name: oauthService + '-refresh_token',
-      expires_in: new Date(Date.now() + (1000 * 60 * 60 * 24 * 30 * 6)), // 6 months
+      expires_in: Date.now() + (1000 * 60 * 60 * 24 * 30 * 6), // 6 months
       token: data['refresh_token'],
       type: 'refresh_token',
       interactive: true,
-      last_login: new Date()
+      last_login: Date.now()
     };
 
     try {
       // append access token on user entity
       // remove expired tokens
       await this.userService.updateUserTokens(user.id, accessToken, resultTokens.filter(t => {
-        return t.expires_in.getTime() < new Date().getTime();
+        return t.expires_in < Date.now();
       }));
       // append refresh token on user entity
       // remove all previous refresh tokens
       await this.userService.updateUserTokens(user.id, refreshToken, resultTokens.filter(t => {
-        return t.expires_in.getTime() > new Date().getTime() && t.name === oauthService + '-refresh_token';
+        return t.expires_in > Date.now() && t.name === oauthService + '-refresh_token';
       }));
       // append auth token on user entity
       await this.userService.updateUserTokens(user.id, authToken);
@@ -280,7 +280,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
     const accessTokens: any[] = tokens.filter(t => t.name.endsWith('access_token'));
     for (let accessToken of accessTokens) {
-      if (accessToken.expires_in.getTime() > Date.now()) {
+      if (accessToken.expires_in > Date.now()) {
         return {token: accessToken.token};
       }
 
@@ -291,7 +291,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
     let data;
     for (const refreshToken of refreshTokens) {
-      if (refreshToken.expires_in.getTime() < Date.now()) {
+      if (refreshToken.expires_in < Date.now()) {
         toRemove.push(refreshToken);
         continue;
       }
@@ -325,11 +325,11 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
     const newAccessToken = {
       name: oauthService + '-access_token',
-      expires_in: new Date(Date.now() + (data['result']['expires_in'] * 1000)),
+      expires_in: Date.now() + (data['result']['expires_in'] * 1000),
       token: data['access_token'],
       type: 'access_token',
       interactive: true,
-      last_login: new Date()
+      last_login: Date.now()
     };
 
     try {

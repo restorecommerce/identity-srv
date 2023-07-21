@@ -367,7 +367,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               if (user && user && user.tokens && user.tokens.length > 0) {
                 for (let user_token of user.tokens) {
                   if (user_token.token === token) {
-                    user_token.last_login = new Date();
+                    user_token.last_login = new Date().getTime();
                   }
                 }
               }
@@ -489,7 +489,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(item => item.id) }], AuthZAction.CREATE,
         Operation.isAllowed);
     } catch (err) {
-      console.log('USERS LIST to be cretaed is...', JSON.stringify(usersList));
       this.logger.error('Error occurred requesting access-control-srv for create', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
