@@ -91,9 +91,9 @@ interface serverRule {
 const permitUserRule = {
   id: 'permit_rule_id',
   target: {
-    action: [],
+    actions: [],
     resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:user.User' }],
-    subject: [
+    subjects: [
       {
         id: 'urn:restorecommerce:acs:names:role',
         value: 'admin-r-id'
@@ -116,12 +116,12 @@ let userPolicySetRQ = {
           combining_algorithm: 'urn:oasis:names:tc:xacml:3.0:rule-combining-algorithm:permit-overrides',
           id: 'user_test_policy_id',
           target: {
-            action: [],
+            actions: [],
             resources: [{
               id: 'urn:restorecommerce:acs:names:model:entity',
               value: 'urn:restorecommerce:acs:model:user.User'
             }],
-            subject: []
+            subjects: []
           }, effect: 'PERMIT',
           rules: [ // permit or deny rule will be added
           ],
