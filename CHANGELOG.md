@@ -1,3 +1,7 @@
+## 1.1.6 (July 26th, 2023)
+
+- up deps
+
 ## 1.1.5 (July 26th, 2023)
 
 - roleAssociation and owner attributes
