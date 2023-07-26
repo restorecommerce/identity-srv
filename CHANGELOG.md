@@ -1,3 +1,9 @@
+## 1.1.5 (July 26th, 2023)
+
+- roleAssociation and owner attributes
+- For DateTimeStamp field handling
+- up deps
+
 ## 1.1.4 (June 28th, 2023)
 
 - bump package and package lock version

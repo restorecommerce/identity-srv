@@ -7,6 +7,12 @@
       },
       "dataStream": true,
       "source": "identity-srv"
+    },
+    "console": {
+      "handleExceptions": false,
+      "level": "silly",
+      "colorize": true,
+      "prettyPrint": true
     }
   },
   "redis": {
@@ -22,14 +28,14 @@
   },
   "service": {
     "hbsTemplates": {
-      "registrationSubjectTpl": "http://restorecommerce-console:8080/identity-srv/templates/registration_subject.hbs",
-      "registrationBodyTpl": "http://restorecommerce-console:8080/identity-srv/templates/registration_body.hbs",
-      "changePWEmailSubjectTpl": "http://restorecommerce-console:8080/identity-srv/templates/change_password_email_subject.hbs",
-      "changePWEmailBodyTpl": "http://restorecommerce-console:8080/identity-srv/templates/change_password_email_body.hbs",
-      "invitationSubjectTpl": "http://restorecommerce-console:8080/identity-srv/templates/invitation_subject.hbs",
-      "invitationBodyTpl": "http://restorecommerce-console:8080/identity-srv/templates/invitation_body.hbs",
-      "layoutTpl": "http://restorecommerce-console:8080/identity-srv/templates/layout.hbs",
-      "resourcesTpl": "http://restorecommerce-console:8080/identity-srv/templates/resources.json"
+      "registrationSubjectTpl": "http://console.restorecommerce.io/identity-srv/templates/registration_subject.hbs",
+      "registrationBodyTpl": "http://console.restorecommerce.io/identity-srv/templates/registration_body.hbs",
+      "changePWEmailSubjectTpl": "http://console.restorecommerce.io/identity-srv/templates/change_password_email_subject.hbs",
+      "changePWEmailBodyTpl": "http://console.restorecommerce.io/identity-srv/templates/change_password_email_body.hbs",
+      "invitationSubjectTpl": "http://console.restorecommerce.io/identity-srv/templates/invitation_subject.hbs",
+      "invitationBodyTpl": "http://console.restorecommerce.io/identity-srv/templates/invitation_body.hbs",
+      "layoutTpl": "http://console.restorecommerce.io/identity-srv/templates/layout.hbs",
+      "resourcesTpl": "http://console.restorecommerce.io/identity-srv/templates/resources.json"
     }
   },
   "database": {
