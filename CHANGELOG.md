@@ -1,3 +1,10 @@
+## 1.1.8 (July 28th, 2023)
+
+- date object for findByToken and AuthenticationLogs
+- use server generated typings
+- hbs email template urls
+- email sending
+
 ## 1.1.7 (July 26th, 2023)
 
 - up deps
