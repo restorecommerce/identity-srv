@@ -1,3 +1,7 @@
+## 1.1.9 (July 28th, 2023)
+
+- fix email config 
+
 ## 1.1.8 (July 28th, 2023)
 
 - date object for findByToken and AuthenticationLogs
