@@ -10,11 +10,11 @@ import {
   DeepPartial,
   FilterOp, FilterOp_Operator,
   Filter_Operation
-} from '@restorecommerce/rc-grpc-clients/dist/generated/io/restorecommerce/resource_base';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
 import {
   UserServiceDefinition,
   UserServiceClient
-} from '@restorecommerce/rc-grpc-clients/dist/generated/io/restorecommerce/user';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import {
   Response_Decision
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
