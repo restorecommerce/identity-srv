@@ -326,6 +326,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         // user data
         logger.debug('Found user data in redis cache', { token });
         userData = JSON.parse(userData);
+        if(userData?.meta?.created || userData?.meta?.modified) {
+          userData.meta.created = new Date(userData.meta.created);
+          userData.meta.modified = new Date(userData.meta.modified);
+        }
         // validate token expiry date and delete it if expired
         if (userData && userData.tokens) {
           const dbToken = _.find(userData.tokens, { token });

@@ -335,6 +335,10 @@
       {
         "fields": ["meta.created", "meta.modified"],
         "entities": ["users", "roles", "authentication_logs", "Tokens"]
+      },
+      {
+        "fields": ["date"],
+        "entities": ["authentication_logs"]
       }
     ]
   },
