@@ -130,7 +130,15 @@ export const marshallProtobufAny = (msg: any): any => {
   };
 };
 
-export const unmarshallProtobufAny = (msg: any): any => JSON.parse(msg.value.toString());
+export const unmarshallProtobufAny = (msg: any, logger: any): any => {
+  try {
+    if(msg.value) {
+      return JSON.parse(msg.value.toString());
+    }
+  } catch(error) {
+    logger.error('Error unmarshalling JSON', msg);
+  }
+};
 
 export const getDefaultFilter = (identifier): DeepPartial<FilterOp[]> => {
   return [{

@@ -8,19 +8,19 @@
       "email"
     ],
     "hbs_templates": {
-      "registrationSubjectTpl": "http://localhost:50066/storage/internal/identity-srv/templates/registration_subject.hbs",
-      "registrationBodyTpl": "http://localhost:50066/storage/internal/identity-srv/templates/registration_body.hbs",
-      "changePWEmailSubjectTpl": "http://localhost:50066/storage/internal/identity-srv/templates/change_password_email_subject.hbs",
-      "changePWEmailBodyTpl": "http://localhost:50066/storage/internal/identity-srv/templates/change_password_email_body.hbs",
-      "invitationSubjectTpl": "http://localhost:50066/storage/internal/identity-srv/templates/invitation_subject.hbs",
-      "invitationBodyTpl": "http://localhost:50066/storage/internal/identity-srv/templates/invitation_body.hbs",
-      "layoutTpl": "http://localhost:50066/storage/internal/identity-srv/templates/layout.hbs",
-      "resourcesTpl": "http://localhost:50066/storage/internal/identity-srv/templates/resources.json"
+      "registrationSubjectTpl": "http://localhost:5000/storage/internal/identity-srv/templates/registration_subject.hbs",
+      "registrationBodyTpl": "http://localhost:5000/storage/internal/identity-srv/templates/registration_body.hbs",
+      "changePWEmailSubjectTpl": "http://localhost:5000/storage/internal/identity-srv/templates/change_password_email_subject.hbs",
+      "changePWEmailBodyTpl": "http://localhost:5000/storage/internal/identity-srv/templates/change_password_email_body.hbs",
+      "invitationSubjectTpl": "http://localhost:5000/storage/internal/identity-srv/templates/invitation_subject.hbs",
+      "invitationBodyTpl": "http://localhost:5000/storage/internal/identity-srv/templates/invitation_body.hbs",
+      "layoutTpl": "http://localhost:5000/storage/internal/identity-srv/templates/layout.hbs",
+      "resourcesTpl": "http://localhost:5000/storage/internal/identity-srv/templates/resources.json"
     },
-    "activationURL": "http://restorecommerce.io/activate_user",
-    "emailConfirmationURL": "http://restorecommerce.io/confirm_email_change",
-    "passwordChangeConfirmationURL": "http://restorecommerce.io/confirm_password_change",
-    "invitationURL": "http://restorecommerce.io/#/invite_user",
+    "activationURL": "http://console.restorecommerce.io/activate_user",
+    "emailConfirmationURL": "http://console.restorecommerce.io/confirm_email_change",
+    "passwordChangeConfirmationURL": "http://console.restorecommerce.io/confirm_password_change",
+    "invitationURL": "http://console.restorecommerce.io/#/invite_user",
     "minUsernameLength": 8,
     "maxUsernameLength": 40
   },

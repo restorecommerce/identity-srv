@@ -1081,8 +1081,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return;
     }
 
-    const responseBody = unmarshallProtobufAny(renderResponse.response[0]);
-    const responseSubject = unmarshallProtobufAny(renderResponse.response[1]);
+    const responseBody = unmarshallProtobufAny(renderResponse.responses[0], this.logger);
+    const responseSubject = unmarshallProtobufAny(renderResponse.responses[1], this.logger);
     const emailData = this.makeNotificationData(emailAddress, responseBody, responseSubject);
     await this.topics.notificationReq.emit('sendEmail', emailData);
   }
@@ -2250,7 +2250,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
     return {
       id: `identity#${userEmail}`,
-      payload: [{
+      payloads: [{
         templates: marshallProtobufAny({
           body: { body, layout: this.layoutTpl },
         }),

@@ -41,6 +41,9 @@ import {
 import {
   protoMetadata as reflectionMeta
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/reflection/v1alpha/reflection';
+import {
+  protoMetadata as notificationReqMeta
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/notification_req';
 import { ServerReflectionService } from 'nice-grpc-server-reflection';
 
 registerProtoMeta(
@@ -50,7 +53,8 @@ registerProtoMeta(
   tokenMeta,
   commandInterfaceMeta,
   renderingMeta,
-  reflectionMeta
+  reflectionMeta,
+  notificationReqMeta
 );
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
