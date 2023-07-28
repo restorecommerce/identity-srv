@@ -27,7 +27,7 @@
     }
   },
   "service": {
-    "hbsTemplates": {
+    "hbs_templates": {
       "registrationSubjectTpl": "http://facade-srv:5000/storage/internal/identity-srv/templates/registration_subject.hbs",
       "registrationBodyTpl": "http://facade-srv:5000/storage/internal/identity-srv/templates/registration_body.hbs",
       "changePWEmailSubjectTpl": "http://facade-srv:5000/storage/internal/identity-srv/templates/change_password_email_subject.hbs",

@@ -358,10 +358,6 @@
   },
   "techUsers": [
     {
-      "id": "hbs_user",
-      "token": "change.this.token.number"
-    },
-    {
       "id": "upsert_user_tokens",
       "token": "123099ffc93b44f6b4a81b1e5589b642"
     }
