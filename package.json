@@ -46,7 +46,7 @@
     "@typescript-eslint/eslint-plugin-tslint": "^6.2.0",
     "@typescript-eslint/parser": "^6.2.0",
     "coveralls": "^3.1.1",
-    "eslint": "^8.45.0",
+    "eslint": "^8.48.0",
     "eslint-plugin-prefer-arrow-functions": "^3.1.4",
     "mocha": "^10.2.0",
     "nodemon": "^3.0.1",
