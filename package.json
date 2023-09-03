@@ -40,7 +40,7 @@
     "@alenon/grpc-mock-server": "^3.0.21",
     "@restorecommerce/protos": "^5.0.1",
     "@types/mocha": "^10.0.1",
-    "@types/node": "^20.4.5",
+    "@types/node": "^20.5.9",
     "@types/oauth": "^0.9.1",
     "@typescript-eslint/eslint-plugin": "^6.2.0",
     "@typescript-eslint/eslint-plugin-tslint": "^6.2.0",
