@@ -774,7 +774,7 @@ describe('testing identity-srv', () => {
           const result = await (userService.findByRole({
             role: 'invalid_role',
           }));
-          result.items.should.be.empty();
+          should.not.exist(result.items);
           should.exist(result.operation_status);
           result.operation_status.code.should.equal(404);
           result.operation_status.message.should.equal('Role invalid_role does not exist');
@@ -1235,7 +1235,7 @@ describe('testing identity-srv', () => {
           const result = await userService.find({
             id: testUserID,
           });
-          result.items.should.be.empty();
+          should.not.exist(result.items);
           result.operation_status.code.should.equal(404);
           result.operation_status.message.should.equal('user not found');
         });
@@ -1534,6 +1534,7 @@ describe('testing identity-srv', () => {
           };
           testUser.role_associations[0].role = 'invalid_role';
           const result = await userService.create({ items: [testuser1, testUser], subject });
+          
           result.items[0].status.code.should.equal(403);
           result.items[0].status.message.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
           result.items[0].status.id.should.equal('testuser');

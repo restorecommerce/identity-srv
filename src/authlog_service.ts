@@ -118,7 +118,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
     }
 
     if (acsResponse.decision === Response_Decision.PERMIT) {
-      for (let i = 0; i < items.length; i += 1) {
+      for (let i = 0; i < items?.length; i += 1) {
         // read the role from DB and check if it exists
         const auth_log = items[i];
         const filters = [{
@@ -129,19 +129,19 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
           }],
         }];
         const auth_logs = await super.read(ReadRequest.fromPartial({ filters }), context);
-        if (auth_logs.total_count === 0) {
+        if (auth_logs?.total_count === 0) {
           return returnOperationStatus(400, 'roles not found for updating');
         }
-        const authLogDB = auth_logs.items[0];
+        const authLogDB = auth_logs?.items[0];
         // update meta information from existing Object in case if its
         // not provided in request
-        if (!auth_log.meta) {
+        if (!auth_log?.meta) {
           auth_log.meta = authLogDB.payload.meta;
-        } else if (auth_log.meta && _.isEmpty(auth_log.meta.owners)) {
+        } else if (auth_log.meta && _.isEmpty(auth_log?.meta?.owners)) {
           auth_log.meta.owners = authLogDB.payload.meta.owners;
         }
         // check for ACS if owners information is changed
-        if (!_.isEqual(auth_log.meta.owners, authLogDB.payload.meta.owners)) {
+        if (!_.isEqual(auth_log?.meta?.owners, authLogDB?.payload?.meta?.owners)) {
           let acsResponse: DecisionResponse;
           try {
             if (!context) { context = {}; };
@@ -208,7 +208,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
       Object.assign(resources, { id: authLogIDs });
       acsResources = await this.createMetadata({ id: authLogIDs }, AuthZAction.DELETE, subject);
     }
-    if (request.collection) {
+    if (request?.collection) {
       acsResources = [{ collection: request.collection }];
     }
     let acsResponse: DecisionResponse;
@@ -236,7 +236,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
       }
       logger.silly('deleting Role IDs:', { authLogIDs });
       // Check each user exist if one of the user does not exist throw an error
-      for (let authLogID of authLogIDs) {
+      for (let authLogID of authLogIDs || []) {
         const filters = [{
           filters: [{
             field: 'id',
@@ -270,7 +270,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
       resources = [resources];
     }
     const urns = this.cfg.get('authorization:urns');
-    if (subject && subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
+    if (subject?.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
       // add user and subject scope as default owners
       orgOwnerAttributes.push(
         {
@@ -283,7 +283,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         });
     }
 
-    for (let resource of resources) {
+    for (let resource of resources || []) {
       if (!resource.meta) {
         resource.meta = {};
       }
@@ -292,15 +292,15 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
           filters: [{
             field: 'id',
             operation: Filter_Operation.eq,
-            value: resource.id
+            value: resource?.id
           }]
         }];
         let result = await super.read(ReadRequest.fromPartial({ filters }), context);
         // update owners info
-        if (result.items.length === 1) {
+        if (result?.items?.length === 1) {
           let item = result.items[0].payload;
-          resource.meta.owners = item.meta.owners;
-        } else if (result.items.length === 0 && !resource.meta.owners) {
+          resource.meta.owners = item?.meta?.owners;
+        } else if (result?.items?.length === 0 && !resource?.meta?.owners) {
           let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
           ownerAttributes.push(
             {

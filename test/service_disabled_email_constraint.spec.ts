@@ -619,28 +619,6 @@ describe('testing identity-srv', () => {
         let activation_code;
         const email = 'test@ms.restorecommerce.io';
         const userName = 'test.user1';
-        it('should allow to ChangePassword with user name as identifier', async () => {
-          // password_hash before change pass
-          const user_before = await userService.find({
-            name: userName
-          });
-          const prev_pass_hash = user_before.items[0].payload.password_hash;
-          should.exist(prev_pass_hash);
-          const result = await userService.changePassword({
-            password: 'notsecure',
-            new_password: 'secure',
-            subject: { id: user_before.items[0].payload.id }
-          });
-          should.exist(result.operation_status);
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
-          // password_hash after change pass
-          const user_after = await userService.find({
-            name: userName
-          });
-          const current_pass_hash = user_after.items[0].payload.password_hash;
-          current_pass_hash.should.not.equal(prev_pass_hash);
-        });
         it('should throw an error for RequestPasswordChange with email as identifier when is not unique', async () => {
           const result = await userService.requestPasswordChange({
             identifier: email

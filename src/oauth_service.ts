@@ -238,12 +238,12 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       // append access token on user entity
       // remove expired tokens
       await this.userService.updateUserTokens(user.id, accessToken, resultTokens.filter(t => {
-        return t.expires_in < Date.now();
+        return t?.expires_in < Date.now();
       }));
       // append refresh token on user entity
       // remove all previous refresh tokens
       await this.userService.updateUserTokens(user.id, refreshToken, resultTokens.filter(t => {
-        return t.expires_in > Date.now() && t.name === oauthService + '-refresh_token';
+        return t?.expires_in > Date.now() && t?.name === oauthService + '-refresh_token';
       }));
       // append auth token on user entity
       await this.userService.updateUserTokens(user.id, authToken);

@@ -82,7 +82,6 @@ import {
   RoleAssociation,
   Subject
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
-import { FilterOp } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/filter';
 
 export class UserService extends ServiceBase<UserListResponse, UserList> implements UserServiceImplementation {
 
@@ -209,14 +208,14 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           value: email
         });
       }
-      if (filterStructure.filters[0].filters.length > 1) {
+      if (filterStructure?.filters[0]?.filters?.length > 1) {
         filterStructure.filters[0].operator = FilterOp_Operator.or;
       }
 
       // add ACS filters if subject is not tech user
       let acsFilterObj, techUser;
       const techUsersCfg = this.cfg.get('techUsers');
-      if (techUsersCfg && techUsersCfg.length > 0) {
+      if (techUsersCfg?.length > 0) {
         techUser = _.find(techUsersCfg, { id: subject.id });
       }
       let filters = getACSFilters(acsResponse, 'user');
@@ -234,10 +233,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }
       }
       const readRequest = ReadRequest.fromPartial({});
-      readRequest.filters = filterStructure.filters;
-      if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
-        readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
-        readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
+      readRequest.filters = filterStructure?.filters;
+      if (acsResponse?.custom_query_args?.length > 0) {
+        readRequest.custom_queries = acsResponse?.custom_query_args[0]?.custom_queries;
+        readRequest.custom_arguments = acsResponse?.custom_query_args[0]?.custom_arguments;
       }
       const users = await super.read(readRequest, context);
       if (users.total_count > 0) {
@@ -326,14 +325,14 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         // user data
         logger.debug('Found user data in redis cache', { token });
         userData = JSON.parse(userData);
-        if(userData?.meta?.created || userData?.meta?.modified) {
+        if (userData?.meta?.created || userData?.meta?.modified) {
           userData.meta.created = new Date(userData.meta.created);
           userData.meta.modified = new Date(userData.meta.modified);
         }
         // validate token expiry date and delete it if expired
-        if (userData && userData.tokens) {
+        if (userData?.tokens) {
           const dbToken = _.find(userData.tokens, { token });
-          if ((dbToken && dbToken.expires_in === 0) || (dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000))) {
+          if ((dbToken?.expires_in === 0) || (dbToken?.expires_in >= Math.round(new Date().getTime() / 1000))) {
             return { payload: userData, status: returnCodeMessage(200, 'success') };
           } else {
             // delete token from redis and update user entity
@@ -353,22 +352,22 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           }]
         }];
         let users = await super.read(ReadRequest.fromPartial({ filters }), context);
-        if (users.total_count === 0) {
+        if (users?.total_count === 0) {
           logger.debug('No user found for provided token value', { token });
           return { status: { code: 401, message: 'No user found for provided token value' } };
         }
-        if (users.total_count === 1) {
+        if (users?.total_count === 1) {
           logger.debug('found user from token', { users });
-          if (users.items && users.items[0] && users.items[0].payload) {
+          if (users?.items[0]?.payload) {
             // validate token expiry and delete if expired
             const dbToken = _.find(users.items[0].payload.tokens, { token });
 
-            if ((dbToken && dbToken.expires_in === 0) || (dbToken && dbToken.expires_in >= Math.round(new Date().getTime() / 1000))) {
+            if ((dbToken?.expires_in === 0) || (dbToken?.expires_in >= Math.round(new Date().getTime() / 1000))) {
               await this.tokenRedisClient.set(token, JSON.stringify(users.items[0].payload));
               logger.debug('Stored user data to redis cache successfully');
               // update token last_login
               let user = users.items[0].payload;
-              if (user && user && user.tokens && user.tokens.length > 0) {
+              if (user?.tokens?.length > 0) {
                 for (let user_token of user.tokens) {
                   if (user_token.token === token) {
                     user_token.last_login = new Date().getTime();
@@ -431,7 +430,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     if (acsResponse.decision != Response_Decision.PERMIT) {
       return { operation_status: acsResponse.operation_status };
     }
-
     const acsFilters = getACSFilters(acsResponse, 'user');
     const readRequest = ReadRequest.fromPartial({
       offset: request.offset, limit: request.limit,
@@ -456,10 +454,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       let rolesList = roles?.items?.map(e => e.payload);
       users?.items?.forEach(userObj => {
         let userRoles = [];
-        if (userObj.payload) {
+        if (userObj?.payload) {
           userObj?.payload?.role_associations?.forEach(roleAssoc => {
             let role = rolesList?.filter(r => r.id === roleAssoc?.role);
-            if (role && role.length === 1) {
+            if (role?.length === 1) {
               userRoles.push(role[0]);
             }
           });
@@ -503,11 +501,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       if (this.cfg.get('authorization:enabled')) {
         try {
           // validate and remove item if there is an error when verifying role associations
-          for (let item of usersList) {
+          for (let item of usersList || []) {
             const verficationResponse = await this.verifyUserRoleAssociations([item], subject);
             // error verifying role associations
             const userID = item.id;
-            if (!_.isEmpty(verficationResponse) && verficationResponse.status && verficationResponse.status.message) {
+            if (!_.isEmpty(verficationResponse) && verficationResponse?.status?.message) {
               insertedUsers.items.push(returnStatus(verficationResponse.status.code,
                 verficationResponse.status.message, verficationResponse.status.id));
               usersList = _.filter(usersList, (item) => (item.id != userID));
@@ -535,7 +533,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           }
           insertedUsers.items.push(await this.createUser(user, context));
 
-          if (this.emailEnabled && user.invite) {
+          if (this.emailEnabled && user?.invite) {
             await this.fetchHbsTemplates();
             // send render request for user Invitation
             const renderRequest = this.makeInvitationEmailData(user);
@@ -560,11 +558,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
     if (token) {
       user = await this.findByToken(FindByTokenRequest.fromPartial({ token }), {});
-      if (user && user.payload) {
-        const tokenFound = _.find(user.payload.tokens, { token });
-        if (tokenFound && tokenFound.interactive) {
+      if (user?.payload) {
+        const tokenFound = _.find(user?.payload?.tokens, { token });
+        if (tokenFound && tokenFound?.interactive) {
           redisHRScopesKey = `cache:${user.payload.id}:hrScopes`;
-        } else if (tokenFound && !tokenFound.interactive) {
+        } else if (tokenFound && !tokenFound?.interactive) {
           redisHRScopesKey = `cache:${user.payload.id}:${token}:hrScopes`;
         }
         subject.role_associations = user.payload.role_associations;
@@ -573,8 +571,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     if (redisHRScopesKey) {
       hierarchical_scopes = await this.redisClient.get(redisHRScopesKey) as any;
-      hierarchical_scopes = hierarchical_scopes ? JSON.parse(hierarchical_scopes) : subject.hierarchical_scopes;
-    } else if (subject && subject.hierarchical_scopes) {
+      hierarchical_scopes = hierarchical_scopes ? JSON.parse(hierarchical_scopes) : subject?.hierarchical_scopes;
+    } else if (subject && subject?.hierarchical_scopes) {
       hierarchical_scopes = subject.hierarchical_scopes;
     }
 
@@ -599,25 +597,25 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         (configuredApiKey && subject.token && configuredApiKey === subject.token)) {
         return;
       }
-      if (acsResponse && (acsResponse as PolicySetRQResponse).policy_sets && (acsResponse as PolicySetRQResponse).policy_sets.length > 0) {
+      if ((acsResponse as PolicySetRQResponse)?.policy_sets?.length > 0) {
         const policiesList = (acsResponse as PolicySetRQResponse).policy_sets[0].policies;
-        if (policiesList && policiesList.length > 0) {
+        if (policiesList?.length > 0) {
           for (let policy of policiesList) {
-            for (let rule of policy.rules) {
-              if (rule.effect === Effect.PERMIT && rule.target && rule.target.subjects) {
+            for (let rule of policy?.rules) {
+              if (rule?.effect === Effect.PERMIT && rule?.target?.subjects) {
                 // check if the rule subject has any scoping Entity
-                const ruleSubjectAttrs = rule.target.subjects;
-                for (let ruleAttr of ruleSubjectAttrs) {
-                  if (ruleAttr.id === this.cfg.get('authorization:urns:role')) {
+                const ruleSubjectAttrs = rule?.target?.subjects;
+                for (let ruleAttr of ruleSubjectAttrs || []) {
+                  if (ruleAttr?.id === this.cfg.get('authorization:urns:role')) {
                     // rule's role which give's user the acess to create User
                     createAccessRole.push(ruleAttr.value);
                     // check if there is no scoping then skip comparing / validating role scope instance
                     // ex: superAdmin who does not have role scoping instance
-                    if (ruleSubjectAttrs.length === 1) {
+                    if (ruleSubjectAttrs?.length === 1) {
                       skipValidatingScopingInstance = true;
                     }
                   }
-                  if (ruleAttr.id === this.cfg.get('authorization:urns:roleScopingEntity')) {
+                  if (ruleAttr?.id === this.cfg.get('authorization:urns:roleScopingEntity')) {
                     validateRoleScope = true;
                   }
                 }
@@ -631,7 +629,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return returnStatus(err.code, err.message);
     }
     // check if the assignable_by_roles contain createAccessRole
-    for (let user of usersList) {
+    for (let user of usersList || []) {
       let userRoleAssocs = user.role_associations ? user.role_associations : [];
       let targetUserRoleIds = [];
       if (_.isEmpty(userRoleAssocs)) {
@@ -661,13 +659,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         return returnStatus(400, message, user.id);
       }
       let dbTargetRoles = [];
-      if (_.isArray(rolesData?.items) && rolesData?.items?.length > 0) {
+      if (rolesData?.items?.length > 0) {
         for (let targetRole of rolesData.items) {
-          if (targetRole.payload) {
+          if (targetRole?.payload?.id) {
             dbTargetRoles.push(targetRole.payload.id);
-            if (!targetRole.payload.assignable_by_roles ||
-              !createAccessRole.some((role) => targetRole.payload.assignable_by_roles.includes(role))) {
-              const userName = user && user.name ? user.name : undefined;
+            if (!targetRole?.payload?.assignable_by_roles ||
+              !createAccessRole.some((role) => targetRole?.payload?.assignable_by_roles?.includes(role))) {
+              const userName = user?.name ? user.name : undefined;
               let message = `The target role ${targetRole.payload.id} cannot be assigned to` +
                 ` user ${userName} as user role ${createAccessRole} does not have permissions`;
               this.logger.verbose(message);
@@ -678,9 +676,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
 
       // validate target roles is a valid role in DB
-      for (let targetUserRoleId of targetUserRoleIds) {
-        if (!dbTargetRoles.includes(targetUserRoleId)) {
-          const userName = user && user.name ? user.name : undefined;
+      for (let targetUserRoleId of targetUserRoleIds || []) {
+        if (!dbTargetRoles?.includes(targetUserRoleId)) {
+          const userName = user?.name ? user.name : undefined;
           let message = `The target role ${targetUserRoleId} is invalid and cannot be assigned to` +
             ` user ${userName}`;
           this.logger.verbose(message);
@@ -699,9 +697,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // find the HR scopes which gives user the create access
       // it's an array `hrScopes` since an user can be Admin for multiple orgs
       let hrScopes: HierarchicalScope[] = [];
-      hierarchical_scopes = subject.hierarchical_scopes;
+      hierarchical_scopes = subject?.hierarchical_scopes;
       if (!_.isEmpty(hierarchical_scopes)) {
-        for (let hrScope of hierarchical_scopes) {
+        for (let hrScope of hierarchical_scopes || []) {
           for (let accessRole of createAccessRole) {
             if (hrScope.role === accessRole) {
               hrScopes.push(hrScope);
@@ -716,15 +714,15 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         return returnStatus(401, 'No Hierarchical Scopes could be found', usersList[0].id);
       }
       for (let user of usersList) {
-        if (user.role_associations && user.role_associations.length > 0) {
+        if (user?.role_associations?.length > 0) {
           const validationResponse = this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, subject, user.id);
           if (!_.isEmpty(validationResponse)) {
             return validationResponse;
           }
-          if (!_.isEmpty(user.tokens)) {
+          if (!_.isEmpty(user?.tokens)) {
             for (let token of user.tokens) {
-              if (!token.interactive && !_.isEmpty(token.scopes)) {
-                for (let scope of token.scopes) {
+              if (!token?.interactive && !_.isEmpty(token?.scopes)) {
+                for (let scope of token?.scopes || []) {
                   // if scope is not found in role assoc invalid scope assignemnt in token
                   if (!_.find(user.role_associations, { id: scope })) {
                     let message = `Invalid token scope ${scope} found for Subject ${user.id}`;
@@ -746,80 +744,78 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    */
   private validateUserRoleAssociations(userRoleAssocs: RoleAssociation[],
     hrScopes: HierarchicalScope[], userName: string, subject: ResolvedSubject, userID: string) {
-    if (userRoleAssocs && !_.isEmpty(userRoleAssocs)) {
-      for (let userRoleAssoc of userRoleAssocs) {
-        let validUserRoleAssoc = false;
-        let userRole = userRoleAssoc.role;
-        if (userRole) {
-          let userRoleAttr = userRoleAssoc.attributes;
-          let userScope;
-          for (let roleScopeInstObj of userRoleAttr) {
-            roleScopeInstObj.attributes.filter((obj) => {
-              if (obj.id === this.cfg.get('authorization:urns:roleScopingInstance')) {
-                userScope = obj.value;
-              }
-            });
-          }
-          // validate the userRole and userScope with hrScopes
-          if (userRole && hrScopes && !_.isEmpty(hrScopes)) {
-            for (let hrScope of hrScopes) {
-              if (userScope && this.checkTargetScopeExists(hrScope, userScope)) {
-                // check if userScope is valid in hrScope
-                validUserRoleAssoc = true;
-                break;
-              } else if (!userScope) {
-                // if targetscope for role is not defined and since its already
-                // verified this user role is assignable by cretor its considered a valid role association
-                validUserRoleAssoc = true;
-                break;
-              }
+    for (let userRoleAssoc of userRoleAssocs || []) {
+      let validUserRoleAssoc = false;
+      let userRole = userRoleAssoc?.role;
+      if (userRole) {
+        let userRoleAttr = userRoleAssoc?.attributes as Attribute[];
+        let userScope;
+        for (let roleScopeInstObj of userRoleAttr || []) {
+          roleScopeInstObj?.attributes?.filter((obj) => {
+            if (obj?.id === this.cfg.get('authorization:urns:roleScopingInstance')) {
+              userScope = obj?.value;
+            }
+          });
+        }
+        // validate the userRole and userScope with hrScopes
+        if (userRole && hrScopes.length > 0) {
+          for (let hrScope of hrScopes) {
+            if (userScope && this.checkTargetScopeExists(hrScope, userScope)) {
+              // check if userScope is valid in hrScope
+              validUserRoleAssoc = true;
+              break;
+            } else if (!userScope) {
+              // if targetscope for role is not defined and since its already
+              // verified this user role is assignable by cretor its considered a valid role association
+              validUserRoleAssoc = true;
+              break;
             }
           }
-          if (!validUserRoleAssoc) {
-            // check the context role assoc - scope matches with requested scope
-            if (subject.role_associations) {
-              const creatorRoleAssocs = subject.role_associations;
-              for (let role of creatorRoleAssocs) {
-                if (role.role === userRole) {
-                  // check if the target scope matches
-                  let creatorScope;
-                  let creatorRoleAttr = role.attributes;
-                  for (let roleScopeInstObj of creatorRoleAttr) {
-                    roleScopeInstObj.attributes.filter((obj) => {
-                      if (obj.id === this.cfg.get('authorization:urns:roleScopingInstance')) {
-                        creatorScope = obj.value;
-                      }
-                    });
-                  }
-                  if (creatorScope && creatorScope === userScope) {
-                    validUserRoleAssoc = true;
-                    break;
-                  }
+        }
+        if (!validUserRoleAssoc) {
+          // check the context role assoc - scope matches with requested scope
+          if (subject?.role_associations?.length > 0) {
+            const creatorRoleAssocs = subject.role_associations;
+            for (let role of creatorRoleAssocs || []) {
+              if (role.role === userRole) {
+                // check if the target scope matches
+                let creatorScope;
+                let creatorRoleAttr = role.attributes;
+                for (let roleScopeInstObj of creatorRoleAttr) {
+                  roleScopeInstObj?.attributes?.filter((obj) => {
+                    if (obj?.id === this.cfg.get('authorization:urns:roleScopingInstance')) {
+                      creatorScope = obj?.value;
+                    }
+                  });
+                }
+                if (creatorScope && creatorScope === userScope) {
+                  validUserRoleAssoc = true;
+                  break;
                 }
               }
             }
           }
-          if (!validUserRoleAssoc) {
-            let details = '';
-            if (userScope) {
-              details = `do not have permissions to assign target scope ${userScope} for ${userName}`;
-            }
-            let message = `the role ${userRole} cannot be assigned to user ${userName};${details}`;
-            this.logger.verbose(message);
-            return returnStatus(403, message, userID);
+        }
+        if (!validUserRoleAssoc) {
+          let details = '';
+          if (userScope) {
+            details = `do not have permissions to assign target scope ${userScope} for ${userName}`;
           }
+          let message = `the role ${userRole} cannot be assigned to user ${userName};${details}`;
+          this.logger.verbose(message);
+          return returnStatus(403, message, userID);
         }
       }
     }
   }
 
   private checkTargetScopeExists(hrScope: HierarchicalScope, targetScope: string): boolean {
-    if (hrScope.id === targetScope) {
+    if (hrScope?.id === targetScope) {
       // found the target scope object, iterate and put the orgs in reducedUserScope array
       this.logger.debug(`Valid target scope:`, targetScope);
       return true;
-    } else if (hrScope.children) {
-      for (let childNode of hrScope.children) {
+    } else if (hrScope?.children.length > 0) {
+      for (let childNode of hrScope?.children) {
         if (this.checkTargetScopeExists(childNode, targetScope)) {
           return true;
         }
@@ -839,7 +835,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     logger.silly('request to register a user');
 
     this.setUserDefaults(user);
-    if ((!user.password && !user.invite && (user.user_type != UserType.TECHNICAL_USER))) {
+    if ((!user?.password && !user?.invite && (user?.user_type != UserType.TECHNICAL_USER))) {
       return returnStatus(400, 'argument password is empty', user.id);
     }
     if (!user.email) {
@@ -851,11 +847,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     const serviceCfg = this.cfg.get('service');
 
-    const minLength = serviceCfg.minUsernameLength;
-    const maxLength = serviceCfg.maxUsernameLength;
+    const minLength = serviceCfg?.minUsernameLength;
+    const maxLength = serviceCfg?.maxUsernameLength;
 
     try {
-      this.validUsername(user.name, minLength, maxLength, logger);
+      this.validUsername(user?.name, minLength, maxLength, logger);
     } catch (err) {
       const errorMessage = `Error while validating username: ${user.name}, ` +
         `error: ${err.name}, message:${err.details}`;
@@ -863,14 +859,14 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return returnStatus(400, errorMessage, user.id);
     }
 
-    if (_.isEmpty(user.first_name) || _.isEmpty(user.last_name)) {
+    if (_.isEmpty(user?.first_name) || _.isEmpty(user?.last_name)) {
       return returnStatus(400, 'User register requires both first and last name', user.id);
     }
 
     // Since for guestUser he should be able to register with same email ID multiple times
     // so we are creating user and not making the unique emailID or user name check
     // Guest creation
-    if (user.guest) {
+    if (user?.guest) {
       logger.silly('request to register a guest');
 
       const createStatus = await super.create(UserList.fromPartial({
@@ -902,10 +898,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
     let users = await super.read(ReadRequest.fromPartial({ filters }), context);
     if (users.total_count > 0) {
-      let guest = false;
-      for (let user of users.items) {
-        if (user.payload.guest) {
-          guest = true;
+      for (let user of users.items || []) {
+        if (user?.payload?.guest) {
           logger.debug('Guest user', { name: user.payload.name });
         } else {
           logger.debug('user does already exist', users);
@@ -995,11 +989,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     let user: DeepPartial<User>;
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
 
-    if (users && users.total_count === 1) {
-      user = users.items[0].payload;
-    } else if (users.total_count === 0) {
+    if (users?.total_count === 1) {
+      user = users?.items[0]?.payload;
+    } else if (users?.total_count === 0) {
       return returnOperationStatus(404, `user not found for identifier ${identifier}`);
-    } else if (users.total_count > 1) {
+    } else if (users?.total_count > 1) {
       return returnOperationStatus(400, `Invalid identifier provided for user invitation confirmation, multiple users found for identifier ${identifier}`);
     }
 
@@ -1047,14 +1041,14 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * @param  {any} renderResponse
    */
   async sendEmail(renderResponse: any): Promise<void> {
-    const responseID: string = renderResponse.id;
-    if (!responseID.startsWith('identity')) {
+    const responseID: string = renderResponse?.id;
+    if (!responseID?.startsWith('identity')) {
       this.logger.verbose(`Discarding render response ${responseID}`);
       return;
     }
 
-    const split = responseID.split('#');
-    if (split.length != 2) {
+    const split = responseID?.split('#');
+    if (split?.length != 2) {
       this.logger.verbose(`Unknown render response ID format: ${responseID}`);
       return;
     }
@@ -1076,15 +1070,15 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }];
 
     const user = await super.read(ReadRequest.fromPartial({ filters }), {});
-    if (_.isEmpty(user.items)) {
+    if (_.isEmpty(user?.items)) {
       this.logger.silly(`Received rendering response from unknown email address ${emailAddress}; discarding`);
       return;
     }
 
-    const responseBody = unmarshallProtobufAny(renderResponse.responses[0], this.logger);
-    const responseSubject = unmarshallProtobufAny(renderResponse.responses[1], this.logger);
+    const responseBody = unmarshallProtobufAny(renderResponse?.responses[0], this.logger);
+    const responseSubject = unmarshallProtobufAny(renderResponse?.responses[1], this.logger);
     const emailData = this.makeNotificationData(emailAddress, responseBody, responseSubject);
-    await this.topics.notificationReq.emit('sendEmail', emailData);
+    await this.topics?.notificationReq?.emit('sendEmail', emailData);
   }
 
   private idGen(): string {
@@ -1115,7 +1109,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     // check for the identifier against name or email in DB
     const filters = getDefaultFilter(identifier);
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
-    if (!users || users.total_count === 0) {
+    if (!users || users?.total_count === 0) {
       return returnOperationStatus(404, 'user not found');
     } else if (users.total_count > 1) {
       return returnOperationStatus(400, `Invalid identifier provided for user activation, multiple users found for identifier ${identifier}`);
@@ -1170,19 +1164,20 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   }
 
   /**
-   * Endpoint to change user password.
+   * Endpoint to change user password for authenticated user
    */
   async changePassword(request: ChangePasswordRequest, context): Promise<DeepPartial<OperationStatusObj>> {
     const logger = this.logger;
     const pw = request.password;
     const newPw = request.new_password;
     let subject = request.subject;
+    const dbUser = await this.findByToken(FindByTokenRequest.fromPartial({ token: subject.token }), {});
     const users = await super.read(ReadRequest.fromPartial({
       filters: [{
         filters: [{
           field: 'id',
           operation: Filter_Operation.eq,
-          value: subject?.id
+          value: dbUser?.payload?.id
         }]
       }]
     }), context);
@@ -1481,7 +1476,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               const verficationResponse = await this.verifyUserRoleAssociations([item], subject);
               // error verifying role associations
               const userID = item.id;
-              if (!_.isEmpty(verficationResponse) && verficationResponse.status && verficationResponse.status.message) {
+              if (!_.isEmpty(verficationResponse) && verficationResponse?.status?.message) {
                 updateWithStatus.items.push(returnStatus(verficationResponse.status.code,
                   verficationResponse.status.message, verficationResponse.status.id));
                 items = _.filter(items, (item) => (item.id != userID));
@@ -1489,14 +1484,14 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             }
           }
         } catch (err) {
-          this.logger.error('Error validating role associations');
           const errMessage = err.details ? err.details : err.message;
+          this.logger.error('Error validating role associations', { code: err.code, message: errMessage, stack: err.stack });
           // for unhandled promise rejection
           return returnOperationStatus(400, errMessage);
         }
       }
       // each item includes payload and status in turn
-      for (let i = 0; i < items.length; i += 1) {
+      for (let i = 0; i < items?.length; i += 1) {
         // read the user from DB and update the special fields from DB
         // for user modification
         const user = items[i];
@@ -1522,7 +1517,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }
         let dbUser = users.items[0].payload;
         // if user name is changed, check if the new user name is not used by any one else in application
-        if (dbUser.name != user.name) {
+        if (user?.name && (dbUser.name != user.name)) {
           const filters = getNameFilter(user.name);
           let users = await super.read(ReadRequest.fromPartial({ filters }), context);
           if (users.total_count > 0) {
@@ -1563,7 +1558,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }
 
         // Flush findByToken redis data
-        if (user && user.tokens && user.tokens.length > 0) {
+        if (user?.tokens?.length > 0) {
           for (let token of user.tokens) {
             const tokenValue = token.token;
             const response = await this.tokenRedisClient.get(tokenValue);
@@ -1623,7 +1618,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                   }
                 }
               }
-              if (!roleAssocEqual || !tokensEqual || (updatedRoleAssocs.length != redisRoleAssocs.length)) {
+              if (!roleAssocEqual || !tokensEqual || (updatedRoleAssocs?.length != redisRoleAssocs?.length)) {
                 // flush token subject cache
                 await this.tokenRedisClient.del(tokenValue);
                 this.logger.info('Redis cached data for findByToken deleted successfully', { token: tokenValue });
@@ -1640,7 +1635,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           // set the existing hash password field
           user.password_hash = dbUser.password_hash;
         }
-        if (!user.active) {
+        if (!user.active && user?.tokens?.length > 0) {
           for (let token of user.tokens) {
             const tokenValue = token.token;
             await this.tokenRedisClient.del(tokenValue);
@@ -1669,42 +1664,44 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }];
       const userRoleAssocs = user.role_associations;
       const users = await super.read(ReadRequest.fromPartial({ filters }), context);
-      if (users && users.items && users.items.length > 0) {
+      if (users?.items?.length > 0) {
         let dbRoleAssocs = users.items[0].payload.role_associations;
-        if (userRoleAssocs.length != dbRoleAssocs.length) {
+        if (userRoleAssocs?.length != dbRoleAssocs?.length) {
           roleAssocsModified = true;
           this.logger.debug('Role associations length are not equal', { id: userID });
           break;
         } else {
           // compare each role and its association
-          for (let userRoleAssoc of userRoleAssocs) {
-            let found = false;
-            for (let dbRoleAssoc of dbRoleAssocs) {
-              if (dbRoleAssoc.role === userRoleAssoc.role) {
-                if (dbRoleAssoc.attributes && dbRoleAssoc.attributes.length > 0) {
-                  for (let dbAttribute of dbRoleAssoc.attributes) {
-                    const dbNestedAttributes = dbAttribute.attributes;
-                    for (let userAttribute of userRoleAssoc.attributes) {
-                      const userNestedAttributes = userAttribute.attributes;
-                      if (userAttribute.id === dbAttribute.id &&
-                        userAttribute.value === dbAttribute.value &&
-                        _.isEqual(dbNestedAttributes, userNestedAttributes)) {
-                        found = true;
-                        break;
+          if (userRoleAssocs?.length > 0 && dbRoleAssocs?.length > 0) {
+            for (let userRoleAssoc of userRoleAssocs) {
+              let found = false;
+              for (let dbRoleAssoc of dbRoleAssocs) {
+                if (dbRoleAssoc.role === userRoleAssoc.role) {
+                  if (dbRoleAssoc?.attributes?.length > 0) {
+                    for (let dbAttribute of dbRoleAssoc.attributes) {
+                      const dbNestedAttributes = dbAttribute.attributes;
+                      for (let userAttribute of userRoleAssoc.attributes) {
+                        const userNestedAttributes = userAttribute.attributes;
+                        if (userAttribute.id === dbAttribute.id &&
+                          userAttribute.value === dbAttribute.value &&
+                          _.isEqual(dbNestedAttributes, userNestedAttributes)) {
+                          found = true;
+                          break;
+                        }
                       }
                     }
                   }
                 }
               }
-            }
-            if (!found) {
-              roleAssocsModified = true;
-            }
-            if (roleAssocsModified) {
-              this.logger.debug('Role associations objects are not equal', { id: userID });
-              break;
-            } else {
-              this.logger.debug('Role assocations not changed for user', { id: userID });
+              if (!found) {
+                roleAssocsModified = true;
+              }
+              if (roleAssocsModified) {
+                this.logger.debug('Role associations objects are not equal', { id: userID });
+                break;
+              } else {
+                this.logger.debug('Role assocations not changed for user', { id: userID });
+              }
             }
           }
         }
@@ -2065,7 +2062,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
       // note: inefficient, a custom AQL query should be the final solution
       let custom_queries, custom_arguments;
-      if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
+      if (acsResponse?.custom_query_args?.length > 0) {
         custom_queries = acsResponse.custom_query_args[0].custom_queries;
         custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
       }
@@ -2127,7 +2124,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       try {
         const techUsersCfg = this.cfg.get('techUsers');
         let headers;
-        if (techUsersCfg && techUsersCfg.length > 0) {
+        if (techUsersCfg?.length > 0) {
           const hbsUser = _.find(techUsersCfg, { id: 'hbs_user' });
           if (hbsUser) {
             headers = this.setAuthenticationHeaders(hbsUser.token);
@@ -2313,7 +2310,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // and get only those belong to orgIds and then check below to see if
       // that org is the only one present before actually deleting the user
       const users = result.items || [];
-      for (let i = 0; i < users.length; i += 1) {
+      for (let i = 0; i < users?.length; i += 1) {
         const user: User = _.cloneDeep(users[i].payload);
         user.active = false;
         deactivateUsers.push(user);
@@ -2435,7 +2432,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           if (result?.items?.length === 1) {
             let item = result.items[0].payload;
             resource.meta.owners = item.meta.owners;
-          } else if (result.items.length === 0) {
+          } else if (result?.items?.length === 0) {
             if (_.isEmpty(resource.id)) {
               resource.id = uuid.v4().replace(/-/g, '');
             }
@@ -2630,7 +2627,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
   }
 
   async create(request: RoleList, context: any): Promise<DeepPartial<RoleListResponse>> {
-    if (!request || !request.items || request.items.length == 0) {
+    if (!request || !request.items || request?.items?.length == 0) {
       return returnOperationStatus(400, 'No role was provided for creation');
     }
     let subject = request.subject;
@@ -2681,7 +2678,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
       return { operation_status: acsResponse.operation_status };
     }
     const readRequest = request;
-    if (acsResponse?.custom_query_args && acsResponse.custom_query_args.length > 0) {
+    if (acsResponse?.custom_query_args?.length > 0) {
       readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
       readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
     }
@@ -2719,7 +2716,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     }
 
     if (acsResponse.decision === Response_Decision.PERMIT) {
-      for (let i = 0; i < items.length; i += 1) {
+      for (let i = 0; i < items?.length; i += 1) {
         // read the role from DB and check if it exists
         const role = items[i];
         const filters = [{
@@ -2911,10 +2908,10 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
           filters
         }), {});
         // update owners info
-        if (result.items.length === 1) {
+        if (result?.items?.length === 1) {
           let item = result.items[0].payload;
           resource.meta.owners = item.meta.owners;
-        } else if (result.items.length === 0) {
+        } else if (result?.items?.length === 0) {
           if (_.isEmpty(resource.id)) {
             resource.id = uuid.v4().replace(/-/g, '');
           }
