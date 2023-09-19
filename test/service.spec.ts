@@ -911,8 +911,31 @@ describe('testing identity-srv', () => {
         });
       });
 
-      describe('calling changePassword', function changePassword(): void {
-        it('should change the password', async function changePassword(): Promise<void> {
+      describe('passwordChange', function changePassword(): void {
+        it('should allow to change the password for user with valid token', async function changePassword(): Promise<void> {
+          // store token to Redis as passwordChange looks up the user based on token (as this operation is for logged in user)
+
+          let userWithToken = {
+            name: 'test.user1', // user registered initially, storing with token in DB
+            first_name: 'test',
+            last_name: 'user',
+            password: 'notsecure',
+            email: 'test@ms.restorecommerce.io',
+            token: 'user-token',
+            tokens: [{
+              token: 'user-token',
+              expires_in: 0
+            }]
+          };
+          const redisConfig = cfg.get('redis');
+          // for findByToken
+          redisConfig.database = cfg.get('redis:db-indexes:db-findByToken') || 0;
+          tokenRedisClient = RedisCreateClient(redisConfig);
+          tokenRedisClient.on('error', (err) => logger.error('Redis client error in token cache store', err));
+          await tokenRedisClient.connect();
+          // store user with tokens and role associations to Redis index `db-findByToken`
+          await tokenRedisClient.set('user-token', JSON.stringify(userWithToken));
+
           this.timeout(30000);
           const offset = await topic.$offset(-1);
           const listener = function listener(message: any, context: any): void {
@@ -921,13 +944,14 @@ describe('testing identity-srv', () => {
           await topic.on('passwordChanged', listener);
           let result = await userService.find({
             id: testUserID,
+            subject: { token: 'user-token' }
           });
           should.exist(result.items);
           const pwHashA = result.items[0].payload.password_hash;
           const changeResult = await (userService.changePassword({
             password: 'notsecure',
             new_password: 'newPassword',
-            subject: { id: result.items[0].payload.id }
+            subject: { token: 'user-token' }
           }));
           should.exist(changeResult);
           should.exist(changeResult.operation_status);
@@ -936,7 +960,7 @@ describe('testing identity-srv', () => {
           await topic.$wait(offset);
 
           const findResult = await (userService.find({
-            id: testUserID,
+            id: testUserID, subject: { token: 'user-token' }
           }));
           const pwHashB = findResult.items[0].payload.password_hash;
           pwHashB.should.not.be.null();
@@ -1534,7 +1558,7 @@ describe('testing identity-srv', () => {
           };
           testUser.role_associations[0].role = 'invalid_role';
           const result = await userService.create({ items: [testuser1, testUser], subject });
-          
+
           result.items[0].status.code.should.equal(403);
           result.items[0].status.message.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
           result.items[0].status.id.should.equal('testuser');

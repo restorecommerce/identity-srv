@@ -1172,6 +1172,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const newPw = request.new_password;
     let subject = request.subject;
     const dbUser = await this.findByToken(FindByTokenRequest.fromPartial({ token: subject.token }), {});
+    if(!dbUser || _.isEmpty(dbUser.payload)) {
+      return returnOperationStatus(404, 'Invalid token or user does not exist');
+    }
     const users = await super.read(ReadRequest.fromPartial({
       filters: [{
         filters: [{
