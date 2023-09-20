@@ -1,3 +1,7 @@
+## 1.2.0 (September 20th, 2023)
+
+- protos made all fields optionals
+
 ## 1.1.9 (July 28th, 2023)
 
 - fix email config 
