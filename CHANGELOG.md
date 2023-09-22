@@ -1,3 +1,7 @@
+## 1.2.1 (September 20th, 2023)
+
+- fix reference error
+
 ## 1.2.0 (September 20th, 2023)
 
 - protos made all fields optionals

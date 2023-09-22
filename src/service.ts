@@ -651,7 +651,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       let rolesData = await this.roleService.read({
         filters,
         subject
-      } as any, context);
+      } as any, {});
       if (rolesData?.total_count === 0) {
         let message = `One or more of the target role IDs are invalid ${targetUserRoleIds},` +
           ` no such role exist in system`;
