@@ -11,36 +11,36 @@ A microservice for identity management.
 
 * Management of _User Account_ and _Role_ entities
 * User-to-Role associations with arbitrary scoping
-* User account creation (self-service, by privileged user, by invitation)
+* User account creation using any of the following options: self-service, by privileged user, by invitation
 * Password change as self-service
 * Password recovery as self-service
 * Un-registration as self-service
 * Customizable, optional email notifications to drive processes
 * Token management service
-* Authentication Log Service
+* Authentication log audit log
 
 [#configuration]
 == Configuration
 
 The following service specific configuration properties are available:
 
-* `uniqueEmailConstraint` [`true`]: `name` and `email` fields for registering / creating user are unique (by default if this config is missing its true), if set to false it allows to register / create users with same email identifier, however `name` should always be unique.
+* `uniqueEmailConstraint` [`true`]: `name` and `email` fields for registering/ creating user are unique, if set to `false` it allows to register/ create users with same email identifier, however `name` must always be unique.
 * `loginIdentifierProperty` [`name`, `email`]: list of identifiers to enable user to login, if the config is missing then by default user can login with either name or email.
 * `userActivationRequired` [`true`]: if set to `false`, users do not require account activation to be able to log in and use their account.
-* `register` [`true`]: if set to `false`, the `Register` endpoint is disabled and users can only be created through the bulk creation method `Create`, which can be seen as an admin-only operation.
+* `register` [`true`]: if set to `false`, the `Register` endpoint is disabled and users cannot self sign up but only be created through the bulk creation method `Create` which is usually only available to adminstrative user roles.
 * `enableEmail` [`true`]: if set to `true`, emails are sent out upon specific events, like account creation and email change.
-* `activationURL`: URL to show link in activation email to activate the account.
-* `emailConfirmationURL`: URL to show link in confirmation email to confirm email address change.
-* `invitationURL`: URL to show link in invitation email to accept invitation.
-* `data`: additional fields can be provided inside data. These fields can then be
-used inside the hbs templates.
-* `hbsTemplates`: contains URLs for https://handlebarsjs.com/[Handlebars templates] and served via external web application. These templates are used in email sent by system for different user operations like `Register`, `RequestEmailChange` and `RequestPasswordChange`.
+* `activationURL`: URL used for link in activation email to activate the account.
+* `unactivatedAccountExpiry` in seconds [`undefined`]: if set to a number of seconds, the account will completely be removed from the system (log date will be retained) if no activation has been performed since the given number of seconds.
+* `emailConfirmationURL`: URL used for link in confirmation email to confirm email address change.
+* `invitationURL`: URL used for link in invitation email to accept invitation.
+* `data`: additional fields can be provided inside data. These fields can then be used inside the hbs templates.
+* `hbsTemplates`: contains URLs for externally served https://handlebarsjs.com/[Handlebars templates]. These templates are used in emails sent by system for different operations like `Register`, `RequestEmailChange` and `RequestPasswordChange`.
 * `minUsernameLength`: minimum length for the user’s `name`.
 * `maxUsernameLength`: maximum length for the user’s `name`.
-* `obfuscateAuthNErrorReason`: default value is `false`, if set to `true` the login error details are obfuscated and generalized error message is shown.
-* `authorization:enable`: default value is `true`, if set to `true` then access-control check is performed, if value is set to `false` then access-control check is overridden.
-* `authorization:enforce`: default value is `true`, if set to `true` then result of access-control-check is enforced, if value is set to `false` the result of access-control check if logged and ignored.
-* `defaultRegisterUserRoles`: default role associations configured to be used when registering users
+* `obfuscateAuthNErrorReason`:`false`, if set to `true` the login error details are obfuscated and generalized error message is shown.
+* `authorization:enable` [`true`]: if set to `true` then access-control check is performed, if set to `false` then access-control check is overridden.
+* `authorization:enforce` [`true`]: if set to `true` then result of access-control-check is enforced, if value is set to `false` the result of access-control check is logged and ignored.
+* `defaultRegisterUserRoles`: default role associations granted to newly registered users.
 
 Example: We can add a field called `url` nested inside the `data` field in
 the `config.json` file, and then use this field in `registration_body.hbs` to
