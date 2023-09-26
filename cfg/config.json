@@ -18,6 +18,7 @@
       "resourcesTpl": "http://localhost:5000/storage/internal/identity-srv/templates/resources.json"
     },
     "activationURL": "http://console.restorecommerce.io/activate_user",
+    "unactivatedAccountExpiry": "undefined",
     "emailConfirmationURL": "http://console.restorecommerce.io/confirm_email_change",
     "passwordChangeConfirmationURL": "http://console.restorecommerce.io/confirm_password_change",
     "invitationURL": "http://console.restorecommerce.io/#/invite_user",
@@ -380,5 +381,26 @@
         "scope": "email"
       }
     }
+  },
+  "importJobs": {
+    "jobs": [
+      {
+        "id": "delete-expired-users",
+        "type": "DELETE_EXPIRED_USERS",
+        "data": {
+          "timezone": "Europe/Berlin"
+        },
+        "options": {
+          "attempts": 0,
+          "backoff": {
+            "type": "FIXED",
+            "delay": 1000
+          },
+          "repeat": {
+            "cron": "0 0 * * *"
+          }
+        }
+      }
+    ]
   }
 }

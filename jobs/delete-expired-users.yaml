@@ -1,0 +1,15 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: delete-expired-user-accounts
+spec:
+  schedule: "0 0 * * *" # This schedules the job to run daily at midnight
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: delete-expired-users
+            image: your-image:tag # Replace with the Docker image that contains the service
+            command: ["node", "src/service.ts", "deleteExpiredUsers"]
+          restartPolicy: OnFailure

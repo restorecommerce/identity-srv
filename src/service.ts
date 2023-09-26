@@ -1106,15 +1106,36 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const activationCode = request.activation_code;
     const subject = request.subject;
     let acsResponse: DecisionResponse;
+    const unactivatedAccountExpiry = this.cfg.get('service:unactivatedAccountExpiry');
+
     // check for the identifier against name or email in DB
     const filters = getDefaultFilter(identifier);
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+    const user = users.items[0].payload;
+
+    // Check if unactivatedAccountExpiry is set and positive
+    if (unactivatedAccountExpiry != undefined && unactivatedAccountExpiry > 0) {
+
+      if (user && user.meta.created) {
+        const currentTimestamp = new Date(); // Current Unix timestamp in seconds
+        const activationTimestamp = user.meta.created;
+
+        // Check if the activation code has expired
+        // calculate the difference between currentTimestamp.getTime() and activationTimestamp.getTime(). This gives the time difference in milliseconds.
+        // multiply unactivatedAccountExpiry by 1000 to convert it to milliseconds (assuming it's specified in seconds), and then compare it with the time difference to check if the activation code has expired.
+        if (currentTimestamp.getTime() - activationTimestamp.getTime() > unactivatedAccountExpiry * 1000) {
+          logger.debug('activation code has expired', user);
+          return returnOperationStatus(400, 'Activation code has expired');
+        }
+      }
+    }
+
     if (!users || users?.total_count === 0) {
       return returnOperationStatus(404, 'user not found');
     } else if (users.total_count > 1) {
       return returnOperationStatus(400, `Invalid identifier provided for user activation, multiple users found for identifier ${identifier}`);
     }
-    const user = users.items[0].payload;
+
     try {
       acsResponse = await checkAccessRequest({
         ...context,
@@ -1172,7 +1193,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const newPw = request.new_password;
     let subject = request.subject;
     const dbUser = await this.findByToken(FindByTokenRequest.fromPartial({ token: subject.token }), {});
-    if(!dbUser || _.isEmpty(dbUser.payload)) {
+    if (!dbUser || _.isEmpty(dbUser.payload)) {
       return returnOperationStatus(404, 'Invalid token or user does not exist');
     }
     const users = await super.read(ReadRequest.fromPartial({
@@ -1989,6 +2010,44 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       logger.info('Users deleted:', userIDs);
       return deleteStatusArr;
     }
+  }
+
+  async deleteExpiredUsers(subject: string, context): Promise<DeepPartial<DeleteResponse>> {
+    const logger = this.logger;
+    const unactivatedAccountExpiry = this.cfg.get('service:unactivatedAccountExpiry');
+
+    if (unactivatedAccountExpiry === undefined || unactivatedAccountExpiry <= 0) {
+      return returnOperationStatus(400, 'Invalid unactivatedAccountExpiry configuration');
+    }
+
+    // Calculate the timestamp threshold for expiration
+    const currentTimestamp = new Date().getTime(); // Current Unix timestamp in milliseconds
+    const expirationTimestamp = currentTimestamp - unactivatedAccountExpiry * 1000; // Calculate the threshold
+
+    // Fetch inactivated user accounts with expired activation codes
+    const filters = getDefaultFilter('inactivated'); // Replace 'inactivated' with an appropriate filter for your inactive users
+    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+
+    const usersToDelete = users.items.filter((user) => {
+      if (user.payload.meta.created) {
+        const activationTimestamp = new Date(user.payload.meta.created).getTime();
+        return activationTimestamp < expirationTimestamp;
+      }
+      return false;
+    });
+
+    if (usersToDelete.length === 0) {
+      logger.info('No expired inactivated user accounts found');
+      return returnOperationStatus(200, 'No expired inactivated user accounts found');
+    }
+
+    // Extract user IDs to delete
+    const userIDsToDelete = usersToDelete.map((user) => user.payload.id);
+
+    // Call the delete function to delete expired inactivated user accounts
+    const deleteStatusArr = await this.delete(DeleteRequest.fromPartial({ ids: userIDsToDelete }), { subject });
+
+    return deleteStatusArr;
   }
 
   async deleteUsersByOrg(request: OrgIDRequest, context): Promise<DeepPartial<DeleteUsersByOrgResponse>> {
