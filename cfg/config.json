@@ -266,6 +266,12 @@
       "flushCacheResponse": {
         "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
       },
+      "jobDone": {
+        "messageObject": "io.restorecommerce.job.JobDone"
+      },
+      "jobFailed": {
+        "messageObject": "io.restorecommerce.job.JobFailed"
+      },
       "topics": {
         "user.resource": {
           "topic": "io.restorecommerce.users.resource"

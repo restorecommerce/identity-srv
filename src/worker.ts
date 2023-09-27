@@ -45,6 +45,10 @@ import {
   protoMetadata as notificationReqMeta
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/notification_req';
 import { ServerReflectionService } from 'nice-grpc-server-reflection';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as glob from 'glob';
+import { runWorker } from './utils';
 
 registerProtoMeta(
   userMeta,
@@ -148,6 +152,8 @@ export class Worker {
     this.topics = {};
   }
 
+
+
   async start(): Promise<any> {
     // Load config
     const cfg = this.cfg;
@@ -189,6 +195,30 @@ export class Worker {
     const events = new Events(cfg.get('events:kafka'), logger);
     await events.start();
     this.offsetStore = new chassis.OffsetStore(events as any, cfg, logger);
+
+    let externalJobFiles;
+    try {
+      externalJobFiles = fs.readdirSync(process.env.EXTERNAL_JOBS_DIR || './lib/scs-jobs');
+    } catch (err) {
+      if (err.message.includes('no such file or directory')) {
+        logger.info('No files for external job processors found');
+      } else {
+        logger.error('Error reading scs-jobs files');
+      }
+    }
+    if (externalJobFiles && externalJobFiles.length > 0) {
+      externalJobFiles.forEach((externalFile) => {
+        if (externalFile.endsWith('.js')) {
+          let require_dir = './scs-jobs';
+          if (process.env.EXTERNAL_JOBS_REQUIRE_DIR) {
+            require_dir = process.env.EXTERNAL_JOBS_REQUIRE_DIR;
+          }
+          (async () => require(require_dir + '/' + externalFile).default(cfg, logger, events, runWorker))().catch(err => {
+            logger.error(`Error scheduling scs job ${externalFile}`, { err: err.message });
+          });
+        }
+      });
+    }
 
     // Enable events firing for resource api using config
     let isEventsEnabled = cfg.get('events:enableEvents');
@@ -339,10 +369,44 @@ export class Worker {
 if (require.main === module) {
   const worker = new Worker();
   const logger = worker.logger;
+
+  // const cfg = worker.cfg;
+  // const events = worker.events;
+  // const kafkaCfg = cfg.get('events:kafka');
+  // const events: Events = new Events(kafkaCfg, logger);
+
+
+
   worker.start().then().catch((err) => {
     logger.error('startup error', err);
     process.exit(1);
   });
+
+  // let externalJobFiles;
+  // try {
+  //   console.log('runWorker');
+  //   externalJobFiles = fs.readdirSync(process.env.EXTERNAL_JOBS_DIR || './lib/scs-jobs');
+  // } catch (err) {
+  //   if (err.message.includes('no such file or directory')) {
+  //     logger.info('No files for external job processors found');
+  //   } else {
+  //     logger.error('Error reading scs-jobs files');
+  //   }
+  // }
+  // if (externalJobFiles && externalJobFiles.length > 0) {
+  //   console.log('runWorke2');
+  //   externalJobFiles.forEach((externalFile) => {
+  //     if (externalFile.endsWith('.js')) {
+  //       let require_dir = './scs-jobs';
+  //       if (process.env.EXTERNAL_JOBS_REQUIRE_DIR) {
+  //         require_dir = process.env.EXTERNAL_JOBS_REQUIRE_DIR;
+  //       }
+  //       (async () => require(require_dir + '/' + externalFile).default(cfg, logger, events, runWorker))().catch(err => {
+  //         logger.error(`Error scheduling scs job ${externalFile}`, { err: err.message });
+  //       });
+  //     }
+  //   });
+  // }
 
   process.on('SIGINT', () => {
     worker.stop().then().catch((err) => {

@@ -24,7 +24,8 @@
     ]
   },
   "include": [
-    "./src/**/*.ts"
+    "./src/**/*.ts",
+    "src/scs-jobs/delete_expired_users_job.ts"
   ],
   "exclude": [
     "node_modules",

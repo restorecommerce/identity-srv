@@ -2012,8 +2012,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
   }
 
-  async deleteExpiredUsers(subject: string, context): Promise<DeepPartial<DeleteResponse>> {
+  async deleteExpiredUsers(request: ActivateRequest, context): Promise<DeepPartial<DeleteResponse>> {
     const logger = this.logger;
+    const subject = request.subject;
     const unactivatedAccountExpiry = this.cfg.get('service:unactivatedAccountExpiry');
 
     if (unactivatedAccountExpiry === undefined || unactivatedAccountExpiry <= 0) {
