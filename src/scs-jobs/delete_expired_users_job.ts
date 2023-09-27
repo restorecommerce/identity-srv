@@ -11,7 +11,7 @@ import {
 import { UserService } from '../service';
 
 export default async (cfg, logger, events, runWorker) => {
-  console.log('Starting delete_expired_users_job');
+  logger.info('Starting delete_expired_users_job...');
 
   await runWorker('scs-job', 1, cfg, logger, events, async (job) => {
     try {

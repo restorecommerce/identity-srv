@@ -2025,8 +2025,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const currentTimestamp = new Date().getTime(); // Current Unix timestamp in milliseconds
     const expirationTimestamp = currentTimestamp - unactivatedAccountExpiry * 1000; // Calculate the threshold
 
-    // Fetch inactivated user accounts with expired activation codes
-    const filters = getDefaultFilter('inactivated'); // Replace 'inactivated' with an appropriate filter for your inactive users
+    // Fetch inactivated user accounts
+    const filters = getDefaultFilter('inactivated');
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
 
     const usersToDelete = users.items.filter((user) => {
