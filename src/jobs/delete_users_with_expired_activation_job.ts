@@ -11,6 +11,7 @@ import {
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
 
 import { UserService } from '../service';
+import * as _ from 'lodash';
 
 export default async (cfg, logger, events, runWorker) => {
   logger.info('Starting delete_expired_users_job...');
@@ -56,7 +57,6 @@ export default async (cfg, logger, events, runWorker) => {
 
       // Extract user IDs to delete
       const userIDsToDelete = usersToDelete.map((user) => user.payload.id);
-      
       const user = users.items[0].payload;
 
       let tokenTechUser: any = {};
