@@ -29,18 +29,18 @@ export default async (cfg, logger, events, runWorker) => {
       const currentTimestamp = new Date().getTime(); // Current Unix timestamp in milliseconds
       const expirationTimestamp = currentTimestamp - inactivatedAccountExpiry * 1000; // Calculate the threshold
 
-      // Fetch inactivated user accounts with expired activation codes
-      const filter = [
-        {
-          field: 'active',
-          operation: Filter_Operation.eq,
-          value: 'false',
-          type: Filter_ValueType.BOOLEAN
-        }];
+      const filters = [{
+        filters: [
+          {
+            field: 'active',
+            operation: Filter_Operation.eq,
+            value: 'false',
+            type: Filter_ValueType.BOOLEAN
+          }
+        ]
+      }];
 
-      const filters = getDefaultFilter(filter);
       const users = await userService.read(ReadRequest.fromPartial({ filters }), context);
-
       const usersToDelete = users.items.filter((user) => {
         if (user.payload.meta.created && user.payload.activation_code) {
           const activationTimestamp = new Date(user.payload.meta.created).getTime();
