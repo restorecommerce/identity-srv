@@ -5,7 +5,9 @@ import {
 
 import {
   DeleteRequest,
-  ReadRequest
+  ReadRequest,
+  Filter_ValueType,
+  Filter_Operation
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
 
 import { UserService } from '../service';
@@ -28,11 +30,19 @@ export default async (cfg, logger, events, runWorker) => {
       const expirationTimestamp = currentTimestamp - inactivatedAccountExpiry * 1000; // Calculate the threshold
 
       // Fetch inactivated user accounts with expired activation codes
-      const filters = getDefaultFilter('inactivated'); // Replace 'inactivated' with an appropriate filter for your inactive users
+      const filter = [
+        {
+          field: 'active',
+          operation: Filter_Operation.eq,
+          value: 'false',
+          type: Filter_ValueType.BOOLEAN
+        }];
+
+      const filters = getDefaultFilter(filter);
       const users = await userService.read(ReadRequest.fromPartial({ filters }), context);
 
       const usersToDelete = users.items.filter((user) => {
-        if (user.payload.meta.created) {
+        if (user.payload.meta.created && user.payload.activation_code) {
           const activationTimestamp = new Date(user.payload.meta.created).getTime();
           return activationTimestamp < expirationTimestamp;
         }
