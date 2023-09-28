@@ -42,9 +42,9 @@ export default async (cfg, logger, events, runWorker) => {
 
       const users = await userService.read(ReadRequest.fromPartial({ filters }), context);
       const usersToDelete = users.items.filter((user) => {
-        if (user.payload.meta.created && user.payload.activation_code) {
-          const activationTimestamp = new Date(user.payload.meta.created).getTime();
-          return activationTimestamp < expirationTimestamp;
+        if (user.payload.meta.created && user.payload.activation_code !== undefined && user.payload.activation_code !== '') {
+          const createdTimestamp = new Date(user.payload.meta.created).getTime();
+          return createdTimestamp < expirationTimestamp;
         }
         return false;
       });
@@ -56,9 +56,18 @@ export default async (cfg, logger, events, runWorker) => {
 
       // Extract user IDs to delete
       const userIDsToDelete = usersToDelete.map((user) => user.payload.id);
+      
+      const user = users.items[0].payload;
+
+      let tokenTechUser: any = {};
+      const techUsersCfg = cfg.get('techUsers');
+      if (techUsersCfg && techUsersCfg.length > 0) {
+        tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
+      }
+      tokenTechUser.scope = user.default_scope;
 
       // Call the delete function to delete expired inactivated user accounts
-      const deleteStatusArr = await userService.delete(DeleteRequest.fromPartial({ ids: userIDsToDelete }), { subject });
+      const deleteStatusArr = await userService.delete(DeleteRequest.fromPartial({ ids: userIDsToDelete }), { tokenTechUser });
 
       return deleteStatusArr;
 
