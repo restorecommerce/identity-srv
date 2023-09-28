@@ -1106,15 +1106,15 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const activationCode = request.activation_code;
     const subject = request.subject;
     let acsResponse: DecisionResponse;
-    const unactivatedAccountExpiry = this.cfg.get('service:unactivatedAccountExpiry');
+    const inactivatedAccountExpiry = this.cfg.get('service:inactivatedAccountExpiry');
 
     // check for the identifier against name or email in DB
     const filters = getDefaultFilter(identifier);
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
     const user = users.items[0].payload;
 
-    // Check if unactivatedAccountExpiry is set and positive
-    if (unactivatedAccountExpiry != undefined && unactivatedAccountExpiry > 0) {
+    // Check if inactivatedAccountExpiry is set and positive
+    if (inactivatedAccountExpiry != undefined && inactivatedAccountExpiry > 0) {
 
       if (user && user.meta.created) {
         const currentTimestamp = new Date(); // Current Unix timestamp in seconds
@@ -1122,8 +1122,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
         // Check if the activation code has expired
         // calculate the difference between currentTimestamp.getTime() and activationTimestamp.getTime(). This gives the time difference in milliseconds.
-        // multiply unactivatedAccountExpiry by 1000 to convert it to milliseconds (assuming it's specified in seconds), and then compare it with the time difference to check if the activation code has expired.
-        if (currentTimestamp.getTime() - activationTimestamp.getTime() > unactivatedAccountExpiry * 1000) {
+        // multiply inactivatedAccountExpiry by 1000 to convert it to milliseconds (assuming it's specified in seconds), and then compare it with the time difference to check if the activation code has expired.
+        if (currentTimestamp.getTime() - activationTimestamp.getTime() > inactivatedAccountExpiry * 1000) {
           logger.debug('activation code has expired', user);
           return returnOperationStatus(400, 'Activation code has expired');
         }
@@ -2012,18 +2012,18 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
   }
 
-  async deleteExpiredUsers(request: ActivateRequest, context): Promise<DeepPartial<DeleteResponse>> {
+  async deleteUsersWithExpiredActivation(request: ActivateRequest, context): Promise<DeepPartial<DeleteResponse>> {
     const logger = this.logger;
     const subject = request.subject;
-    const unactivatedAccountExpiry = this.cfg.get('service:unactivatedAccountExpiry');
+    const inactivatedAccountExpiry = this.cfg.get('service:inactivatedAccountExpiry');
 
-    if (unactivatedAccountExpiry === undefined || unactivatedAccountExpiry <= 0) {
-      return returnOperationStatus(400, 'Invalid unactivatedAccountExpiry configuration');
+    if (inactivatedAccountExpiry === undefined || inactivatedAccountExpiry <= 0) {
+      return returnOperationStatus(400, 'Invalid inactivatedAccountExpiry configuration');
     }
 
     // Calculate the timestamp threshold for expiration
     const currentTimestamp = new Date().getTime(); // Current Unix timestamp in milliseconds
-    const expirationTimestamp = currentTimestamp - unactivatedAccountExpiry * 1000; // Calculate the threshold
+    const expirationTimestamp = currentTimestamp - inactivatedAccountExpiry * 1000; // Calculate the threshold
 
     // Fetch inactivated user accounts
     const filters = getDefaultFilter('inactivated');

@@ -13,19 +13,19 @@ import { UserService } from '../service';
 export default async (cfg, logger, events, runWorker) => {
   logger.info('Starting delete_expired_users_job...');
 
-  await runWorker('scs-job', 1, cfg, logger, events, async (job) => {
+  await runWorker('job', 1, cfg, logger, events, async (job) => {
     try {
       const userService = new UserService(cfg, events, job.db, logger, true, job.role, job.auth_context);
       const subject = job.subject;
-      const unactivatedAccountExpiry = cfg.get('service:unactivatedAccountExpiry');
+      const inactivatedAccountExpiry = cfg.get('service:inactivatedAccountExpiry');
 
-      if (unactivatedAccountExpiry === undefined || unactivatedAccountExpiry <= 0) {
-        return returnOperationStatus(400, 'Invalid unactivatedAccountExpiry configuration');
+      if (inactivatedAccountExpiry === undefined || inactivatedAccountExpiry <= 0) {
+        return returnOperationStatus(400, 'Invalid inactivatedAccountExpiry configuration');
       }
 
       // Calculate the timestamp threshold for expiration
       const currentTimestamp = new Date().getTime(); // Current Unix timestamp in milliseconds
-      const expirationTimestamp = currentTimestamp - unactivatedAccountExpiry * 1000; // Calculate the threshold
+      const expirationTimestamp = currentTimestamp - inactivatedAccountExpiry * 1000; // Calculate the threshold
 
       // Fetch inactivated user accounts with expired activation codes
       const filters = getDefaultFilter('inactivated'); // Replace 'inactivated' with an appropriate filter for your inactive users

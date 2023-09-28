@@ -194,23 +194,23 @@ export class Worker {
 
     let externalJobFiles;
     try {
-      externalJobFiles = fs.readdirSync(process.env.EXTERNAL_JOBS_DIR || './lib/scs-jobs');
+      externalJobFiles = fs.readdirSync(process.env.EXTERNAL_JOBS_DIR || './lib/jobs');
     } catch (err) {
       if (err.message.includes('no such file or directory')) {
         logger.info('No files for external job processors found');
       } else {
-        logger.error('Error reading scs-jobs files');
+        logger.error('Error reading jobs files');
       }
     }
     if (externalJobFiles && externalJobFiles.length > 0) {
       externalJobFiles.forEach((externalFile) => {
         if (externalFile.endsWith('.js')) {
-          let require_dir = './scs-jobs';
+          let require_dir = './jobs';
           if (process.env.EXTERNAL_JOBS_REQUIRE_DIR) {
             require_dir = process.env.EXTERNAL_JOBS_REQUIRE_DIR;
           }
           (async () => require(require_dir + '/' + externalFile).default(cfg, logger, events, runWorker))().catch(err => {
-            logger.error(`Error scheduling scs job ${externalFile}`, { err: err.message });
+            logger.error(`Error scheduling job ${externalFile}`, { err: err.message });
           });
         }
       });
