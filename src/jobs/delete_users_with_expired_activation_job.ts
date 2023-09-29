@@ -17,7 +17,7 @@ import * as _ from 'lodash';
 export default async (cfg, logger, events, runWorker) => {
   logger.info('Starting delete_expired_users_job...');
 
-  await runWorker('delete-expire-job', 1, cfg, logger, events, async (job) => {
+  await runWorker('defaultQueue', 1, cfg, logger, events, async (job) => {
     try {
       logger.info('Job ', job);
       const userService = getUserServiceClient();
