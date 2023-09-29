@@ -317,7 +317,6 @@ export function _filterQueuedJob<T extends FilterOpts>(job: T, logger: Logger): 
 }
 
 export async function runWorker(queue: string, concurrency: number, cfg: any, logger: Logger, events: Events, cb: Processor): Promise<Worker> {
-  logger.info('runWorker TEST');
   // Get a redis connection
   const redisConfig = cfg.get('redis');
   // below config is used for bull queu options and it still uses db config
@@ -336,9 +335,7 @@ export async function runWorker(queue: string, concurrency: number, cfg: any, lo
   const jobEvents = await events.topic('io.restorecommerce.jobs');
 
   const redisURL = new URL(redisConfig.url);
-  logger.info('before Worker TEST');
   const worker = new Worker(queue, async job => {
-    logger.info('new Worker TEST');
     const filteredJob = _filterQueuedJob<JobType>(job as any, logger);
     // For recurring job add time so if service goes down we can fire jobs
     // for the missed schedules comparing the last run time
@@ -403,7 +400,6 @@ export async function runWorker(queue: string, concurrency: number, cfg: any, lo
     concurrency,
     autorun: false
   });
-  logger.info('Worker print ', worker);
   worker.on('error', err => logger.error(`worker#${queue} error`, err));
   worker.on('closed', () => logger.verbose(`worker#${queue} closed`));
   worker.on('progress', (j, p) => logger.debug(`worker#${queue} job#${j.id} progress`, p));
@@ -418,6 +414,5 @@ export async function runWorker(queue: string, concurrency: number, cfg: any, lo
 
   worker.run().catch(err => logger.error(`worker#${queue} run error`, err));
   await worker.waitUntilReady();
-  logger.info('Return worker print ');
   return worker;
 }
