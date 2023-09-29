@@ -95,7 +95,10 @@
     "db-indexes": {
       "db-offsetStore": 0,
       "db-subject": 4,
-      "db-findByToken": 5
+      "db-findByToken": 5,
+      "db-reccurTime": 7,
+      "db-repeatJobId": 8,
+      "db-jobStore": 1
     }
   },
   "urns": {

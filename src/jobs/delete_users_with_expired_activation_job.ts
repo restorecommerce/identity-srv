@@ -1,6 +1,7 @@
 import {
   getDefaultFilter,
-  returnOperationStatus
+  returnOperationStatus,
+  getUserServiceClient
 } from '../utils';
 
 import {
@@ -16,10 +17,10 @@ import * as _ from 'lodash';
 export default async (cfg, logger, events, runWorker) => {
   logger.info('Starting delete_expired_users_job...');
 
-  await runWorker('job', 1, cfg, logger, events, async (job) => {
+  await runWorker('delete-expire-job', 1, cfg, logger, events, async (job) => {
     try {
-      const userService = new UserService(cfg, events, job.db, logger, true, job.role, job.auth_context);
-      const subject = job.subject;
+      logger.info('Job ', job);
+      const userService = getUserServiceClient();
       const inactivatedAccountExpiry = cfg.get('service:inactivatedAccountExpiry');
 
       if (inactivatedAccountExpiry === undefined || inactivatedAccountExpiry <= 0) {
@@ -41,7 +42,13 @@ export default async (cfg, logger, events, runWorker) => {
         ]
       }];
 
-      const users = await userService.read(ReadRequest.fromPartial({ filters }), context);
+      let tokenTechUser: any = {};
+      const techUsersCfg = cfg.get('techUsers');
+      if (techUsersCfg && techUsersCfg.length > 0) {
+        tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
+      }
+
+      const users = await userService.read(ReadRequest.fromPartial({ filters, subject:{token: tokenTechUser.token}}));
       const usersToDelete = users.items.filter((user) => {
         if (user.payload.meta.created && user.payload.activation_code !== undefined && user.payload.activation_code !== '') {
           const createdTimestamp = new Date(user.payload.meta.created).getTime();
@@ -57,17 +64,9 @@ export default async (cfg, logger, events, runWorker) => {
 
       // Extract user IDs to delete
       const userIDsToDelete = usersToDelete.map((user) => user.payload.id);
-      const user = users.items[0].payload;
-
-      let tokenTechUser: any = {};
-      const techUsersCfg = cfg.get('techUsers');
-      if (techUsersCfg && techUsersCfg.length > 0) {
-        tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
-      }
-      tokenTechUser.scope = user.default_scope;
 
       // Call the delete function to delete expired inactivated user accounts
-      const deleteStatusArr = await userService.delete(DeleteRequest.fromPartial({ ids: userIDsToDelete }), { tokenTechUser });
+      const deleteStatusArr = await userService.delete(DeleteRequest.fromPartial({ ids: userIDsToDelete, subject: { token: tokenTechUser.token} }));
 
       return deleteStatusArr;
 
