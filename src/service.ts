@@ -82,6 +82,11 @@ import {
   RoleAssociation,
   Subject
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
+import { zxcvbnOptions, zxcvbnAsync, ZxcvbnResult } from '@zxcvbn-ts/core';
+import * as zxcvbnCommonPackage from '@zxcvbn-ts/language-common';
+import * as zxcvbnEnPackage from '@zxcvbn-ts/language-en';
+import * as zxcvbnDePackage from '@zxcvbn-ts/language-de';
+import { matcherPwnedFactory } from '@zxcvbn-ts/matcher-pwned';
 
 export class UserService extends ServiceBase<UserListResponse, UserList> implements UserServiceImplementation {
 
@@ -824,6 +829,27 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     return false;
   }
 
+  private async checkPasswordStrength(password: string): Promise<ZxcvbnResult> {
+
+    const matcherPwned = matcherPwnedFactory(fetch, zxcvbnOptions);
+    zxcvbnOptions.addMatcher('pwned', matcherPwned);
+
+    const options = {
+      dictionary: {
+        ...zxcvbnCommonPackage.dictionary,
+        ...zxcvbnEnPackage.dictionary,
+        ...zxcvbnDePackage.dictionary,
+      },
+      graphs: zxcvbnCommonPackage.adjacencyGraphs,
+      useLevenshteinDistance: true,
+      translations: zxcvbnEnPackage.translations,
+    };
+    zxcvbnOptions.setOptions(options);
+    const result = await zxcvbnAsync(password);
+
+    return result;
+  };
+
   /**
    * Validates User and creates it in DB,
    * @param user
@@ -844,6 +870,19 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     if (!user.name) {
       return returnStatus(400, 'argument name is empty', user.id);
     }
+
+    await this.checkPasswordStrength(user.password).then((result) => {
+      if (user.password) {
+        const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
+        if (minScore > result.score) {
+          logger.error(`Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
+          return returnStatus(400, `Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
+        }
+      } else {
+        logger.error(`User password does not exist`);
+        return returnStatus(400, `User password does not exist`);
+      }
+    });
 
     const serviceCfg = this.cfg.get('service');
 
@@ -1172,7 +1211,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const newPw = request.new_password;
     let subject = request.subject;
     const dbUser = await this.findByToken(FindByTokenRequest.fromPartial({ token: subject.token }), {});
-    if(!dbUser || _.isEmpty(dbUser.payload)) {
+    if (!dbUser || _.isEmpty(dbUser.payload)) {
       return returnOperationStatus(404, 'Invalid token or user does not exist');
     }
     const users = await super.read(ReadRequest.fromPartial({
@@ -1212,6 +1251,19 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       if (!password.verify(userPWhash, pw)) {
         return returnOperationStatus(401, 'password does not match');
       }
+
+      await this.checkPasswordStrength(user.password).then((result) => {
+        if (user.password) {
+          const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
+          if (minScore > result.score) {
+            logger.error(`Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
+            return returnStatus(400, `Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
+          }
+        } else {
+          logger.error(`User password does not exist`);
+          return returnStatus(400, `User password does not exist`);
+        }
+      });
 
       user.password_hash = password.hash(newPw);
       const updateStatus = await super.update(UserList.fromPartial({
@@ -1316,6 +1368,18 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         user.active = true;
         user.unauthenticated = false;
       }
+      await this.checkPasswordStrength(user.password).then((result) => {
+        if (user.password) {
+          const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
+          if (minScore > result.score) {
+            logger.error(`Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
+            return returnStatus(400, `Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
+          }
+        } else {
+          logger.error(`User password does not exist`);
+          return returnStatus(400, `User password does not exist`);
+        }
+      });
       user.password_hash = password.hash(newPassword);
       const updateStatus = await super.update(UserList.fromPartial({
         items: [user]
@@ -1629,6 +1693,19 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             }
           }
         }
+
+        await this.checkPasswordStrength(user.password).then((result) => {
+          if (user.password) {
+            const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
+            if (minScore > result.score) {
+              this.logger.error(`Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
+              return returnStatus(400, `Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
+            }
+          } else {
+            this.logger.error(`User password does not exist`);
+            return returnStatus(400, `User password does not exist`);
+          }
+        });
 
         // Update password if it contains that field by updating hash
         if (user.password) {

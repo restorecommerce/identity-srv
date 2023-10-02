@@ -22,7 +22,8 @@
     "passwordChangeConfirmationURL": "http://console.restorecommerce.io/confirm_password_change",
     "invitationURL": "http://console.restorecommerce.io/#/invite_user",
     "minUsernameLength": 8,
-    "maxUsernameLength": 40
+    "maxUsernameLength": 40,
+    "passwordComplexityMinScore": 3
   },
   "logger": {
     "console": {
