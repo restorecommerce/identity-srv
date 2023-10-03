@@ -207,7 +207,7 @@
         "messageObject": "io.restorecommerce.user.PasswordChangeRequested"
       },
       "emailChangeConfirmed": {
-        "messageObject": "io.restorecommerce.user.EmailChanged"
+        "messageObject": "io.restorecommerce.user.EmailChangeConfirmed"
       },
       "emailChangeRequested": {
         "messageObject": "io.restorecommerce.user.EmailChangeRequested"
