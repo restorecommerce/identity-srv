@@ -34,7 +34,8 @@
     "fieldOptions": {
       "maskFields": [
         "password",
-        "request.password"
+        "request.password",
+        "items.[0].password"
       ],
       "bufferFields": [
         {
