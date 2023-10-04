@@ -10,7 +10,7 @@ import {
 export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): Promise<any> => {
   try {
     const idsClient = await getUserServiceClient();
-    if(!idsClient) {
+    if (!idsClient) {
       logger.error('Identity service client not initialized');
       return returnOperationStatus(503, 'Identity service client not initialized');
     }
@@ -42,26 +42,33 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
     }
 
     const users = await idsClient.read(ReadRequest.fromPartial({ filters, subject: { token: tokenTechUser.token } }), {});
-    const usersToDelete = users.items.filter((user) => {
-      if (user.payload.meta.created !== null && user.payload.activation_code !== undefined || user.payload.activation_code === '') {
-        const createdTimestamp = new Date(user.payload.meta.created).getTime();
-        return createdTimestamp < expirationTimestamp;
+
+    if (users.total_count > 0) {
+      const usersToDelete = users.items.filter((user) => {
+        if (user.payload.meta.created !== null && user.payload.activation_code !== undefined || user.payload.activation_code === '') {
+          const createdTimestamp = new Date(user.payload.meta.created).getTime();
+          return createdTimestamp < expirationTimestamp;
+        }
+        return false;
+      });
+
+      if (usersToDelete.length === 0) {
+        logger.info('No expired inactivated user accounts found');
+        return returnOperationStatus(200, 'No expired inactivated user accounts found');
       }
-      return false;
-    });
 
-    if (usersToDelete.length === 0) {
-      logger.info('No expired inactivated user accounts found');
-      return returnOperationStatus(200, 'No expired inactivated user accounts found');
+      // Extract user IDs to delete
+      const userIDsToDelete = usersToDelete.map((user) => user.payload.id);
+
+      // Call the delete function to delete expired inactivated user accounts
+      const deleteStatusArr = await idsClient.delete(DeleteRequest.fromPartial({ ids: userIDsToDelete, subject: { token: tokenTechUser.token } }), {});
+
+      return deleteStatusArr;
     }
-
-    // Extract user IDs to delete
-    const userIDsToDelete = usersToDelete.map((user) => user.payload.id);
-
-    // Call the delete function to delete expired inactivated user accounts
-    const deleteStatusArr = await idsClient.delete(DeleteRequest.fromPartial({ ids: userIDsToDelete, subject: { token: tokenTechUser.token } }), {});
-
-    return deleteStatusArr;
+    else {
+      logger.info('No inactivated user accounts found');
+      return returnOperationStatus(200, 'No inactivated user accounts found');
+    }
 
   } catch (error) {
     logger.error(`Error in delete_expired_users_job: ${error.message}`);
