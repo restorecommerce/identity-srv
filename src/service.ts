@@ -871,16 +871,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return returnStatus(400, 'argument name is empty', user.id);
     }
 
-    if (user.password) {
-      await this.checkPasswordStrength(user.password).then((result) => {
-        const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
-        if (minScore > result.score) {
-          logger.error(`Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
-          return returnStatus(400, `Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
-        }
-      });
-    } else {
-      logger.error(`User password does not exist`);
+    const resultPasswordChecker = await this.checkPasswordStrength(user.password);
+    const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
+    if (minScore > resultPasswordChecker.score) {
+      logger.error(`Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+      return returnStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
     }
 
     const serviceCfg = this.cfg.get('service');
@@ -1272,16 +1267,12 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         return returnOperationStatus(401, 'password does not match');
       }
 
-      if (user.password) {
-        await this.checkPasswordStrength(user.password).then((result) => {
-          const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
-          if (minScore > result.score) {
-            logger.error(`Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
-            return returnStatus(400, `Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
-          }
-        });
-      } else {
-        logger.error(`User password does not exist`);
+      const resultPasswordChecker = await this.checkPasswordStrength(newPw);
+      const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
+      if (minScore > resultPasswordChecker.score) {
+        logger.error(`Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+        returnStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+        return;
       }
 
       user.password_hash = password.hash(newPw);
@@ -1387,16 +1378,12 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         user.active = true;
         user.unauthenticated = false;
       }
-      if (user.password) {
-        await this.checkPasswordStrength(user.password).then((result) => {
-          const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
-          if (minScore > result.score) {
-            logger.error(`Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
-            return returnStatus(400, `Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
-          }
-        });
-      } else {
-        logger.error(`User password does not exist`);
+      const resultPasswordChecker = await this.checkPasswordStrength(newPassword);
+      const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
+      if (minScore > resultPasswordChecker.score) {
+        logger.error(`Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+        returnStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+        return;
       }
 
       user.password_hash = password.hash(newPassword);
@@ -1712,20 +1699,16 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             }
           }
         }
-        if (user.password) {
-          await this.checkPasswordStrength(user.password).then((result) => {
-            const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
-            if (minScore > result.score) {
-              this.logger.error(`Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
-              return returnStatus(400, `Password is too weak The password score is ${result.score}/4, minimum score is ${minScore}. Suggestions: ${result.feedback.suggestions} & ${result.feedback.warning} User ID:`, user.id);
-            }
-          });
-        } else {
-          this.logger.error(`User password does not exist`);
-        }
-
         // Update password if it contains that field by updating hash
         if (user.password) {
+          const resultPasswordChecker = await this.checkPasswordStrength(user.password);
+          const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
+          if (minScore > resultPasswordChecker.score) {
+            this.logger.error(`Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+            returnStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+            return;
+          }
+
           user.password_hash = password.hash(user.password);
           delete user.password;
         } else {

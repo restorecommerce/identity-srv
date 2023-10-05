@@ -328,7 +328,7 @@ describe('testing identity-srv', () => {
           name: 'test.user1', // this user is used in the next tests
           first_name: 'test',
           last_name: 'user',
-          password: 'notsecure',
+          password: 'CNQJrH%KAayeDpf3h',
           email: 'test@ms.restorecommerce.io'
         };
       });
@@ -385,7 +385,6 @@ describe('testing identity-srv', () => {
           }
           await topic.removeListener('registered', listener);
         });
-
         it('should re-send activation email for registered user', async function sendActivationEmail(): Promise<void> {
           this.timeout(60000);
           const listener = function listener(message: any, context: any): void {
@@ -410,7 +409,7 @@ describe('testing identity-srv', () => {
             name: 'guest_user',
             first_name: 'guest_first_name',
             last_name: 'guest_last_name',
-            password: 'notsecure',
+            password: 'CNQJrH%KAayeDpf3h',
             email: 'guest@guest.com',
             guest: true
           };
@@ -609,8 +608,22 @@ describe('testing identity-srv', () => {
           // name: 'test.user2',
           first_name: 'test',
           last_name: 'user',
-          // password: 'notsecure',
+          // password: 'CNQJrH%KAayeDpf3h',
           // email: 'test2@ms.restorecommerce.io',
+          role_associations: [{
+            role: 'user-r-id',
+            attributes: []
+          }],
+          active: true
+        };
+
+        const testuser3: any = {
+          id: 'testuser3',
+          name: 'test.user3',
+          first_name: 'test',
+          last_name: 'user',
+          password: '123',
+          email: 'test3@ms.restorecommerce.io',
           role_associations: [{
             role: 'user-r-id',
             attributes: []
@@ -626,9 +639,17 @@ describe('testing identity-srv', () => {
           result.items[0].status.message.should.equal('argument password is empty');
         });
 
+        it('should not create a user with a weak password', async function createUser(): Promise<void> {
+          const result = await userService.create({ items: [testuser3] });
+          should.exist(result);
+          should.not.exist(result?.items[0]?.payload);
+          result.items[0].status.code.should.equal(400);
+          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common.,If you use this password elsewhere, you should change it. & Your password was exposed by a data breach on the Internet. User ID:');
+        });
+
         it('should not create a user with empty email', async function createUser(): Promise<void> {
           // append password, but no email
-          Object.assign(testuser2, { password: 'notsecure' });
+          Object.assign(testuser2, { password: 'CNQJrH%KAayeDpf3h' });
           const result = await userService.create({ items: [testuser2] });
           should.not.exist(result.items[0].payload);
           result.items[0].status.code.should.equal(400);
@@ -785,7 +806,7 @@ describe('testing identity-srv', () => {
         it('should return an error for invalid user identifier', async function login(): Promise<void> {
           const result = await (userService.login({
             identifier: 'invalid_id',
-            password: 'invalid_pw',
+            password: 'CNQJrH%KAayeDpf3h',
           }));
           should.not.exist(result.payload);
           result.status.code.should.equal(404);
@@ -796,7 +817,7 @@ describe('testing identity-srv', () => {
           cfg.set('obfuscateAuthNErrorReason', true);
           const result = await (userService.login({
             identifier: 'invalid_id',
-            password: 'invalid_pw',
+            password: 'CNQJrH%KAayeDpf3h',
           }));
           should.not.exist(result.payload);
           result.status.code.should.equal(412);
@@ -892,7 +913,7 @@ describe('testing identity-srv', () => {
           cfg.set('obfuscateAuthNErrorReason', true);
           const result = await (userService.login({
             identifier: user.name,
-            password: 'invalid_pw',
+            password: 'CNQJrH%KAayeDpf3htest',
           }));
           should.not.exist(result.payload);
           result.status.code.should.equal(412);
@@ -903,7 +924,7 @@ describe('testing identity-srv', () => {
         it('should return concise error in case the passwords don`t match', async function login(): Promise<void> {
           const result = await (userService.login({
             identifier: user.name,
-            password: 'invalid_pw',
+            password: 'CNQJrH%KAayeDpf3htes4',
           }));
           should.not.exist(result.payload);
           result.status.code.should.equal(401);
@@ -919,7 +940,7 @@ describe('testing identity-srv', () => {
             name: 'test.user1', // user registered initially, storing with token in DB
             first_name: 'test',
             last_name: 'user',
-            password: 'notsecure',
+            password: 'CNQJrH%KAayeDpf3h',
             email: 'test@ms.restorecommerce.io',
             token: 'user-token',
             tokens: [{
@@ -949,8 +970,8 @@ describe('testing identity-srv', () => {
           should.exist(result.items);
           const pwHashA = result.items[0].payload.password_hash;
           const changeResult = await (userService.changePassword({
-            password: 'notsecure',
-            new_password: 'newPassword',
+            password: 'CNQJrH%KAayeDpf3h',
+            new_password: 'CNQJrH%43KAayeDpf3h',
             subject: { token: 'user-token' }
           }));
           should.exist(changeResult);
@@ -1004,7 +1025,7 @@ describe('testing identity-srv', () => {
 
           const changeResult = await userService.confirmPasswordChange({
             identifier: user.name,
-            password: 'newPassword2',
+            password: 'CNQJrH%44KAayeDpf3h',
             activation_code: activationCode
           });
 
@@ -1156,7 +1177,7 @@ describe('testing identity-srv', () => {
             name: 'test.user2',
             first_name: 'test',
             last_name: 'user',
-            password: 'notsecure',
+            password: 'CNQJrH%KAayeDpf3h',
             email: 'test2@ms.restorecommerce.io',
             role_associations: [{
               role: 'user-r-id',
@@ -1206,7 +1227,7 @@ describe('testing identity-srv', () => {
               id: testUserID,
               name: 'test.user1', // existing user
               email: 'update@restorecommerce.io',
-              password: 'notsecure2',
+              password: 'CNQJrH%KAayeDpf3h2',
               first_name: 'John'
             }]
           });
@@ -1274,7 +1295,7 @@ describe('testing identity-srv', () => {
             name: 'sampleuser1',
             first_name: 'sampleUser7_first',
             last_name: 'user',
-            password: 'notsecure3443',
+            password: 'CNQJrH%KAayeDpf3h3443',
             email: 'sampleUser3@ms.restorecommerce.io',
             role_associations: [{
               role: 'user-r-id',
@@ -1287,7 +1308,7 @@ describe('testing identity-srv', () => {
             name: 'invitinguser',
             first_name: 'invitingUser_first',
             last_name: 'invitingUser_last',
-            password: 'notsecure',
+            password: 'CNQJrH%KAayeDpf3h',
             email: 'invitingUser@ms.restorecommerce.io',
             role_associations: [{
               role: 'user-r-id',
@@ -1318,7 +1339,7 @@ describe('testing identity-srv', () => {
             items: [{
               name: 'upsertuser',
               email: 'upsert@restorecommerce.io',
-              password: 'testUpsert',
+              password: 'RNZzHwG&jpv5RS4Ev',
               first_name: 'John',
               last_name: 'upsert'
             }]
@@ -1341,7 +1362,7 @@ describe('testing identity-srv', () => {
               id: upserUserID,
               name: 'sampleuser1',
               email: 'upsert@restorecommerce.io',
-              password: 'testUpsert',
+              password: 'RNZzHwG&jpv5RS4Ev',
               first_name: 'John',
               last_name: 'upsert'
             }]
@@ -1360,7 +1381,7 @@ describe('testing identity-srv', () => {
               id: upserUserID,
               name: 'upsertuser',
               email: 'upsert2@restorecommerce.io',
-              password: 'testUpsert2',
+              password: 'RNZzHwG&jpv5RS4Ev2',
               first_name: 'John',
               last_name: 'upsert2'
             }]
@@ -1393,7 +1414,7 @@ describe('testing identity-srv', () => {
           name: 'test.user',
           first_name: 'test',
           last_name: 'user',
-          password: 'password',
+          password: 'CNQJrH%KAayeDpf3h',
           email: 'test@restorecommerce.io',
           role_associations: [{
             role: 'user-r-id',
@@ -1549,7 +1570,7 @@ describe('testing identity-srv', () => {
             name: 'test.user2',
             first_name: 'test',
             last_name: 'user',
-            password: 'notsecure',
+            password: 'CNQJrH%KAayeDpf3h',
             email: 'test2@ms.restorecommerce.io',
             role_associations: [{
               role: 'user-r-id',

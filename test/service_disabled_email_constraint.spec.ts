@@ -282,7 +282,7 @@ describe('testing identity-srv', () => {
         name: 'test.user1', // this user is used in the next tests
         first_name: 'test',
         last_name: 'user',
-        password: 'notsecure',
+        password: 'CNQJrH%KAayeDpf3h',
         email: 'test@ms.restorecommerce.io'
       };
     });
@@ -388,7 +388,7 @@ describe('testing identity-srv', () => {
           id: 'testuser1', name: 'testuser1',
           first_name: 'test',
           last_name: 'user',
-          password: 'notsecure',
+          password: 'CNQJrH%KAayeDpf3h',
           email: 'test@ms.restorecommerce.io',
           role_associations: [{
             role: 'user-r-id',
@@ -464,7 +464,7 @@ describe('testing identity-srv', () => {
           // techUser
           let techUser = Object.assign(testusersTemplate, {
             id: 'techUserID1',
-            name: 'techUserName', password: 'Test1!Test1!',
+            name: 'techUserName', password: 'CNQJrH%KAayeDpf3h',
             email: 'techuser@techuser', user_type: UserType.TECHNICAL_USER,
             role_associations: [{
               id: 'user-r-role-assoc-id',
@@ -524,7 +524,7 @@ describe('testing identity-srv', () => {
         it('should throw an error when logging in with email identifier when is not unique', async () => {
           const result = await userService.login({
             identifier: 'test@ms.restorecommerce.io',
-            password: 'notsecure',
+            password: 'CNQJrH%KAayeDpf3h',
           });
           should.exist(result);
           should.not.exist(result.payload);
@@ -535,7 +535,7 @@ describe('testing identity-srv', () => {
         it('should login with valid user name identifier and password', async () => {
           const result = await userService.login({
             identifier: 'testuser1',
-            password: 'notsecure',
+            password: 'CNQJrH%KAayeDpf3h',
           });
           should.exist(result);
           should.exist(result.payload);
@@ -550,7 +550,7 @@ describe('testing identity-srv', () => {
         it('should login for tech user wth valid user name identifier and password', async () => {
           const result = await userService.login({
             identifier: 'techUserName',
-            password: 'Test1!Test1!',
+            password: 'CNQJrH%KAayeDpf3h',
           });
           should.exist(result);
           should.exist(result.payload);
@@ -649,7 +649,7 @@ describe('testing identity-srv', () => {
           const result = await userService.confirmPasswordChange({
             identifier: email,
             activation_code,
-            password: 'newpassword'
+            password: 'CNQJrH%KAayeDpf3h'
           });
           should.exist(result.operation_status);
           result.operation_status.code.should.equal(400);
@@ -665,7 +665,7 @@ describe('testing identity-srv', () => {
           const result = await userService.confirmPasswordChange({
             identifier: userName,
             activation_code,
-            password: 'newpassword'
+            password: 'CNQJrH%KAayeDpf3h655'
           });
           should.exist(result.operation_status);
           result.operation_status.code.should.equal(200);
@@ -706,7 +706,7 @@ describe('testing identity-srv', () => {
           activation_code = user.items[0].payload.activation_code;
           const result = await userService.confirmUserInvitation({
             identifier: email,
-            password: 'new_password',
+            password: 'CNQJrH%5KAayeDpf3h',
             activation_code
           });
           should.exist(result.operation_status);
@@ -716,7 +716,7 @@ describe('testing identity-srv', () => {
         it('should successfully confirm user invitation with user name as identifier', async () => {
           const result = await userService.confirmUserInvitation({
             identifier: userName,
-            password: 'new_password',
+            password: 'CNQJrH%5KAayeDpf3h',
             activation_code
           });
           should.exist(result.operation_status);
