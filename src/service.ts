@@ -82,6 +82,11 @@ import {
   RoleAssociation,
   Subject
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
+import { zxcvbnOptions, zxcvbnAsync, ZxcvbnResult } from '@zxcvbn-ts/core';
+import * as zxcvbnCommonPackage from '@zxcvbn-ts/language-common';
+import * as zxcvbnEnPackage from '@zxcvbn-ts/language-en';
+import * as zxcvbnDePackage from '@zxcvbn-ts/language-de';
+import { matcherPwnedFactory } from '@zxcvbn-ts/matcher-pwned';
 
 export class UserService extends ServiceBase<UserListResponse, UserList> implements UserServiceImplementation {
 
@@ -824,6 +829,27 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     return false;
   }
 
+  private async checkPasswordStrength(password: string): Promise<ZxcvbnResult> {
+
+    const matcherPwned = matcherPwnedFactory(fetch, zxcvbnOptions);
+    zxcvbnOptions.addMatcher('pwned', matcherPwned);
+
+    const options = {
+      dictionary: {
+        ...zxcvbnCommonPackage.dictionary,
+        ...zxcvbnEnPackage.dictionary,
+        ...zxcvbnDePackage.dictionary,
+      },
+      graphs: zxcvbnCommonPackage.adjacencyGraphs,
+      useLevenshteinDistance: true,
+      translations: zxcvbnEnPackage.translations,
+    };
+    zxcvbnOptions.setOptions(options);
+    const result = await zxcvbnAsync(password);
+
+    return result;
+  };
+
   /**
    * Validates User and creates it in DB,
    * @param user
@@ -843,6 +869,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
     if (!user.name) {
       return returnStatus(400, 'argument name is empty', user.id);
+    }
+
+    const resultPasswordChecker = await this.checkPasswordStrength(user.password);
+    const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
+    if (minScore > resultPasswordChecker.score) {
+      logger.error(`Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+      return returnStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
     }
 
     const serviceCfg = this.cfg.get('service');
@@ -1234,6 +1267,14 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         return returnOperationStatus(401, 'password does not match');
       }
 
+      const resultPasswordChecker = await this.checkPasswordStrength(newPw);
+      const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
+      if (minScore > resultPasswordChecker.score) {
+        logger.error(`Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+        returnStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+        return;
+      }
+
       user.password_hash = password.hash(newPw);
       const updateStatus = await super.update(UserList.fromPartial({
         items: [user]
@@ -1337,6 +1378,14 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         user.active = true;
         user.unauthenticated = false;
       }
+      const resultPasswordChecker = await this.checkPasswordStrength(newPassword);
+      const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
+      if (minScore > resultPasswordChecker.score) {
+        logger.error(`Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+        returnStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+        return;
+      }
+
       user.password_hash = password.hash(newPassword);
       const updateStatus = await super.update(UserList.fromPartial({
         items: [user]
@@ -1650,9 +1699,16 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             }
           }
         }
-
         // Update password if it contains that field by updating hash
         if (user.password) {
+          const resultPasswordChecker = await this.checkPasswordStrength(user.password);
+          const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
+          if (minScore > resultPasswordChecker.score) {
+            this.logger.error(`Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+            returnStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
+            return;
+          }
+
           user.password_hash = password.hash(user.password);
           delete user.password;
         } else {
