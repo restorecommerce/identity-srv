@@ -17,10 +17,11 @@
       "layoutTpl": "http://localhost:5000/storage/internal/identity-srv/templates/layout.hbs",
       "resourcesTpl": "http://localhost:5000/storage/internal/identity-srv/templates/resources.json"
     },
-    "activationURL": "http://console.restorecommerce.io/activate_user",
-    "emailConfirmationURL": "http://console.restorecommerce.io/confirm_email_change",
-    "passwordChangeConfirmationURL": "http://console.restorecommerce.io/confirm_password_change",
-    "invitationURL": "http://console.restorecommerce.io/#/invite_user",
+    "activationURL": "https://console.restorecommerce.io/activate-account",
+    "inactivatedAccountExpiry": "undefined",
+    "emailConfirmationURL": "https://console.restorecommerce.io/confirm-email-change",
+    "passwordChangeConfirmationURL": "https://console.restorecommerce.io/confirm-password-change",
+    "invitationURL": "https://console.restorecommerce.io/#/invite-user",
     "minUsernameLength": 8,
     "maxUsernameLength": 40,
     "passwordComplexityMinScore": 3
@@ -35,7 +36,8 @@
     "fieldOptions": {
       "maskFields": [
         "password",
-        "request.password"
+        "request.password",
+        "items.[0].password"
       ],
       "bufferFields": [
         {
@@ -95,7 +97,10 @@
     "db-indexes": {
       "db-offsetStore": 0,
       "db-subject": 4,
-      "db-findByToken": 5
+      "db-findByToken": 5,
+      "db-reccurTime": 7,
+      "db-repeatJobId": 8,
+      "db-jobStore": 1
     }
   },
   "urns": {
@@ -207,7 +212,7 @@
         "messageObject": "io.restorecommerce.user.PasswordChangeRequested"
       },
       "emailChangeConfirmed": {
-        "messageObject": "io.restorecommerce.user.EmailChanged"
+        "messageObject": "io.restorecommerce.user.EmailChangeConfirmed"
       },
       "emailChangeRequested": {
         "messageObject": "io.restorecommerce.user.EmailChangeRequested"
@@ -265,6 +270,12 @@
       },
       "flushCacheResponse": {
         "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
+      },
+      "jobDone": {
+        "messageObject": "io.restorecommerce.job.JobDone"
+      },
+      "jobFailed": {
+        "messageObject": "io.restorecommerce.job.JobFailed"
       },
       "topics": {
         "user.resource": {
@@ -381,5 +392,26 @@
         "scope": "email"
       }
     }
+  },
+  "importJobs": {
+    "jobs": [
+      {
+        "id": "delete-users-with-expired-activation",
+        "type": "DELETE_USERS_WITH_EXPIRED_ACTIVATION",
+        "data": {
+          "timezone": "Europe/Berlin"
+        },
+        "options": {
+          "attempts": 0,
+          "backoff": {
+            "type": "FIXED",
+            "delay": 1000
+          },
+          "repeat": {
+            "cron": "0 0 * * *"
+          }
+        }
+      }
+    ]
   }
 }

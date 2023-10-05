@@ -45,6 +45,8 @@ import {
   protoMetadata as notificationReqMeta
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/notification_req';
 import { ServerReflectionService } from 'nice-grpc-server-reflection';
+import * as fs from 'fs';
+import { runWorker } from '@restorecommerce/scs-jobs';
 
 registerProtoMeta(
   userMeta,
@@ -189,6 +191,30 @@ export class Worker {
     const events = new Events(cfg.get('events:kafka'), logger);
     await events.start();
     this.offsetStore = new chassis.OffsetStore(events as any, cfg, logger);
+
+    let externalJobFiles;
+    try {
+      externalJobFiles = fs.readdirSync(process.env.EXTERNAL_JOBS_DIR || './lib/jobs');
+    } catch (err) {
+      if (err.message.includes('no such file or directory')) {
+        logger.info('No files for external job processors found');
+      } else {
+        logger.error('Error reading jobs files');
+      }
+    }
+    if (externalJobFiles && externalJobFiles.length > 0) {
+      externalJobFiles.forEach((externalFile) => {
+        if (externalFile.endsWith('.js')) {
+          let require_dir = './jobs';
+          if (process.env.EXTERNAL_JOBS_REQUIRE_DIR) {
+            require_dir = process.env.EXTERNAL_JOBS_REQUIRE_DIR;
+          }
+          (async () => require(require_dir + '/' + externalFile).default(cfg, logger, events, runWorker))().catch(err => {
+            logger.error(`Error scheduling job ${externalFile}`, { err: err.message });
+          });
+        }
+      });
+    }
 
     // Enable events firing for resource api using config
     let isEventsEnabled = cfg.get('events:enableEvents');

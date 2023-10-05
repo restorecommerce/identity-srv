@@ -1,6 +1,6 @@
 {
   "name": "@restorecommerce/identity-srv",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Restorecommerce identity service",
   "main": "lib/start.js",
   "author": "n-fuse GmbH",
@@ -31,7 +31,9 @@
     "@zxcvbn-ts/language-de": "^3.0.2",
     "@zxcvbn-ts/language-en": "^3.0.2",
     "@zxcvbn-ts/matcher-pwned": "^3.0.4",
+    "@restorecommerce/scs-jobs": "^0.1.0",
     "bcryptjs": "^2.4.3",
+    "bullmq": "^4.11.4",
     "cross-env": "^7.0.3",
     "jose": "^4.14.6",
     "lodash": "^4.17.21",

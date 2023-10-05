@@ -1,3 +1,8 @@
+## 1.2.2 (October 3rd, 2023)
+
+- fix email confirm change message name
+- update URLs for email
+
 ## 1.2.1 (September 20th, 2023)
 
 - fix reference error
