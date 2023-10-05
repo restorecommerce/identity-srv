@@ -18,6 +18,7 @@
       "resourcesTpl": "http://localhost:5000/storage/internal/identity-srv/templates/resources.json"
     },
     "activationURL": "https://console.restorecommerce.io/activate-account",
+    "inactivatedAccountExpiry": "undefined",
     "emailConfirmationURL": "https://console.restorecommerce.io/confirm-email-change",
     "passwordChangeConfirmationURL": "https://console.restorecommerce.io/confirm-password-change",
     "invitationURL": "https://console.restorecommerce.io/#/invite-user",
@@ -95,7 +96,10 @@
     "db-indexes": {
       "db-offsetStore": 0,
       "db-subject": 4,
-      "db-findByToken": 5
+      "db-findByToken": 5,
+      "db-reccurTime": 7,
+      "db-repeatJobId": 8,
+      "db-jobStore": 1
     }
   },
   "urns": {
@@ -266,6 +270,12 @@
       "flushCacheResponse": {
         "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
       },
+      "jobDone": {
+        "messageObject": "io.restorecommerce.job.JobDone"
+      },
+      "jobFailed": {
+        "messageObject": "io.restorecommerce.job.JobFailed"
+      },
       "topics": {
         "user.resource": {
           "topic": "io.restorecommerce.users.resource"
@@ -381,5 +391,26 @@
         "scope": "email"
       }
     }
+  },
+  "importJobs": {
+    "jobs": [
+      {
+        "id": "delete-users-with-expired-activation",
+        "type": "DELETE_USERS_WITH_EXPIRED_ACTIVATION",
+        "data": {
+          "timezone": "Europe/Berlin"
+        },
+        "options": {
+          "attempts": 0,
+          "backoff": {
+            "type": "FIXED",
+            "delay": 1000
+          },
+          "repeat": {
+            "cron": "0 0 * * *"
+          }
+        }
+      }
+    ]
   }
 }

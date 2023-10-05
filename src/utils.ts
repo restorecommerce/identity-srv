@@ -19,10 +19,16 @@ import {
   Response_Decision
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
+import { FilterOpts, JobType } from './types';
+import { createClient as createRedisClient } from 'redis';
+import { Events } from '@restorecommerce/kafka-client';
+import { Logger } from 'winston';
+import { Worker, Processor } from 'bullmq';
+import { Data } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/job';
 
 // Create a ids client instance
 let idsClientInstance: UserServiceClient;
-const getUserServiceClient = (): UserServiceClient => {
+export const getUserServiceClient = (): UserServiceClient => {
   if (!idsClientInstance) {
     const cfg = createServiceConfig(process.cwd());
     // identity-srv client to resolve subject ID by token
@@ -132,10 +138,10 @@ export const marshallProtobufAny = (msg: any): any => {
 
 export const unmarshallProtobufAny = (msg: any, logger: any): any => {
   try {
-    if(msg.value) {
+    if (msg.value) {
       return JSON.parse(msg.value.toString());
     }
-  } catch(error) {
+  } catch (error) {
     logger.error('Error unmarshalling JSON', msg);
   }
 };

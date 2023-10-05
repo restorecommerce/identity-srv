@@ -30,7 +30,7 @@ The following service specific configuration properties are available:
 * `register` [`true`]: if set to `false`, the `Register` endpoint is disabled and users cannot self sign up but only be created through the bulk creation method `Create` which is usually only available to adminstrative user roles.
 * `enableEmail` [`true`]: if set to `true`, emails are sent out upon specific events, like account creation and email change.
 * `activationURL`: URL used for link in activation email to activate the account.
-* `unactivatedAccountExpiry` in seconds [`undefined`]: if set to a number of seconds, the account will completely be removed from the system (log date will be retained) if no activation has been performed since the given number of seconds.
+* `inactivatedAccountExpiry` in seconds [`undefined`]: if set to a number of seconds, the account will completely be removed from the system (log date will be retained) if no activation has been performed since the given number of seconds.
 * `emailConfirmationURL`: URL used for link in confirmation email to confirm email address change.
 * `invitationURL`: URL used for link in invitation email to accept invitation.
 * `data`: additional fields can be provided inside data. These fields can then be used inside the hbs templates.

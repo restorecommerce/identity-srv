@@ -1106,15 +1106,36 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const activationCode = request.activation_code;
     const subject = request.subject;
     let acsResponse: DecisionResponse;
+    const inactivatedAccountExpiry = this.cfg.get('service:inactivatedAccountExpiry');
+
     // check for the identifier against name or email in DB
     const filters = getDefaultFilter(identifier);
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+    const user = users.items[0].payload;
+
+    // Check if inactivatedAccountExpiry is set and positive
+    if (inactivatedAccountExpiry != undefined && inactivatedAccountExpiry > 0) {
+
+      if (user && user.meta.created) {
+        const currentTimestamp = new Date(); // Current Unix timestamp in seconds
+        const activationTimestamp = user.meta.created;
+
+        // Check if the activation code has expired
+        // calculate the difference between currentTimestamp.getTime() and activationTimestamp.getTime(). This gives the time difference in milliseconds.
+        // multiply inactivatedAccountExpiry by 1000 to convert it to milliseconds (assuming it's specified in seconds), and then compare it with the time difference to check if the activation code has expired.
+        if (currentTimestamp.getTime() - activationTimestamp.getTime() > inactivatedAccountExpiry * 1000) {
+          logger.debug('activation code has expired', user);
+          return returnOperationStatus(400, 'Activation code has expired');
+        }
+      }
+    }
+
     if (!users || users?.total_count === 0) {
       return returnOperationStatus(404, 'user not found');
     } else if (users.total_count > 1) {
       return returnOperationStatus(400, `Invalid identifier provided for user activation, multiple users found for identifier ${identifier}`);
     }
-    const user = users.items[0].payload;
+
     try {
       acsResponse = await checkAccessRequest({
         ...context,
@@ -1172,7 +1193,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const newPw = request.new_password;
     let subject = request.subject;
     const dbUser = await this.findByToken(FindByTokenRequest.fromPartial({ token: subject.token }), {});
-    if(!dbUser || _.isEmpty(dbUser.payload)) {
+    if (!dbUser || _.isEmpty(dbUser.payload)) {
       return returnOperationStatus(404, 'Invalid token or user does not exist');
     }
     const users = await super.read(ReadRequest.fromPartial({
