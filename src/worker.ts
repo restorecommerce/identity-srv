@@ -46,7 +46,7 @@ import {
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/notification_req';
 import { ServerReflectionService } from 'nice-grpc-server-reflection';
 import * as fs from 'fs';
-import { runWorker } from './utils';
+import { runWorker } from '@restorecommerce/scs-jobs';
 
 registerProtoMeta(
   userMeta,

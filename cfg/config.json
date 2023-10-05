@@ -18,7 +18,7 @@
       "resourcesTpl": "http://localhost:5000/storage/internal/identity-srv/templates/resources.json"
     },
     "activationURL": "http://console.restorecommerce.io/activate_user",
-    "inactivatedAccountExpiry": "undefined",
+    "inactivatedAccountExpiry": 172800,
     "emailConfirmationURL": "http://console.restorecommerce.io/confirm_email_change",
     "passwordChangeConfirmationURL": "http://console.restorecommerce.io/confirm_password_change",
     "invitationURL": "http://console.restorecommerce.io/#/invite_user",
