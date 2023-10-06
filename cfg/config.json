@@ -24,7 +24,8 @@
     "invitationURL": "https://console.restorecommerce.io/#/invite-user",
     "minUsernameLength": 8,
     "maxUsernameLength": 40,
-    "passwordComplexityMinScore": 3
+    "passwordComplexityMinScore": 3,
+    "passwordMinLength": 12
   },
   "logger": {
     "console": {

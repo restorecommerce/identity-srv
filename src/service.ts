@@ -87,6 +87,12 @@ import * as zxcvbnCommonPackage from '@zxcvbn-ts/language-common';
 import * as zxcvbnEnPackage from '@zxcvbn-ts/language-en';
 import * as zxcvbnDePackage from '@zxcvbn-ts/language-de';
 import { matcherPwnedFactory } from '@zxcvbn-ts/matcher-pwned';
+import {
+  MatchEstimated,
+  MatchExtended,
+  Matcher,
+  Match,
+} from '@zxcvbn-ts/core/dist/types';
 
 export class UserService extends ServiceBase<UserListResponse, UserList> implements UserServiceImplementation {
 
@@ -830,9 +836,145 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   }
 
   private async checkPasswordStrength(password: string): Promise<ZxcvbnResult> {
+    const minLength: number = this.cfg.get('service:passwordMinLength');
+    const minLengthMatcher: Matcher = {
+      Matching: class MatchMinLength {
+        match({ password }: { password: string }) {
+          const matches: Match[] = [];
+          if (password.length <= minLength) {
+            matches.push({
+              pattern: 'minLength',
+              token: password,
+              i: 0,
+              j: password.length - 1,
+            });
+          }
+          return matches;
+        }
+      },
+      feedback(match: MatchEstimated, isSoleMatch: boolean | undefined) {
+        return {
+          warning: 'Your password is not long enough',
+          suggestions: [],
+        };
+      },
+      scoring(match: MatchExtended) {
+        // The length of the password is multiplied by 10 to create a higher score the more characters are added.
+        return match.token.length * 10;
+      },
+    };
+
+    const numberMatcher: Matcher = {
+      Matching: class MatchNumber {
+        match({ password }: { password: string }) {
+          const matches: Match[] = [];
+          if (!/[0-9]/.test(password)) {
+            matches.push({
+              pattern: 'number',
+              token: password,
+              i: 0,
+              j: password.length - 1,
+            });
+          }
+          return matches;
+        }
+      },
+      feedback(match: MatchEstimated, isSoleMatch: boolean | undefined) {
+        return {
+          warning: 'Your password must contain at least one number',
+          suggestions: [],
+        };
+      },
+      scoring(match: MatchExtended) {
+        return 10; // adjust the score as needed
+      },
+    };
+
+    const uppercaseMatcher: Matcher = {
+      Matching: class MatchUppercase {
+        match({ password }: { password: string }) {
+          const matches: Match[] = [];
+          if (!/[A-Z]/.test(password)) {
+            matches.push({
+              pattern: 'uppercase',
+              token: password,
+              i: 0,
+              j: password.length - 1,
+            });
+          }
+          return matches;
+        }
+      },
+      feedback(match: MatchEstimated, isSoleMatch: boolean | undefined) {
+        return {
+          warning: 'Your password must contain at least one uppercase letter',
+          suggestions: [],
+        };
+      },
+      scoring(match: MatchExtended) {
+        return 10; // adjust the score as needed
+      },
+    };
+
+    const lowercaseMatcher: Matcher = {
+      Matching: class MatchLowercase {
+        match({ password }: { password: string }) {
+          const matches: Match[] = [];
+          if (!/[a-z]/.test(password)) {
+            matches.push({
+              pattern: 'lowercase',
+              token: password,
+              i: 0,
+              j: password.length - 1,
+            });
+          }
+          return matches;
+        }
+      },
+      feedback(match: MatchEstimated, isSoleMatch: boolean | undefined) {
+        return {
+          warning: 'Your password must contain at least one lowercase letter',
+          suggestions: [],
+        };
+      },
+      scoring(match: MatchExtended) {
+        return 10; // adjust the score as needed.
+      },
+    };
+
+    const specialCharMatcher: Matcher = {
+      Matching: class MatchSpecialChar {
+        match({ password }: { password: string }) {
+          const matches: Match[] = [];
+          if (!/[!@#$%^&*]/.test(password)) {
+            matches.push({
+              pattern: 'specialChar',
+              token: password,
+              i: 0,
+              j: password.length - 1,
+            });
+          }
+          return matches;
+        }
+      },
+      feedback(match: MatchEstimated, isSoleMatch: boolean | undefined) {
+        return {
+          warning: 'Your password must contain at least one special character (!@#$%^&*)',
+          suggestions: [],
+        };
+      },
+      scoring(match: MatchExtended) {
+        return 10; // adjust the score as needed
+      },
+    };
 
     const matcherPwned = matcherPwnedFactory(fetch, zxcvbnOptions);
     zxcvbnOptions.addMatcher('pwned', matcherPwned);
+    zxcvbnOptions.addMatcher('minLength', minLengthMatcher);
+    zxcvbnOptions.addMatcher('number', numberMatcher);
+    zxcvbnOptions.addMatcher('uppercase', uppercaseMatcher);
+    zxcvbnOptions.addMatcher('lowercase', lowercaseMatcher);
+    zxcvbnOptions.addMatcher('specialChar', specialCharMatcher);
 
     const options = {
       dictionary: {

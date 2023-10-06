@@ -23,6 +23,7 @@
     "minUsernameLength": 8,
     "maxUsernameLength": 20,
     "passwordComplexityMinScore": 3,
+    "passwordMinLength": 12,
     "data": {
       "url": "https://www.google.com/"
     }
