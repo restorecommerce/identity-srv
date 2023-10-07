@@ -37,7 +37,10 @@
     },
     "fieldOptions": {
       "maskFields": [
-        "password", "request.password"
+        "password",
+        "request.password",
+        "request.token",
+        "items.[0].password"
       ],
       "bufferFields": [
         {
@@ -76,6 +79,19 @@
         {
           "fieldPath": "payload.[1].options"
         }
+      ],
+      "omitFields": [
+        "context",
+        "custom_arguments",
+        "subject.token",
+        "token",
+        "tokens",
+        "items.[0].tokens",
+        "messages.[0].tokens",
+        "request.items.[0].tokens",
+        "response.payload.token",
+        "response.payload.tokens",
+        "request.subject.token"
       ]
     }
   },

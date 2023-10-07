@@ -18,13 +18,6 @@ import {
 import {
   Response_Decision
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
-import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
-import { FilterOpts, JobType } from './types';
-import { createClient as createRedisClient } from 'redis';
-import { Events } from '@restorecommerce/kafka-client';
-import { Logger } from 'winston';
-import { Worker, Processor } from 'bullmq';
-import { Data } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/job';
 
 // Create a ids client instance
 let idsClientInstance: UserServiceClient;
@@ -54,29 +47,6 @@ export interface Resource {
   resource: string;
   id?: string | string[]; // for what is allowed operation id is not mandatory
   property?: string[];
-}
-
-export interface Attribute {
-  id: string;
-  value: string;
-  attributes: Attribute[];
-}
-
-export interface CtxResource {
-  id: string;
-  meta: {
-    created?: number;
-    modified?: number;
-    modified_by?: string;
-    owners: Attribute[]; // id and owner is mandatory in ctx resource other attributes are optional
-  };
-  [key: string]: any;
-}
-
-export interface GQLClientContext {
-  // if subject is missing by default it will be treated as unauthenticated subject
-  subject?: Subject;
-  resources?: CtxResource[];
 }
 
 /**

@@ -1,3 +1,7 @@
+## 1.3.0 (October 7th, 2023)
+
+- up node and dependencies
+
 ## 1.2.2 (October 3rd, 2023)
 
 - fix email confirm change message name
