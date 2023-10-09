@@ -94,6 +94,8 @@ import {
   Match,
 } from '@zxcvbn-ts/core/dist/types';
 
+export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
+
 export class UserService extends ServiceBase<UserListResponse, UserList> implements UserServiceImplementation {
 
   db: Arango;

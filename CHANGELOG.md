@@ -1,3 +1,7 @@
+## 1.3.1 (October 9th, 2023)
+
+- up job name
+
 ## 1.3.0 (October 7th, 2023)
 
 - up node and dependencies
