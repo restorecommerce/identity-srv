@@ -1,3 +1,7 @@
+## 1.3.2 (October 9th, 2023)
+
+- enable to import tech users without password having null check for password
+
 ## 1.3.1 (October 9th, 2023)
 
 - up job name

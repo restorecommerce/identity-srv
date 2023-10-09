@@ -843,7 +843,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       Matching: class MatchMinLength {
         match({ password }: { password: string }) {
           const matches: Match[] = [];
-          if (password.length <= minLength) {
+          if (password.length < minLength) {
             matches.push({
               pattern: 'minLength',
               token: password,
@@ -1015,9 +1015,12 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return returnStatus(400, 'argument name is empty', user.id);
     }
 
-    const resultPasswordChecker = await this.checkPasswordStrength(user.password);
+    let resultPasswordChecker;
+    if (user.password) {
+      resultPasswordChecker = await this.checkPasswordStrength(user.password);
+    }
     const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
-    if (minScore > resultPasswordChecker.score) {
+    if (minScore > resultPasswordChecker?.score) {
       logger.error(`Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
       return returnStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
     }
