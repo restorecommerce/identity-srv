@@ -30,13 +30,13 @@ export const createMetadata = async (res: any, urns: any, userService: UserServi
       );
     } else if (subject?.token) {
       // when no subjectID is provided find the subjectID using findByToken
-      const user = await userService.findByToken(FindByTokenRequest.fromPartial({ token: subject.token }), context);
+      const user = await userService.findByToken(FindByTokenRequest.fromPartial({ token: subject.token }), {});
       if (user?.payload?.id) {
         orgOwnerAttributes.push(
           {
             id: urns.ownerIndicatoryEntity,
             value: urns.user,
-            owners: [{
+            attributes: [{
               id: urns.ownerInstance,
               value: user.payload.id
             }]

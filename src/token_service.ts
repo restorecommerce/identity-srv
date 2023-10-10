@@ -152,17 +152,16 @@ export class TokenService implements TokenServiceImplementation {
    * Find access token data from User entity by tokenID
   **/
   async find(request: Identifier, context): Promise<Any> {
-    if (request || !request.id) {
+    const subject = request.subject;
+    if (!request || !request.id) {
       const response = { status: { code: 400, message: 'No id was provided for find' } };
       return marshallProtobufAny(response);
     }
-
-    request = await createMetadata(request, this.cfg.get('authorization:urns'), this.userService, request.subject);
     let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest({
         ...context,
-        subject: request.subject,
+        subject,
         resources: []
       }, [{ resource: 'token' }], AuthZAction.READ, Operation.whatIsAllowed);
     } catch (err) {
@@ -179,7 +178,7 @@ export class TokenService implements TokenServiceImplementation {
       let data;
       let tokenData;
       const user = await this.userService.findByToken(FindByTokenRequest.fromPartial({ token: request.id }), context);
-      if (user && user.payload && user.payload.tokens && user.payload.tokens.length > 0) {
+      if (user?.payload?.tokens?.length > 0) {
         let userTokens = user.payload.tokens;
         for (let token of userTokens) {
           if (token.token === request.id) {
@@ -188,7 +187,7 @@ export class TokenService implements TokenServiceImplementation {
           }
         }
       }
-      if (user && user.payload && tokenData) {
+      if (user?.payload && tokenData) {
         data = {
           accountId: user.payload.id,
           exp: tokenData.expires_in,
