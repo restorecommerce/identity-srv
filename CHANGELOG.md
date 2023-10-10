@@ -1,3 +1,8 @@
+## 1.3.3 (October 10th, 2023)
+
+- fix db expries in for findByToken
+- up log message and added more tests for password verification
+
 ## 1.3.2 (October 9th, 2023)
 
 - enable to import tech users without password having null check for password
