@@ -631,6 +631,76 @@ describe('testing identity-srv', () => {
           active: true
         };
 
+        const testuser4: any = {
+          id: 'testuser4',
+          name: 'test.user4',
+          first_name: 'test',
+          last_name: 'user',
+          password: 'CNQJrH%KAayeDpfh',
+          email: 'test4@ms.restorecommerce.io',
+          role_associations: [{
+            role: 'user-r-id',
+            attributes: []
+          }],
+          active: true
+        };
+
+        const testuser5: any = {
+          id: 'testuser5',
+          name: 'test.user5',
+          first_name: 'test',
+          last_name: 'user',
+          password: 'CNQJrHKAayeDp4fh',
+          email: 'test5@ms.restorecommerce.io',
+          role_associations: [{
+            role: 'user-r-id',
+            attributes: []
+          }],
+          active: true
+        };
+
+        const testuser6: any = {
+          id: 'testuser6',
+          name: 'test.user6',
+          first_name: 'test',
+          last_name: 'user',
+          password: 'cnerqrhsea%yedp4fh',
+          email: 'test6@ms.restorecommerce.io',
+          role_associations: [{
+            role: 'user-r-id',
+            attributes: []
+          }],
+          active: true
+        };
+
+        const testuser7: any = {
+          id: 'testuser7',
+          name: 'test.user7',
+          first_name: 'test',
+          last_name: 'user',
+          password: 'CNQJRH%KAYEDP4FH',
+          email: 'test5@ms.restorecommerce.io',
+          role_associations: [{
+            role: 'user-r-id',
+            attributes: []
+          }],
+          active: true
+        };
+
+        const testuser8: any = {
+          id: 'testuser8',
+          name: 'test.user8',
+          first_name: 'test',
+          last_name: 'user',
+          password: 'CNQJr5HK%Aa',
+          email: 'test8@ms.restorecommerce.io',
+          role_associations: [{
+            role: 'user-r-id',
+            attributes: []
+          }],
+          active: true
+        };
+
         it('should not create a user with empty password', async function createUser(): Promise<void> {
           const result = await userService.create({ items: [testuser2] });
           should.exist(result);
@@ -644,7 +714,47 @@ describe('testing identity-srv', () => {
           should.exist(result);
           should.not.exist(result?.items[0]?.payload);
           result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common.,If you use this password elsewhere, you should change it. & Your password was exposed by a data breach on the Internet. User ID:');
+          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common.,If you use this password elsewhere, you should change it. & Your password was exposed by a data breach on the Internet. User ID testuser3');
+        });
+
+        it('should not create a user with a password missing number', async function createUser(): Promise<void> {
+          const result = await userService.create({ items: [testuser4] });
+          should.exist(result);
+          should.not.exist(result?.items[0]?.payload);
+          result.items[0].status.code.should.equal(400);
+          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password must contain at least one number User ID testuser4');
+        });
+
+        it('should not create a user with a password missing special character', async function createUser(): Promise<void> {
+          const result = await userService.create({ items: [testuser5] });
+          should.exist(result);
+          should.not.exist(result?.items[0]?.payload);
+          result.items[0].status.code.should.equal(400);
+          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password must contain at least one special character (!@#$%^&*) User ID testuser5');
+        });
+
+        it('should not create a user with a password missing uppercase letter', async function createUser(): Promise<void> {
+          const result = await userService.create({ items: [testuser6] });
+          should.exist(result);
+          should.not.exist(result?.items[0]?.payload);
+          result.items[0].status.code.should.equal(400);
+          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password must contain at least one uppercase letter User ID testuser6');
+        });
+
+        it('should not create a user with a password missing lowercase letter', async function createUser(): Promise<void> {
+          const result = await userService.create({ items: [testuser7] });
+          should.exist(result);
+          should.not.exist(result?.items[0]?.payload);
+          result.items[0].status.code.should.equal(400);
+          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password must contain at least one lowercase letter User ID testuser7');
+        });
+
+        it('should not create a user with a password without of a length of password 12', async function createUser(): Promise<void> {
+          const result = await userService.create({ items: [testuser8] });
+          should.exist(result);
+          should.not.exist(result?.items[0]?.payload);
+          result.items[0].status.code.should.equal(400);
+          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password is not long enough User ID testuser8');
         });
 
         it('should not create a user with empty email', async function createUser(): Promise<void> {
