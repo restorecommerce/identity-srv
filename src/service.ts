@@ -1291,7 +1291,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     // check for the identifier against name or email in DB
     const filters = getDefaultFilter(identifier);
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
-    const user = users.items[0].payload;
+    const user = users?.items[0]?.payload;
 
     // Check if inactivatedAccountExpiry is set and positive
     if (inactivatedAccountExpiry != undefined && inactivatedAccountExpiry > 0) {
