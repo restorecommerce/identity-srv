@@ -243,7 +243,7 @@ export class TokenService implements TokenServiceImplementation {
       try {
         let payload = await this.find(request, context);
         // delete user token here
-        if (payload && payload.value) {
+        if (payload?.value) {
           const userData = await this.userService.findByToken(FindByTokenRequest.fromPartial({ token: request.id }), {});
           if (userData?.payload) {
             user = userData.payload;
@@ -255,7 +255,7 @@ export class TokenService implements TokenServiceImplementation {
             // check if the token is existing if not update it
             let updateToken = false;
             let currentTokenList = [];
-            if (user && user.tokens && user.tokens.length > 0) {
+            if (user?.tokens?.length > 0) {
               currentTokenList = user.tokens;
             }
             for (let token of currentTokenList) {
@@ -290,6 +290,8 @@ export class TokenService implements TokenServiceImplementation {
               message: `Key for subject ${user.id} deleted successfully`
             }
           };
+        } else {
+          response = { status: { code: 404, message: `Token ${request.id} not found` } };
         }
       } catch (err) {
         this.logger.error(response);
@@ -300,6 +302,7 @@ export class TokenService implements TokenServiceImplementation {
           }
         };
       }
+      this.logger.debug('Token destroy response', response);
       return marshallProtobufAny(response);
     }
   }
