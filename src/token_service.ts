@@ -212,19 +212,16 @@ export class TokenService implements TokenServiceImplementation {
    * Delete access token data from User entity
   **/
   async destroy(request: Identifier, context): Promise<DeepPartial<Any>> {
-    if (request || !request.id) {
+    if (!request || !request.id) {
       const response = { status: { code: 400, message: 'Key was not provided for delete operation' } };
       return marshallProtobufAny(response);
     }
-
-    request = await createMetadata(request, this.cfg.get('authorization:urns'), this.userService, request.subject);
+    context.subject = request.subject;
+    const resources = await createMetadata(request, this.cfg.get('authorization:urns'), this.userService, request.subject);
+    context.resources = resources;
     let acsResponse: DecisionResponse;
     try {
-      acsResponse = await checkAccessRequest({
-        ...context,
-        subject: request.subject,
-        resources: request
-      }, [{ resource: 'token', id: request.id }], AuthZAction.DELETE, Operation.isAllowed);
+      acsResponse = await checkAccessRequest(context, [{ resource: 'token', id: request.id }], AuthZAction.DELETE, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv for token destroy', err);
       const response = { status: { code: err.code, message: err.message } };
@@ -360,11 +357,11 @@ export class TokenService implements TokenServiceImplementation {
   *
   **/
   async revokeByGrantId(request: GrantId, context): Promise<DeepPartial<Any>> {
-    if (request || !request.grant_id) {
+    if (!request || !request.grant_id) {
       const response = { status: { code: 400, message: 'GrantId was not provided for revoke operation' } };
       return marshallProtobufAny(response);
     }
-
+    context.subject = request.subject;
     let subject = request.subject;
     let tokens = await this.userService.tokenRedisClient.get(request.grant_id) as any;
     if (tokens) {
@@ -372,17 +369,13 @@ export class TokenService implements TokenServiceImplementation {
       tokens = JSON.parse(tokens);
     }
     Object.assign(subject, { tokens });
-    request = await createMetadata(request, this.cfg.get('authorization:urns'), this.userService, subject);
+    const resources = await createMetadata(request, this.cfg.get('authorization:urns'), this.userService, subject);
     let acsResponse: DecisionResponse;
     try {
       if (!context) { context = {}; };
       context.subject = subject;
-      context.resources = request;
-      acsResponse = await checkAccessRequest({
-        ...context,
-        subject: request.subject,
-        resources: request
-      }, [{ resource: 'token', id: request.grant_id }], AuthZAction.DELETE, Operation.isAllowed);
+      context.resources = resources;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'token', id: request.grant_id }], AuthZAction.DELETE, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv for token revoke by grant id', err);
       const response = { status: { code: err.code, message: err.message } };
