@@ -345,7 +345,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         // validate token expiry date and delete it if expired
         if (userData?.tokens) {
           const dbToken = _.find(userData.tokens, { token });
-          if ((dbToken?.expires_in === 0) || (dbToken?.expires_in >= Math.round(new Date().getTime() / 1000))) {
+          if ((!dbToken.expires_in || dbToken?.expires_in === 0) || (dbToken?.expires_in >= Math.round(new Date().getTime() / 1000))) {
             return { payload: userData, status: returnCodeMessage(200, 'success') };
           } else {
             // delete token from redis and update user entity
@@ -374,8 +374,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           if (users?.items[0]?.payload) {
             // validate token expiry and delete if expired
             const dbToken = _.find(users.items[0].payload.tokens, { token });
-
-            if ((dbToken?.expires_in === 0) || (dbToken?.expires_in >= Math.round(new Date().getTime() / 1000))) {
+            // if expires_in does not exist or if its set to value 0 - token valid without time frame
+            if ((!dbToken.expires_in || dbToken?.expires_in === 0) || (dbToken?.expires_in >= Math.round(new Date().getTime() / 1000))) {
               await this.tokenRedisClient.set(token, JSON.stringify(users.items[0].payload));
               logger.debug('Stored user data to redis cache successfully');
               // update token last_login
