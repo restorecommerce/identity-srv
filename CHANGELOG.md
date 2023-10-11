@@ -1,3 +1,7 @@
+## 1.3.4 (October 11th, 2023)
+
+- fix token destroy api
+
 ## 1.3.3 (October 10th, 2023)
 
 - fix db expries in for findByToken

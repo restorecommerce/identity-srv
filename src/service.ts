@@ -1291,7 +1291,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     // check for the identifier against name or email in DB
     const filters = getDefaultFilter(identifier);
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
-    const user = users?.items[0]?.payload;
+    let user;
+    if(users.items.length > 0) {
+      user = users?.items[0]?.payload;
+    }
 
     // Check if inactivatedAccountExpiry is set and positive
     if (inactivatedAccountExpiry != undefined && inactivatedAccountExpiry > 0) {
@@ -1356,7 +1359,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const updateStatus = await super.update(UserList.fromPartial({
         items: [user]
       }), context);
-      if (updateStatus?.items[0].status?.message === 'success') {
+      if (updateStatus?.items[0]?.status?.message === 'success') {
         logger.info('user activated', user);
         await this.topics['user.resource'].emit('activated', { id: user.id });
       }
@@ -2142,7 +2145,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     if (acsResponse.decision === Response_Decision.PERMIT) {
       // delete user
-      let userID = users.items[0].payload.id;
+      let userID = users?.items[0]?.payload?.id;
       const unregisterStatus = await super.delete(DeleteRequest.fromPartial({
         ids: [userID]
       }), context);
@@ -2572,8 +2575,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }]
     }];
     const role: any = await this.roleService.read(ReadRequest.fromPartial({ filters, subject }), context);
-    if (role) {
-      roleID = role.items[0].payload.id;
+    if (role?.items?.length > 0) {
+      roleID = role?.items[0]?.payload?.id;
     }
     return roleID;
   }
