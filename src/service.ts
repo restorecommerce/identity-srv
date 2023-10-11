@@ -1421,8 +1421,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
       if (minScore > resultPasswordChecker.score) {
         logger.error(`Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
-        returnStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
-        return;
+        return returnOperationStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID ${user.id}`);
       }
 
       user.password_hash = password.hash(newPw);
@@ -1532,8 +1531,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
       if (minScore > resultPasswordChecker.score) {
         logger.error(`Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
-        returnStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
-        return;
+        return returnOperationStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID ${user.id}`);
       }
 
       user.password_hash = password.hash(newPassword);
@@ -1855,8 +1853,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
           if (minScore > resultPasswordChecker.score) {
             this.logger.error(`Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
-            returnStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID:`, user.id);
-            return;
+            return returnOperationStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID ${user.id}`);
           }
 
           user.password_hash = password.hash(user.password);
