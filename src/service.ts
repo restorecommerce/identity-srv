@@ -1896,9 +1896,12 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   }
 
   private nestedAttributesEqual(dbAttributes, userAttributes) {
+    if(!userAttributes) {
+      return true;
+    }
     if (dbAttributes?.length > 0 && userAttributes?.length > 0) {
       return userAttributes.every((obj) => dbAttributes.some((dbObj => dbObj.value === obj.value)));
-    } else if (dbAttributes.length != userAttributes.length) {
+    } else if (dbAttributes?.length != userAttributes?.length) {
       return false;
     }
   }

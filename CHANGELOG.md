@@ -1,3 +1,7 @@
+## 1.3.7 (October 14th, 2023)
+
+- added null condition for comparison of nested attributes
+
 ## 1.3.6 (October 14th, 2023)
 
 - added data field for register user
