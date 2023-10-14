@@ -1485,6 +1485,26 @@ describe('testing identity-srv', () => {
           result.operation_status.message.should.equal('success');
         });
 
+        it('should fail trying to update invalid / not existing user', async function update(): Promise<void> {
+          // sampleuser1 already exists in DB, so changing the `upseruser` name to `sampleuser1` should fail
+          let result = await userService.update({
+            items: [{
+              id: 'invalidUserID',
+              name: 'invalidName',
+              email: 'invalidemail',
+              password: 'RNZzHwG&jpv5RS4Ev',
+              first_name: 'John',
+              last_name: 'upsert'
+            }]
+          });
+          // validate fail result
+          should.exist(result.items);
+          result.items[0].status.code.should.equal(404);
+          result.items[0].status.message.should.equal('user not found for update');
+          result.operation_status.code.should.equal(200);
+          result.operation_status.message.should.equal('success');
+        });
+
         it('should upsert (update) user and delete user collection', async function upsert(): Promise<void> {
           let result = await userService.upsert({
             items: [{
@@ -1773,6 +1793,34 @@ describe('testing identity-srv', () => {
           cfg.set('authorization:enabled', false);
           cfg.set('authorization:enforce', false);
           updateConfig(cfg);
+        });
+
+        it('should register a user with JSON data and unregister the same', async () => {
+          const user = {
+            name: 'test.user1', // this user is used in the next tests
+            first_name: 'test',
+            last_name: 'user',
+            password: 'CNQJrH%KAayeDpf3h',
+            email: 'test@ms.restorecommerce.io',
+            data: { value: Buffer.from(JSON.stringify({ testKey: 'testValue' })) }
+          };
+          const registerResult = await userService.register(user);
+          should.exist(registerResult.payload);
+          should.exist(registerResult.status);
+          const result = registerResult.payload;
+          should.exist(result);
+          should.exist(result.id);
+          testUserID = result.id;
+          testUserName = result.name;
+          should.exist(result.name);
+          result.name.should.equal(user.name);
+          should.exist(result.password_hash);
+          should.exist(result.email);
+          result.email.should.equal(user.email);
+          result.active.should.be.false();
+          result.activation_code.should.not.be.empty();
+          JSON.parse(result.data.value.toString()).testKey.should.equal('testValue');
+          await userService.unregister({ identifier: 'test.user1' });
         });
       });
     });

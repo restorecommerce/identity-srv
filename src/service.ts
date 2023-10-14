@@ -604,7 +604,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         this.logger.error('Error making wahtIsAllowedACS request for verifying role associations', { code: err.code, message: err.message, stack: err.stack });
         return returnStatus(err.code, err.message, usersList[0].id);
       }
-      // for apiKey no need to verifyUserRoleAssociations
+      // for apiKey no need to verify role assocs
       const configuredApiKey = this.cfg.get('authentication:apiKey');
       if ((acsResponse.decision === Response_Decision.PERMIT) &&
         (configuredApiKey && subject.token && configuredApiKey === subject.token)) {
@@ -1102,6 +1102,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const result = await super.create(UserList.fromPartial({
       items: [user]
     }), context);
+    if (result?.items?.length > 0) {
+      for (let item of result?.items) {
+        if (item?.payload?.data) {
+          item.payload.data = { value: Buffer.from(JSON.stringify(item.payload.data)) };
+        }
+      }
+    }
     return (result).items[0];
   }
 
@@ -1292,7 +1299,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const filters = getDefaultFilter(identifier);
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
     let user;
-    if(users.items.length > 0) {
+    if (users?.items?.length > 0) {
       user = users?.items[0]?.payload;
     }
 
@@ -1731,7 +1738,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }];
         const users = await super.read(ReadRequest.fromPartial({ filters }), context);
         if (users.total_count === 0) {
-          // return returnStatus(404, 'user not found');
           updateWithStatus.items.push(returnStatus(404, 'user not found for update', user.id));
           items = _.filter(items, (item) => item.id !== user.id);
           continue;
@@ -1743,7 +1749,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           let users = await super.read(ReadRequest.fromPartial({ filters }), context);
           if (users.total_count > 0) {
             updateWithStatus.items.push(returnStatus(409, `User name ${user.name} already exists`, user.id));
-            request.items = _.filter(items, (item) => item.name !== user.name);
+            items = _.filter(items, (item) => item.name !== user.name);
             continue;
           }
         }
@@ -1799,15 +1805,21 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                     if (redisRoleAssoc.role === userRoleAssoc.role) {
                       for (let redisAttribute of redisRoleAssoc.attributes) {
                         const redisNestedAttributes = redisAttribute.attributes;
-                        for (let userAttribute of userRoleAssoc.attributes) {
-                          const userNestedAttributes = userAttribute.attributes;
-                          if (userAttribute.id === redisAttribute.id &&
-                            userAttribute.value === redisAttribute.value &&
-                            _.isEqual(redisNestedAttributes, userNestedAttributes)) {
-                            found = true;
-                            roleAssocEqual = true;
-                            break;
+                        if (userRoleAssoc?.attributes?.length > 0) {
+                          for (let userAttribute of userRoleAssoc.attributes) {
+                            const userNestedAttributes = userAttribute.attributes;
+                            if (userAttribute.id === redisAttribute.id &&
+                              userAttribute.value === redisAttribute.value &&
+                              this.nestedAttributesEqual(redisNestedAttributes, userNestedAttributes)) {
+                              found = true;
+                              roleAssocEqual = true;
+                              break;
+                            }
                           }
+                        } else {
+                          found = true;
+                          roleAssocEqual = true;
+                          break;
                         }
                       }
                     }
@@ -1871,9 +1883,23 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           user.tokens = [];
         }
       }
-      let updateStatus = await super.update(request, context);
+      let updateStatus: any = { items: [] };
+      if (items?.length > 0) {
+        updateStatus = await super.update({ items }, context);
+      }
       updateStatus.items.push(...updateWithStatus.items);
+      if (!updateStatus.operation_status) {
+        updateStatus.operation_status = { code: 200, message: 'success' };
+      }
       return updateStatus;
+    }
+  }
+
+  private nestedAttributesEqual(dbAttributes, userAttributes) {
+    if (dbAttributes?.length > 0 && userAttributes?.length > 0) {
+      return userAttributes.every((obj) => dbAttributes.some((dbObj => dbObj.value === obj.value)));
+    } else if (dbAttributes.length != userAttributes.length) {
+      return false;
     }
   }
 
@@ -1907,16 +1933,21 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                   if (dbRoleAssoc?.attributes?.length > 0) {
                     for (let dbAttribute of dbRoleAssoc.attributes) {
                       const dbNestedAttributes = dbAttribute.attributes;
-                      for (let userAttribute of userRoleAssoc.attributes) {
-                        const userNestedAttributes = userAttribute.attributes;
-                        if (userAttribute.id === dbAttribute.id &&
-                          userAttribute.value === dbAttribute.value &&
-                          _.isEqual(dbNestedAttributes, userNestedAttributes)) {
-                          found = true;
-                          break;
+                      if (userRoleAssoc?.attributes?.length > 0) {
+                        for (let userAttribute of userRoleAssoc.attributes) {
+                          const userNestedAttributes = userAttribute.attributes;
+                          if (userAttribute.id === dbAttribute.id &&
+                            userAttribute.value === dbAttribute.value &&
+                            this.nestedAttributesEqual(dbNestedAttributes, userNestedAttributes)) {
+                            found = true;
+                            break;
+                          }
                         }
                       }
                     }
+                  } else {
+                    found = true;
+                    break;
                   }
                 }
               }
@@ -3074,19 +3105,21 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
 
   async verifyRoles(role_associations: RoleAssociation[]): Promise<boolean> {
     // checking if user roles are valid
-    for (let roleAssociation of role_associations) {
-      const roleID = roleAssociation.role;
-      const filters = [{
-        filters: [{
-          field: 'id',
-          operation: Filter_Operation.eq,
-          value: roleID
-        }]
-      }];
-      const result = await super.read(ReadRequest.fromPartial({ filters }), {});
+    if (role_associations?.length > 0) {
+      for (let roleAssociation of role_associations) {
+        const roleID = roleAssociation.role;
+        const filters = [{
+          filters: [{
+            field: 'id',
+            operation: Filter_Operation.eq,
+            value: roleID
+          }]
+        }];
+        const result = await super.read(ReadRequest.fromPartial({ filters }), {});
 
-      if (!result || !result.items || result.total_count == 0) {
-        return false;
+        if (!result || !result.items || result.total_count == 0) {
+          return false;
+        }
       }
     }
 

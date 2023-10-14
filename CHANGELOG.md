@@ -1,4 +1,8 @@
-## 1.3.4 (October 11th, 2023)
+## 1.3.6 (October 14th, 2023)
+
+- added data field for register user
+
+## 1.3.5 (October 11th, 2023)
 
 - fix return status message for password change
 
