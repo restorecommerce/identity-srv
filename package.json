@@ -26,7 +26,7 @@
     "@restorecommerce/rc-grpc-clients": "^5.1.4",
     "@restorecommerce/resource-base-interface": "^1.4.0",
     "@restorecommerce/scs-jobs": "^0.1.0",
-    "@restorecommerce/service-config": "^1.0.7",
+    "@restorecommerce/service-config": "^1.0.8",
     "@zxcvbn-ts/core": "^3.0.4",
     "@zxcvbn-ts/language-common": "^3.0.4",
     "@zxcvbn-ts/language-de": "^3.0.2",
