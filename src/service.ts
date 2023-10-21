@@ -1896,7 +1896,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   }
 
   private nestedAttributesEqual(dbAttributes, userAttributes) {
-    if(!userAttributes) {
+    if (!userAttributes) {
       return true;
     }
     if (dbAttributes?.length > 0 && userAttributes?.length > 0) {
@@ -2245,6 +2245,28 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         ids: userIDs
       }), context);
       logger.info('Users deleted:', userIDs);
+      if (userIDs.length > 0) {
+        const filters = [{
+          filters: [{
+            field: 'id',
+            operation: Filter_Operation.in,
+            value: JSON.stringify(userIDs),
+            type: FilterValueType.ARRAY
+          }]
+        }];
+        let userData = await super.read({
+          filters,
+        } as any, {});
+        if (userData?.items?.length > 0) {
+          userData?.items?.forEach((user) => {
+            user?.payload?.tokens?.forEach(async (tokenObj) => {
+              if(tokenObj?.token) {
+                await this.tokenRedisClient.del(tokenObj.token);
+              }
+            });
+          });
+        }
+      }
       return deleteStatusArr;
     }
   }

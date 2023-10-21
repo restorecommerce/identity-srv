@@ -1,3 +1,7 @@
+## 1.3.8 (October 21st, 2023)
+
+- delete tokens from redis on user deletion
+
 ## 1.3.7 (October 14th, 2023)
 
 - added null condition for comparison of nested attributes
