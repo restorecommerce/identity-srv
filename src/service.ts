@@ -2238,13 +2238,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         logger.info('Users collection deleted');
         return deleteResponse;
       }
-      logger.silly('Deleting User IDs', { userIDs });
-
-      // delete users
-      const deleteStatusArr = await super.delete(DeleteRequest.fromPartial({
-        ids: userIDs
-      }), context);
-      logger.info('Users deleted:', userIDs);
       if (userIDs.length > 0) {
         const filters = [{
           filters: [{
@@ -2260,13 +2253,19 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         if (userData?.items?.length > 0) {
           userData?.items?.forEach((user) => {
             user?.payload?.tokens?.forEach(async (tokenObj) => {
-              if(tokenObj?.token) {
+              if (tokenObj?.token) {
                 await this.tokenRedisClient.del(tokenObj.token);
               }
             });
           });
         }
       }
+      logger.silly('Deleting User IDs', { userIDs });
+      // delete users
+      const deleteStatusArr = await super.delete(DeleteRequest.fromPartial({
+        ids: userIDs
+      }), context);
+      logger.info('Users deleted:', userIDs);
       return deleteStatusArr;
     }
   }
