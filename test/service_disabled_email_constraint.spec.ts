@@ -624,8 +624,8 @@ describe('testing identity-srv', () => {
             identifier: email
           });
           should.exist(result.operation_status);
-          result.operation_status.code.should.equal(404);
-          result.operation_status.message.should.equal(`user not found`);
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal(`Invalid identifier provided for request password change, multiple users found for identifier ${email}`);
         });
         it('should successfully RequestPasswordChange with user name as identifier', async () => {
           // activation_code should be empty initially
@@ -735,8 +735,8 @@ describe('testing identity-srv', () => {
             new_email: 'new_test@ms.restorecommerce.io'
           });
           should.exist(result.operation_status);
-          result.operation_status.code.should.equal(404);
-          result.operation_status.message.should.equal(`user does not exist`);
+          result.operation_status.code.should.equal(400);
+          result.operation_status.message.should.equal(`Invalid identifier provided for request email change, multiple users found for identifier ${email}`);
         });
         it('should change new_email field with provided email using user name as identifier', async () => {
           const result = await userService.requestEmailChange({
