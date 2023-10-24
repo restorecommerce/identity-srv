@@ -1,3 +1,7 @@
+## 1.4.0 (October 22nd, 2023)
+
+- support request password change and request email change for both name and email as identifier
+
 ## 1.3.9 (October 22nd, 2023)
 
 - fix delete tokens from redis on user deletion

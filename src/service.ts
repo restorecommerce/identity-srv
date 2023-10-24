@@ -1451,8 +1451,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   async requestPasswordChange(request: RequestPasswordChangeRequest, context): Promise<DeepPartial<OperationStatusObj>> {
     const logger = this.logger;
     const identifier = request.identifier;
-    // check for the identifier against name
-    const filters = getNameFilter(identifier);
+    // check for the identifier against name or email
+    const filters = getDefaultFilter(identifier);
     let user;
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
     if (users.total_count === 1) {
@@ -1562,8 +1562,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const new_email = request.new_email;
     const subject = request.subject;
     let acsResponse: DecisionResponse;
-    // check for the identifier against name
-    const filters = getNameFilter(identifier);
+    // check for the identifier against name or email
+    const filters = getDefaultFilter(identifier);
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
     if (!users || users.total_count === 0) {
       logger.debug('user does not exist', { identifier });
