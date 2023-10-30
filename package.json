@@ -33,7 +33,7 @@
     "@zxcvbn-ts/language-en": "^3.0.2",
     "@zxcvbn-ts/matcher-pwned": "^3.0.4",
     "bcryptjs": "^2.4.3",
-    "bullmq": "^4.11.4",
+    "bullmq": "^4.12.7",
     "cross-env": "^7.0.3",
     "jose": "^4.15.2",
     "lodash": "^4.17.21",
