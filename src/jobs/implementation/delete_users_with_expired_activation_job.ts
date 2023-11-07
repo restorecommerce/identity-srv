@@ -2,7 +2,6 @@ import * as _ from 'lodash';
 import { returnOperationStatus, getUserServiceClient } from './../../utils';
 import {
   DeleteRequest,
-  ReadRequest,
   Filter_ValueType,
   Filter_Operation
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
@@ -17,7 +16,7 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
     const inactivatedAccountExpiry = cfg.get('service:inactivatedAccountExpiry');
 
     if (inactivatedAccountExpiry === undefined || inactivatedAccountExpiry === 'undefined' || inactivatedAccountExpiry <= 0) {
-      logger.error(400, ' Invalid inactivatedAccountExpiry configuration');
+      logger.error(400, 'Invalid inactivatedAccountExpiry configuration');
       return returnOperationStatus(400, 'Invalid inactivatedAccountExpiry configuration');
     }
 
@@ -41,7 +40,8 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
       tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
     }
 
-    const users = await idsClient.read(ReadRequest.fromPartial({ filters, subject: { token: tokenTechUser.token } }), {});
+    const users = await idsClient.read({ filters, subject: { token: tokenTechUser.token } }, {});
+    logger.info('Retrieved users: ', users);
 
     if (users.total_count > 0) {
       const usersToDelete = users.items.filter((user) => {
@@ -62,7 +62,7 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
 
       // Call the delete function to delete expired inactivated user accounts
       const deleteStatusArr = await idsClient.delete(DeleteRequest.fromPartial({ ids: userIDsToDelete, subject: { token: tokenTechUser.token } }), {});
-
+      logger.info('Deleted users: ', deleteStatusArr);
       return deleteStatusArr;
     }
     else {

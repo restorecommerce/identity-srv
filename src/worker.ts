@@ -20,6 +20,9 @@ import {
   protoMetadata as userMeta
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import {
+  protoMetadata as jobMeta
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/job';
+import {
   RoleServiceDefinition,
   protoMetadata as roleMeta
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
@@ -51,6 +54,7 @@ import { runWorker } from '@restorecommerce/scs-jobs';
 registerProtoMeta(
   userMeta,
   roleMeta,
+  jobMeta,
   authenticationLogMeta,
   tokenMeta,
   commandInterfaceMeta,
