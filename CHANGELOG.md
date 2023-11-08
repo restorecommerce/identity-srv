@@ -1,3 +1,9 @@
+## 1.4.1 (November 08th, 2023)
+
+- added jobMeta
+- improved loggers
+- removed ReadRequest
+
 ## 1.4.0 (October 22nd, 2023)
 
 - support request password change and request email change for both name and email as identifier
