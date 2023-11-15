@@ -49,6 +49,9 @@ export interface Resource {
   property?: string[];
 }
 
+export async function checkAccessRequest(ctx: ACSClientContext, resource: Resource[], action: AuthZAction, operation: Operation.isAllowed, useCache?: boolean): Promise<DecisionResponse>;
+export async function checkAccessRequest(ctx: ACSClientContext, resource: Resource[], action: AuthZAction, operation: Operation.whatIsAllowed, useCache?: boolean): Promise<PolicySetRQResponse>;
+
 /**
  * Perform an access request using inputs from a GQL request
  *

@@ -1045,7 +1045,8 @@ describe('testing identity-srv', () => {
       describe('passwordChange', function changePassword(): void {
         it('should allow to change the password for user with valid token', async function changePassword(): Promise<void> {
           // store token to Redis as passwordChange looks up the user based on token (as this operation is for logged in user)
-
+          let expires_in = new Date(); // set expires_in to +1 day
+          expires_in.setDate(expires_in.getDate() + 1);
           let userWithToken = {
             name: 'test.user1', // user registered initially, storing with token in DB
             first_name: 'test',
@@ -1055,7 +1056,7 @@ describe('testing identity-srv', () => {
             token: 'user-token',
             tokens: [{
               token: 'user-token',
-              expires_in: 0
+              expires_in
             }]
           };
           const redisConfig = cfg.get('redis');
@@ -1566,13 +1567,15 @@ describe('testing identity-srv', () => {
           token: 'admin-token'
         };
 
+        let expires_in = new Date(); // set expires_in to +1 day
+        expires_in.setDate(expires_in.getDate() + 1);
         let subjectResolved = {
           id: 'admin_user_id',
           scope: 'orgA',
           token: 'admin-token',
           tokens: [{
             token: 'admin-token',
-            expires_in: 0
+            expires_in: expires_in
           }],
           role_associations: [
             {

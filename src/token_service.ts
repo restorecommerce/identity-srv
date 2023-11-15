@@ -1,5 +1,5 @@
 import { Logger } from 'winston';
-import { ACSAuthZ, AuthZAction, DecisionResponse, Operation } from '@restorecommerce/acs-client';
+import { ACSAuthZ, AuthZAction, DecisionResponse, Operation, PolicySetRQResponse } from '@restorecommerce/acs-client';
 import { checkAccessRequest } from './utils';
 import * as _ from 'lodash';
 import { UserService } from './service';
@@ -14,7 +14,7 @@ import {
 import { Any } from '@restorecommerce/rc-grpc-clients/dist/generated-server/google/protobuf/any';
 import {
   FindByTokenRequest,
-  FindRequest, UserList
+  FindRequest, UserList, User
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import {
   Response_Decision
@@ -89,13 +89,13 @@ export class TokenService implements TokenServiceImplementation {
     try {
       // pass tech user for subject find operation
       const userData = await this.userService.find(FindRequest.fromPartial({ id: payload.accountId, subject: tokenTechUser }), {});
-      if (userData && userData.items && userData.items.length > 0) {
+      if (userData?.items?.length > 0) {
         let user = userData.items[0].payload;
         let expiredTokenList = [];
-        if (user && user.tokens && user.tokens.length > 0) {
+        if (user?.tokens?.length > 0) {
           // remove expired tokens
           expiredTokenList = (user.tokens).filter(t => {
-            return t.expires_in != 0 && t.expires_in < Math.round(new Date().getTime() / 1000);
+            return t.expires_in.getTime() < new Date().getTime();
           });
         }
         let token_name;
@@ -112,7 +112,6 @@ export class TokenService implements TokenServiceImplementation {
           interactive: true,
           last_login: new Date().getTime()
         };
-        user.last_access = new Date().getTime();
         try {
           // append tokens on user entity
           this.logger.debug('Removing expired token list', expiredTokenList);
@@ -157,7 +156,7 @@ export class TokenService implements TokenServiceImplementation {
       const response = { status: { code: 400, message: 'No id was provided for find' } };
       return marshallProtobufAny(response);
     }
-    let acsResponse: DecisionResponse;
+    let acsResponse: PolicySetRQResponse;
     try {
       acsResponse = await checkAccessRequest({
         ...context,
@@ -235,59 +234,43 @@ export class TokenService implements TokenServiceImplementation {
     if (acsResponse.decision === Response_Decision.PERMIT) {
       this.logger.info('Logout user', { request });
       let response;
-      let user: any = {};
+      let user: User = {};
       try {
         let payload = await this.find(request, context);
         // delete user token here
         if (payload?.value) {
           const userData = await this.userService.findByToken(FindByTokenRequest.fromPartial({ token: request.id }), {});
           if (userData?.payload) {
-            user = userData.payload;
             // search user by ID from DB
-            const dbUserData = await this.userService.find(FindRequest.fromPartial({ id: user?.id, subject: request.subject }), context);
+            const dbUserData = await this.userService.find(FindRequest.fromPartial({ id: userData?.payload?.id, subject: request.subject }), context);
             if (dbUserData?.items?.length > 0) {
               user = dbUserData.items[0].payload;
+            } else {
+              this.logger.info(`User ${user?.id} not found in DB or cannot be read`);
+              return marshallProtobufAny({ status: { code: dbUserData?.operation_status?.code, message: dbUserData?.operation_status?.message } });
             }
-            // check if the token is existing if not update it
-            let updateToken = false;
-            let currentTokenList = [];
-            if (user?.tokens?.length > 0) {
-              currentTokenList = user.tokens;
-            }
-            for (let token of currentTokenList) {
-              if (token.token === request.id && token.type === request.type) {
-                // token exists, delete it
-                updateToken = true;
-                break;
-              }
-            }
-            if (updateToken) {
-              user.tokens = currentTokenList.filter(token => token.token !== request.id);
-              user.last_access = new Date().getTime();
-
-              let tokenTechUser: any = {};
-              const techUsersCfg = this.cfg.get('techUsers');
-              if (techUsersCfg && techUsersCfg.length > 0) {
-                tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
-              }
-              tokenTechUser.scope = user.default_scope;
-              await this.userService.update(UserList.fromPartial({ items: [user], subject: tokenTechUser }), context);
+            // check if the token exist, if so remove it
+            const tokenExist = user?.tokens?.some((tokenObj) => tokenObj.token === request.id && tokenObj.type === request.type);
+            if (tokenExist) {
+              // AQL query to remove token
+              await this.userService.removeToken(userData?.payload?.id, user?.tokens?.find((obj) => obj.token === request.id));
               this.logger.info('Removed token successfully from destroy api', { token: request.id, user });
+              // flush token subject cache
+              const numberOfDeletedKeys = await this.userService.tokenRedisClient.del(request.id);
+              this.logger.info('Subject deleted from Redis', { noOfKeys: numberOfDeletedKeys });
+              response = {
+                status: {
+                  code: 200,
+                  message: `Key for subject ${user.id} deleted successfully`
+                }
+              };
+            } else {
+              this.logger.info(`Token ${request.id} does not exist`);
+              return marshallProtobufAny({ status: { code: 404, message: `Token ${request.id} does not exist` } });
             }
+          } else {
+            response = { status: { code: 404, message: `Token ${request.id} not found` } };
           }
-          if (request.id) {
-            // flush token subject cache
-            const numberOfDeletedKeys = await this.userService.tokenRedisClient.del(request.id);
-            this.logger.info('Subject deleted from Redis', { noOfKeys: numberOfDeletedKeys });
-          }
-          response = {
-            status: {
-              code: 200,
-              message: `Key for subject ${user.id} deleted successfully`
-            }
-          };
-        } else {
-          response = { status: { code: 404, message: `Token ${request.id} not found` } };
         }
       } catch (err) {
         this.logger.error(response);
@@ -312,7 +295,7 @@ export class TokenService implements TokenServiceImplementation {
       return marshallProtobufAny(response);
     }
 
-    let acsResponse: DecisionResponse;
+    let acsResponse: PolicySetRQResponse;
     const subject = { token: request.id };
     try {
       acsResponse = await checkAccessRequest({
@@ -337,9 +320,9 @@ export class TokenService implements TokenServiceImplementation {
       if (tokenData) {
         // update last access
         const userData = await this.userService.find(FindRequest.fromPartial({ id: tokenData.accountId, subject }), context);
-        if (userData && userData.items && userData.items.length > 0) {
+        if (userData?.items?.length > 0) {
           let user = userData.items[0].payload;
-          user.last_access = new Date().getTime();
+          user.last_access = new Date();
           await this.userService.update(UserList.fromPartial({ items: [user], subject }), context);
         }
       };

@@ -283,8 +283,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       token,
       last_login: new Date().getTime()
     });
-    const res_last_access = await query(this.db.db, 'users', aql_last_login, bindVars_last_login);
-    return await res_last_access.all();
+    const res_last_login = await query(this.db.db, 'users', aql_last_login, bindVars_last_login);
+    return await res_last_login.all();
   }
 
   async updateUserTokens(id, token, expiredTokens?: any) {
@@ -313,7 +313,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // check for expired tokens if they exist and remove them
       if (expiredTokens?.length > 0) {
         const token_remove = `FOR doc in users FILTER doc.id == @docID UPDATE doc WITH
-      { tokens: REMOVE_VALUES(doc.tokens, @expiredTokens)} IN users return doc`;
+          { tokens: REMOVE_VALUES(doc.tokens, @expiredTokens)} IN users return doc`;
         const bindTokenVars = Object.assign({
           docID: id,
           expiredTokens
@@ -322,6 +322,21 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         await res.all();
         this.logger.debug('Expired tokens removed successfully');
       }
+    }
+  }
+
+  async removeToken(id, tokenObj) {
+    // Remove token using AQL query
+    if (tokenObj) {
+      const token_remove = `FOR doc in users FILTER doc.id == @docID UPDATE doc WITH
+          { tokens: REMOVE_VALUES(doc.tokens, @tokenObj)} IN users return doc`;
+      const bindTokenVars = Object.assign({
+        docID: id,
+        tokenObj
+      });
+      const res = await query(this.db.db, 'users', token_remove, bindTokenVars);
+      await res.all();
+      this.logger.debug('Removed token removed successfully');
     }
   }
 
@@ -336,16 +351,17 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       userData = await this.tokenRedisClient.get(token);
       if (userData) {
         // user data
-        logger.debug('Found user data in redis cache', { token });
         userData = JSON.parse(userData);
+        logger.debug('Found user data in redis cache', { userId: userData?.id });
         if (userData?.meta?.created || userData?.meta?.modified) {
           userData.meta.created = new Date(userData.meta.created);
           userData.meta.modified = new Date(userData.meta.modified);
         }
         // validate token expiry date and delete it if expired
         if (userData?.tokens) {
-          const dbToken = _.find(userData.tokens, { token });
-          if ((!dbToken.expires_in || dbToken?.expires_in === 0) || (dbToken?.expires_in >= Math.round(new Date().getTime() / 1000))) {
+          const redisToken = _.find(userData.tokens, { token });
+          if ((!redisToken.expires_in || redisToken?.expires_in === 0) || (new Date(redisToken?.expires_in).getTime() >= new Date().getTime())) {
+            userData?.tokens?.forEach((tokenObj) => tokenObj.expires_in = new Date(tokenObj.expires_in));
             return { payload: userData, status: returnCodeMessage(200, 'success') };
           } else {
             // delete token from redis and update user entity
@@ -375,23 +391,17 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             // validate token expiry and delete if expired
             const dbToken = _.find(users.items[0].payload.tokens, { token });
             // if expires_in does not exist or if its set to value 0 - token valid without time frame
-            if ((!dbToken.expires_in || dbToken?.expires_in === 0) || (dbToken?.expires_in >= Math.round(new Date().getTime() / 1000))) {
+            if ((!dbToken.expires_in || dbToken?.expires_in === 0) || (dbToken?.expires_in.getTime() >= new Date().getTime())) {
               await this.tokenRedisClient.set(token, JSON.stringify(users.items[0].payload));
               logger.debug('Stored user data to redis cache successfully');
-              // update token last_login
               let user = users.items[0].payload;
-              if (user?.tokens?.length > 0) {
-                for (let user_token of user.tokens) {
-                  if (user_token.token === token) {
-                    user_token.last_login = new Date().getTime();
-                  }
-                }
-              }
+              // update token last_login
               await this.updateTokenLastLogin(user.id, token);
               const updatedUser = await super.read(ReadRequest.fromPartial({ filters }), context);
               logger.debug('updated user token last login successfully', { updatedUser });
-              return { payload: user, status: { code: 200, message: 'success' } };
-            } else if (dbToken && dbToken.expires_in < Math.round(new Date().getTime() / 1000)) {
+              const dbUser = updatedUser?.items.length > 0 ? updatedUser.items[0]?.payload : undefined;
+              return { payload: dbUser, status: { code: 200, message: 'success' } };
+            } else if (dbToken?.expires_in?.getTime() < new Date().getTime()) {
               logger.debug('Token expired');
               return { status: { code: 401, message: 'Token ${token} expired' } };
             }
@@ -1986,7 +1996,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     let usersList = request.items;
     let subject = request.subject;
     const acsResources = await this.createMetadata(request.items, AuthZAction.MODIFY, subject);
-    let acsResponse: DecisionResponse;
+    let acsResponse: PolicySetRQResponse;
     try {
       if (!context) { context = {}; };
       context.subject = subject;

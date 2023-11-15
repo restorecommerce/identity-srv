@@ -207,7 +207,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       .setExpirationTime((Date.now() / 1000) + (60 * 60 * 24 * 30 * 6))
       .encode();
 
-    const authToken = {
+    const authToken: any = {
       name: uuid.v4().replace(/-/g, ''),
       expires_in: Date.now() + (1000 * 60 * 60 * 24 * 30 * 6), // 6 months
       token,
@@ -238,12 +238,12 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       // append access token on user entity
       // remove expired tokens
       await this.userService.updateUserTokens(user.id, accessToken, resultTokens.filter(t => {
-        return t?.expires_in < Date.now();
+        return t?.expires_in.getTime() < Date.now();
       }));
       // append refresh token on user entity
       // remove all previous refresh tokens
       await this.userService.updateUserTokens(user.id, refreshToken, resultTokens.filter(t => {
-        return t?.expires_in > Date.now() && t?.name === oauthService + '-refresh_token';
+        return t?.expires_in.getTime() > Date.now() && t?.name === oauthService + '-refresh_token';
       }));
       // append auth token on user entity
       await this.userService.updateUserTokens(user.id, authToken);
@@ -253,6 +253,8 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       return { user: { status: { code: err.code, message: err.message } } };
     }
 
+    // convert expires_in to date, as updateUserTokens is done using custom AQL query and not via resource base interface
+    authToken.expires_in = new Date(authToken.expires_in);
     return { email, user: { payload: user, status: { code: 200, message: 'success' } }, token: authToken };
   }
 
@@ -280,7 +282,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
     const accessTokens: any[] = tokens.filter(t => t.name.endsWith('access_token'));
     for (let accessToken of accessTokens) {
-      if (accessToken.expires_in > Date.now()) {
+      if (accessToken.expires_in.getTime() > Date.now()) {
         return {token: accessToken.token};
       }
 
@@ -291,7 +293,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
     let data;
     for (const refreshToken of refreshTokens) {
-      if (refreshToken.expires_in < Date.now()) {
+      if (refreshToken.expires_in.getTime() < Date.now()) {
         toRemove.push(refreshToken);
         continue;
       }

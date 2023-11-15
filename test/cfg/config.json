@@ -39,7 +39,6 @@
       "maskFields": [
         "password",
         "request.password",
-        "request.token",
         "items.[0].password"
       ],
       "bufferFields": [
@@ -82,16 +81,7 @@
       ],
       "omitFields": [
         "context",
-        "custom_arguments",
-        "subject.token",
-        "token",
-        "tokens",
-        "items.[0].tokens",
-        "messages.[0].tokens",
-        "request.items.[0].tokens",
-        "response.payload.token",
-        "response.payload.tokens",
-        "request.subject.token"
+        "custom_arguments"
       ]
     }
   },
@@ -335,12 +325,33 @@
   },
   "fieldHandlers": {
     "bufferFields": {
-      "users": ["data"]
+      "users": [
+        "data"
+      ]
     },
     "timeStampFields": [
       {
-        "fields": ["meta.created", "meta.modified"],
-        "entities": ["users", "roles", "authentication_logs", "Tokens"]
+        "fields": [
+          "meta.created",
+          "meta.modified",
+          "last_access",
+          "tokens.[0].expires_in",
+          "tokens.[0].last_login"
+        ],
+        "entities": [
+          "users",
+          "roles",
+          "authentication_logs",
+          "Tokens"
+        ]
+      },
+      {
+        "fields": [
+          "date"
+        ],
+        "entities": [
+          "authentication_logs"
+        ]
       }
     ]
   },

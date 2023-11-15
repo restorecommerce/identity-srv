@@ -366,7 +366,10 @@
       {
         "fields": [
           "meta.created",
-          "meta.modified"
+          "meta.modified",
+          "last_access",
+          "tokens.[0].expires_in",
+          "tokens.[0].last_login"
         ],
         "entities": [
           "users",
