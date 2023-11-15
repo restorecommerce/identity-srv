@@ -116,7 +116,7 @@ A User resource.
 |invited_by_user_first_name |string |optional |inviting User’s first name
 |invited_by_user_last_name |string |optional |inviting User’s last name
 |tokens |https://github.com/restorecommerce/protos/blob/master/io/restorecommerce/auth.proto#L26[`io.restorecommerce.auth.Tokens`] [] |optional |list of Tokens
-|last_access | double |optional | epoch time of user last access to token
+|last_access | `google.protobuf.Timestamp` |optional | timestamp of user's last access
 |==============================================================================================================================================
 
 `io.restorecommerce.auth.RoleAssociation`
@@ -540,11 +540,11 @@ A Token resource.
 |==========================================================================================================================
 |Field |Type |Label |Description
 |name |string |optional |Token name
-|expires_in |number |optional |expiration date for token
+|expires_in | `google.protobuf.Timestamp` |optional |Token expiration timestamp
 |token |string |optional |token value
 |scopes | string []|optional |identifier for RoleAssociation `io.restorecommerce.auth.RoleAssociation.id`
 |type | string |optional |token type ex: access_token, refresh_token etc
-|last_login | number |optional |epoch time of user last logged in
+|last_login | `google.protobuf.Timestamp` |optional |timestamp of user last logged in
 |interactive| bool |optional |flag to indicate a login from GUI
 |==========================================================================================================================
 
@@ -569,7 +569,7 @@ in https://github.com/restorecommerce/identity-srv/blob/master/cfg/config.json#L
 |Field |Type |Label |Description
 |id |string |optional |Token identifier
 |payload |string |optional |Token payload (id_token)
-|expires_in |double |optional |Token expiration time in epoch
+|expires_in | `google.protobuf.Timestamp` |optional |Token expiration timestamp
 |type |string |optional |Token type
 |subject |`io.restorecommerce.auth.Subject` |required |Subject details
 |==============================================================================================================================================

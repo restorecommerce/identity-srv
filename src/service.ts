@@ -402,8 +402,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               const dbUser = updatedUser?.items.length > 0 ? updatedUser.items[0]?.payload : undefined;
               return { payload: dbUser, status: { code: 200, message: 'success' } };
             } else if (dbToken?.expires_in?.getTime() < new Date().getTime()) {
-              logger.debug('Token expired');
-              return { status: { code: 401, message: 'Token ${token} expired' } };
+              logger.debug(`Token ${token} expired`);
+              return { status: { code: 401, message: `Token ${token} expired` } };
             }
           }
         }
