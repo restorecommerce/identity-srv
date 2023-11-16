@@ -361,7 +361,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         if (userData?.tokens) {
           const redisToken = _.find(userData.tokens, { token });
           if ((!redisToken.expires_in || redisToken?.expires_in === 0) || (new Date(redisToken?.expires_in).getTime() >= new Date().getTime())) {
-            userData?.tokens?.forEach((tokenObj) => tokenObj.expires_in = new Date(tokenObj.expires_in));
+            userData?.tokens?.forEach((tokenObj) => {
+              tokenObj.expires_in = tokenObj.expires_in ?  new Date(tokenObj.expires_in): undefined;
+              tokenObj.last_login = tokenObj.last_login ? new Date(tokenObj.last_login) : undefined;
+            });
+            userData.last_access = userData.last_access ? new Date(userData.last_access): undefined;
             return { payload: userData, status: returnCodeMessage(200, 'success') };
           } else {
             // delete token from redis and update user entity
@@ -413,7 +417,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     } else {
       return { status: { code: 400, message: 'Token not provided' } };
     }
-    return userData;
   }
 
   /**
