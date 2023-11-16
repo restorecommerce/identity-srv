@@ -106,7 +106,7 @@ export class TokenService implements TokenServiceImplementation {
         }
         const token = {
           name: token_name,
-          expires_in: payload.exp,
+          expires_in: tokenData?.expires_in?.getTime(), // since AQL is used to store to DB
           token: payload.jti,
           type,
           interactive: true,
