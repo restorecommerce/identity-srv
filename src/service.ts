@@ -327,7 +327,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
   async removeToken(id, tokenObj) {
     // Remove token using AQL query
-    if (tokenObj) {
+    if (tokenObj?.length > 0) {
       const token_remove = `FOR doc in users FILTER doc.id == @docID UPDATE doc WITH
           { tokens: REMOVE_VALUES(doc.tokens, @tokenObj)} IN users return doc`;
       const bindTokenVars = Object.assign({
@@ -336,7 +336,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       });
       const res = await query(this.db.db, 'users', token_remove, bindTokenVars);
       await res.all();
-      this.logger.debug(`Removed token ${tokenObj.token} successfully`);
+      this.logger.debug(`Removed token ${tokenObj[0].token} successfully`);
     }
   }
 
@@ -362,10 +362,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           const redisToken = _.find(userData.tokens, { token });
           if ((!redisToken.expires_in || redisToken?.expires_in === 0) || (new Date(redisToken?.expires_in).getTime() >= new Date().getTime())) {
             userData?.tokens?.forEach((tokenObj) => {
-              tokenObj.expires_in = tokenObj.expires_in ?  new Date(tokenObj.expires_in): undefined;
+              tokenObj.expires_in = tokenObj.expires_in ? new Date(tokenObj.expires_in) : undefined;
               tokenObj.last_login = tokenObj.last_login ? new Date(tokenObj.last_login) : undefined;
             });
-            userData.last_access = userData.last_access ? new Date(userData.last_access): undefined;
+            userData.last_access = userData.last_access ? new Date(userData.last_access) : undefined;
             return { payload: userData, status: returnCodeMessage(200, 'success') };
           } else {
             // delete token from redis and update user entity

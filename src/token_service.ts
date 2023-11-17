@@ -94,8 +94,13 @@ export class TokenService implements TokenServiceImplementation {
         let expiredTokenList = [];
         if (user?.tokens?.length > 0) {
           // remove expired tokens
-          expiredTokenList = (user.tokens).filter(t => {
-            return t.expires_in.getTime() < new Date().getTime();
+          expiredTokenList = (user.tokens).filter(obj => {
+            if (obj.expires_in.getTime() < new Date().getTime()) {
+              // since AQL is used to remove object - convert DateObject to time in ms
+              (obj as any).expires_in = obj.expires_in ? obj.expires_in.getTime() : undefined;
+              (obj as any).last_login = obj.last_login ? obj.last_login.getTime() : undefined;
+              return obj;
+            }
           });
         }
         let token_name;
@@ -253,7 +258,14 @@ export class TokenService implements TokenServiceImplementation {
             const tokenExist = user?.tokens?.some((tokenObj) => tokenObj.token === request.id && tokenObj.type === request.type);
             if (tokenExist) {
               // AQL query to remove token
-              await this.userService.removeToken(userData?.payload?.id, user?.tokens?.find((obj) => obj.token === request.id));
+              await this.userService.removeToken(userData?.payload?.id, user?.tokens?.filter((obj) => {
+                if (obj.token === request.id) {
+                  // since AQL is used to remove object - convert DateObject to time in ms
+                  (obj as any).expires_in = obj.expires_in ? obj.expires_in.getTime() : undefined;
+                  (obj as any).last_login = obj.last_login ? obj.last_login.getTime() : undefined;
+                  return obj;
+                }
+              }));
               this.logger.info('Removed token successfully from destroy api', { token: request.id, user });
               // flush token subject cache
               const numberOfDeletedKeys = await this.userService.tokenRedisClient.del(request.id);
