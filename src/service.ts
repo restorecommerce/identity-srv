@@ -691,9 +691,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             dbTargetRoles.push(targetRole.payload.id);
             if (!targetRole?.payload?.assignable_by_roles ||
               !createAccessRole.some((role) => targetRole?.payload?.assignable_by_roles?.includes(role))) {
-              const userName = user?.name ? user.name : undefined;
+              const userNameId = user?.name ? user.name : user?.id;
               let message = `The target role ${targetRole.payload.id} cannot be assigned to` +
-                ` user ${userName} as user role ${createAccessRole} does not have permissions`;
+                ` user ${userNameId} as user role ${createAccessRole} does not have permissions`;
               this.logger.verbose(message);
               return returnStatus(403, message, user.id);
             }
@@ -704,9 +704,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // validate target roles is a valid role in DB
       for (let targetUserRoleId of targetUserRoleIds || []) {
         if (!dbTargetRoles?.includes(targetUserRoleId)) {
-          const userName = user?.name ? user.name : undefined;
+          const userNameId = user?.name ? user.name : user?.id;
           let message = `The target role ${targetUserRoleId} is invalid and cannot be assigned to` +
-            ` user ${userName}`;
+            ` user ${userNameId}`;
           this.logger.verbose(message);
           return returnStatus(403, message, user.id);
         }
@@ -741,7 +741,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
       for (let user of usersList) {
         if (user?.role_associations?.length > 0) {
-          const validationResponse = this.validateUserRoleAssociations(user.role_associations, hrScopes, user.name, subject, user.id);
+          const userNameId = user?.name ? user.name : user?.id;
+          const validationResponse = this.validateUserRoleAssociations(user.role_associations, hrScopes, userNameId, subject, user.id);
           if (!_.isEmpty(validationResponse)) {
             return validationResponse;
           }
@@ -769,7 +770,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * with the HR scope and roles of the creating user
    */
   private validateUserRoleAssociations(userRoleAssocs: RoleAssociation[],
-    hrScopes: HierarchicalScope[], userName: string, subject: ResolvedSubject, userID: string) {
+    hrScopes: HierarchicalScope[], userNameId: string, subject: ResolvedSubject, userID: string) {
     for (let userRoleAssoc of userRoleAssocs || []) {
       let validUserRoleAssoc = false;
       let userRole = userRoleAssoc?.role;
@@ -825,9 +826,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         if (!validUserRoleAssoc) {
           let details = '';
           if (userScope) {
-            details = `do not have permissions to assign target scope ${userScope} for ${userName}`;
+            details = `do not have permissions to assign target scope ${userScope} for ${userNameId}`;
           }
-          let message = `the role ${userRole} cannot be assigned to user ${userName};${details}`;
+          let message = `the role ${userRole} cannot be assigned to user ${userNameId};${details}`;
           this.logger.verbose(message);
           return returnStatus(403, message, userID);
         }
@@ -1797,6 +1798,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           }
         }
 
+        if (!user.tokens) {
+          // if tokens are not provided read from DB - this is needed to check if Redis cache should be invalidated
+          // if there are any changes in user role associations
+          user.tokens = dbUser.tokens;
+        }
         // Flush findByToken redis data
         if (user?.tokens?.length > 0) {
           for (let token of user.tokens) {
@@ -1816,7 +1822,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                   let found = false;
                   for (let redisRoleAssoc of redisRoleAssocs) {
                     if (redisRoleAssoc.role === userRoleAssoc.role) {
-                      for (let redisAttribute of redisRoleAssoc.attributes) {
+                      for (let redisAttribute of redisRoleAssoc?.attributes || []) {
                         const redisNestedAttributes = redisAttribute.attributes;
                         if (userRoleAssoc?.attributes?.length > 0) {
                           for (let userAttribute of userRoleAssoc.attributes) {
