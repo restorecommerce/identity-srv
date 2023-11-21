@@ -1,3 +1,8 @@
+## 1.4.2 (November 21st, 2023)
+
+- updated expires_in, last_login and last_access to timestamp fields
+- updated dependencies
+
 ## 1.4.1 (November 08th, 2023)
 
 - added jobMeta
