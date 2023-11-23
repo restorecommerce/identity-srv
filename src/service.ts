@@ -1803,19 +1803,19 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           // if there are any changes in user role associations
           user.tokens = dbUser.tokens;
         }
-        // Flush findByToken redis data
-        if (user?.tokens?.length > 0) {
+        // Flush findByToken redis data if role associations have changed
+        if (user?.tokens?.length > 0 && user?.role_associations?.length > 0) {
           for (let token of user.tokens) {
             const tokenValue = token.token;
             const response = await this.tokenRedisClient.get(tokenValue);
             if (response) {
               const redisResp = JSON.parse(response);
-              const redisRoleAssocs = redisResp.role_associations;
+              const redisRoleAssocs = redisResp?.role_associations || [];
               const redisTokens = redisResp.tokens;
               const redisID = redisResp.id;
               let roleAssocEqual;
               let tokensEqual;
-              let updatedRoleAssocs = user.role_associations;
+              let updatedRoleAssocs = user?.role_associations || [];
               let updatedTokens = user.tokens;
               if (redisID === user.id) {
                 for (let userRoleAssoc of updatedRoleAssocs) {
@@ -1893,7 +1893,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           // set the existing hash password field
           user.password_hash = dbUser.password_hash;
         }
-        if (!user.active && user?.tokens?.length > 0) {
+        if (user?.active === false && user?.tokens?.length > 0) {
           for (let token of user.tokens) {
             const tokenValue = token.token;
             await this.tokenRedisClient.del(tokenValue);

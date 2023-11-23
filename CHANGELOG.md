@@ -1,3 +1,7 @@
+## 1.4.4 (November 23rd, 2023)
+
+- added null checks
+
 ## 1.4.3 (November 22nd, 2023)
 
 - added separate queue for identity-srv jobs
