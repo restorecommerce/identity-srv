@@ -1,3 +1,7 @@
+## 1.4.3 (November 22nd, 2023)
+
+- added separate queue for identity-srv jobs
+
 ## 1.4.2 (November 21st, 2023)
 
 - updated expires_in, last_login and last_access to timestamp fields
