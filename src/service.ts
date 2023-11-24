@@ -485,15 +485,24 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }
       };
     }
+
     if (acsResponse.decision != Response_Decision.PERMIT) {
       return { operation_status: acsResponse.operation_status };
     }
+
     const acsFilters = getACSFilters(acsResponse, 'user');
     const readRequest = ReadRequest.fromPartial({
-      offset: request.offset, limit: request.limit,
-      sorts: request.sorts, filters: request.filters, fields: request.fields, locales_limiter: request.locales_limiter,
-      custom_arguments: request.custom_arguments, custom_queries: request.custom_queries, search: request.search
+      offset: request.offset,
+      limit: request.limit,
+      sorts: request.sorts,
+      filters: request.filters,
+      fields: request.fields,
+      locales_limiter: request.locales_limiter,
+      custom_arguments: request.custom_arguments,
+      custom_queries: request.custom_queries,
+      search: request.search
     });
+
     if (acsResponse?.filters && acsFilters) {
       if (!readRequest.filters) {
         readRequest.filters = [];
@@ -506,24 +515,15 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
     }
 
-    if (acsResponse.decision === Response_Decision.PERMIT) {
-      let users = await super.read(readRequest, context) as UserListWithRoleResponse;
-      let roles = await this.roleService.read(ReadRequest.fromPartial({ subject }), context);
-      let rolesList = roles?.items?.map(e => e.payload);
-      users?.items?.forEach(userObj => {
-        let userRoles = [];
-        if (userObj?.payload) {
-          userObj?.payload?.role_associations?.forEach(roleAssoc => {
-            let role = rolesList?.filter(r => r.id === roleAssoc?.role);
-            if (role?.length === 1) {
-              userRoles.push(role[0]);
-            }
-          });
-          userObj.payload.roles = userRoles;
-        }
-      });
-      return users;
-    }
+    const users = await super.read(readRequest, context) as UserListWithRoleResponse;
+    const roles = await this.roleService.read(ReadRequest.fromPartial({ subject }), context);
+    const rolesList = roles?.items?.map(e => e.payload);
+    users?.items?.forEach(userObj => {
+      userObj.payload.roles = userObj?.payload?.role_associations?.flatMap(
+        roleAssoc => rolesList?.filter(r => r.id === roleAssoc?.role)
+      );
+    });
+    return users;
   }
 
   superRead(request: ReadRequest, context): Promise<DeepPartial<UserListResponse>> {
@@ -2370,19 +2370,19 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     if (acsResponse.decision === Response_Decision.PERMIT) {
-      const filters = [{
-        filters: [{
-          field: 'name',
-          operation: Filter_Operation.eq,
-          value: role
-        },{
-          field: 'id',
-          operation: Filter_Operation.eq,
-          value: role
-        }]
-      }];
       const result = await this.roleService.read(ReadRequest.fromPartial({
-        filters,
+        filters: [{
+          filters: [{
+            field: 'name',
+            operation: Filter_Operation.eq,
+            value: role
+          },{
+            field: 'id',
+            operation: Filter_Operation.eq,
+            value: role
+          }],
+          operator: FilterOp_Operator.or,
+        }],
         fields: [{
           name: 'id',
           include: true
