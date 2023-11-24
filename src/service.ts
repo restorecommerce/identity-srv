@@ -80,7 +80,8 @@ import {
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
 import {
   RoleAssociation,
-  Subject
+  Subject,
+  Tokens
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
 import { zxcvbnOptions, zxcvbnAsync, ZxcvbnResult } from '@zxcvbn-ts/core';
 import * as zxcvbnCommonPackage from '@zxcvbn-ts/language-common';
@@ -93,6 +94,7 @@ import {
   Matcher,
   Match,
 } from '@zxcvbn-ts/core/dist/types';
+import { TokenData } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token';
 
 export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
@@ -343,79 +345,109 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   /**
    * Endpoint to search for user by token.
    */
-  async findByToken(request: FindByTokenRequest, context): Promise<DeepPartial<UserResponse>> {
-    const { token } = request;
-    let userData;
-    const logger = this.logger;
-    if (token) {
-      userData = await this.tokenRedisClient.get(token);
-      if (userData) {
-        // user data
-        userData = JSON.parse(userData);
-        logger.debug('Found user data in redis cache', { userId: userData?.id });
-        if (userData?.meta?.created || userData?.meta?.modified) {
-          userData.meta.created = new Date(userData.meta.created);
-          userData.meta.modified = new Date(userData.meta.modified);
-        }
-        // validate token expiry date and delete it if expired
-        if (userData?.tokens) {
-          const redisToken = _.find(userData.tokens, { token });
-          if ((!redisToken.expires_in || redisToken?.expires_in === 0) || (new Date(redisToken?.expires_in).getTime() >= new Date().getTime())) {
-            userData?.tokens?.forEach((tokenObj) => {
-              tokenObj.expires_in = tokenObj.expires_in ? new Date(tokenObj.expires_in) : undefined;
-              tokenObj.last_login = tokenObj.last_login ? new Date(tokenObj.last_login) : undefined;
-            });
-            userData.last_access = userData.last_access ? new Date(userData.last_access) : undefined;
+  async findByToken(request: FindByTokenRequest, context: any): Promise<DeepPartial<UserResponse>> {
+    try {
+      const { token } = request;
+      const logger = this.logger;
+      if (token) {
+        const userData = JSON.parse(await this.tokenRedisClient.get(token));
+        if (userData) {
+          logger.debug('Found user data in redis cache', { userId: userData?.id });
+          if (userData?.meta?.created) userData.meta.created = new Date(userData.meta.created);
+          if (userData?.meta?.modified) userData.meta.modified = new Date(userData.meta.modified);
+          if (userData?.last_access) userData.last_access = new Date(userData.last_access);
+          userData?.tokens?.forEach((t: Tokens) => {
+            t.expires_in = t.expires_in ? new Date(t.expires_in) : undefined;
+            t.last_login = t.last_login ? new Date(t.last_login) : undefined;
+          });
+          // validate token expiry date and delete it if expired
+          const redisToken = userData?.tokens?.find((t: Tokens) => t.token === token);
+          if (!redisToken) {
+            logger.error('Token missing in User Data!', { userData });
+            return { status: { code: 500, message: 'Token missing in User Data!' } };
+          }
+          else if (!redisToken.expires_in
+            || redisToken?.expires_in?.getTime() === 0
+            || new Date(redisToken?.expires_in) >= new Date()
+          ) {
             return { payload: userData, status: returnCodeMessage(200, 'success') };
           } else {
             // delete token from redis and update user entity
-            let numberOfDeletedKeys = await this.tokenRedisClient.del(token);
-            this.logger.info('Redis cached data for findByToken deleted successfully', { noOfKeys: numberOfDeletedKeys });
+            const numberOfDeletedKeys = await this.tokenRedisClient.del(token);
+            logger.info('Redis cached data for findByToken deleted successfully', { noOfKeys: numberOfDeletedKeys });
             return { status: returnCodeMessage(401, 'Redis cached data for findByToken deleted successfully') };
           }
-        }
-      } else {
-        // when not set in redis
-        // regex filter search field for token array
-        const filters = [{
-          filters: [{
-            field: 'tokens[*].token',
-            operation: Filter_Operation.in,
-            value: token
-          }]
-        }];
-        let users = await super.read(ReadRequest.fromPartial({ filters }), context);
-        if (users?.total_count === 0) {
-          logger.debug('No user found for provided token value', { token });
-          return { status: { code: 401, message: 'No user found for provided token value' } };
-        }
-        if (users?.total_count === 1) {
-          logger.debug('found user from token', { users });
-          if (users?.items[0]?.payload) {
+        } else {
+          // when not set in redis
+          // regex filter search field for token array
+          const filters = [{
+            filters: [{
+              field: 'tokens[*].token',
+              operation: Filter_Operation.in,
+              value: token
+            }]
+          }];
+          const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+          const user = users.items?.[0]?.payload;
+
+          if (users?.items?.length > 1) {
+            logger.error('multiple user found for request', { request });
+            return { status: { code: 400, message: 'Multiple users found for token' } };
+          }
+          else if (user) {
+            logger.debug('found user from token', users);
             // validate token expiry and delete if expired
-            const dbToken = _.find(users.items[0].payload.tokens, { token });
+            const dbToken = user.tokens.find(t => t.token === token);
             // if expires_in does not exist or if its set to value 0 - token valid without time frame
-            if ((!dbToken.expires_in || dbToken?.expires_in === 0) || (dbToken?.expires_in?.getTime() >= new Date().getTime())) {
-              await this.tokenRedisClient.set(token, JSON.stringify(users.items[0].payload));
-              logger.debug('Stored user data to redis cache successfully');
-              let user = users.items[0].payload;
+            if (!dbToken) {
+              logger.error('Token missing in User Data!', { user });
+              return { status: { code: 500, message: 'Token missing in User Data!' } };
+            }
+            else if (!dbToken.expires_in
+              || dbToken.expires_in.getTime() === 0
+              || dbToken?.expires_in >= new Date()
+            ) {
               // update token last_login
               await this.updateTokenLastLogin(user.id, token);
-              const updatedUser = await super.read(ReadRequest.fromPartial({ filters }), context);
-              logger.debug('updated user token last login successfully', { updatedUser });
-              const dbUser = updatedUser?.items.length > 0 ? updatedUser.items[0]?.payload : undefined;
-              return { payload: dbUser, status: { code: 200, message: 'success' } };
-            } else if (dbToken?.expires_in?.getTime() < new Date().getTime()) {
+              const response = await super.read(ReadRequest.fromPartial({ filters }), context);
+              const updatedUser = response.items?.[0]?.payload;
+              if (response?.items?.length > 1) {
+                return { status: { code: 400, message: 'Multiple users found for token' } };
+              }
+              else if (updatedUser) {
+                logger.debug('update of user token last login successfully', { updatedUser });
+                await this.tokenRedisClient.set(token, JSON.stringify(updatedUser));
+                logger.debug('Stored user data to redis cache successfully');
+                return {
+                  payload: updatedUser,
+                  status: { code: 200, message: 'success' }
+                };
+              }
+              else {
+                return { status: { code: 500, message: 'Reading error!' } };
+              }
+            } else {
               logger.debug(`Token ${token} expired`);
               return { status: { code: 401, message: `Token ${token} expired` } };
             }
           }
+          else {
+            logger.debug('No user found for provided token value', { token });
+            return { status: { code: 401, message: 'No user found for provided token value' } };
+          }
         }
-        logger.silly('multiple user found for request', request);
-        return { status: { code: 400, message: 'multiple users found for token' } };
+      } else {
+        return { status: { code: 400, message: 'Token not provided' } };
       }
-    } else {
-      return { status: { code: 400, message: 'Token not provided' } };
+    }
+    catch (e) {
+      this.logger.error('Fatal error', { error: e });
+      return {
+        status: {
+          code: 500,
+          message: e.message ?? e.details ?? e.toString() ?? e,
+        }
+      };
     }
   }
 
@@ -2341,6 +2373,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const filters = [{
         filters: [{
           field: 'name',
+          operation: Filter_Operation.eq,
+          value: role
+        },{
+          field: 'id',
           operation: Filter_Operation.eq,
           value: role
         }]
