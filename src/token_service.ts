@@ -115,7 +115,8 @@ export class TokenService implements TokenServiceImplementation {
           token: payload.jti,
           type,
           interactive: true,
-          last_login: new Date().getTime()
+          last_login: new Date().getTime(),
+          client_id: payload?.clientId
         };
         try {
           // append tokens on user entity
@@ -197,7 +198,8 @@ export class TokenService implements TokenServiceImplementation {
           exp: tokenData.expires_in,
           claims: user,
           kind: tokenData.type,
-          jti: tokenData.token
+          jti: tokenData.token,
+          clientId: tokenData?.client_id
         };
       }
       if (!data) {

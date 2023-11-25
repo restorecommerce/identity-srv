@@ -1,3 +1,7 @@
+## 1.4.5 (November 25th, 2023)
+
+- added client_id for token data
+
 ## 1.4.4 (November 23rd, 2023)
 
 - added null checks
