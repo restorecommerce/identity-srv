@@ -583,11 +583,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           if (!user.active) {
             user.activation_code = this.idGen();
           }
-          user.unauthenticated = false;
           if (user.invite) {
             user.active = false;
             user.activation_code = this.idGen();
-            user.unauthenticated = true;
           }
           insertedUsers.items.push(await this.createUser(user, context));
 
@@ -1185,10 +1183,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // New users must be activated
       user.active = false;
       user.activation_code = this.idGen();
-      user.unauthenticated = true;
     } else {
       user.active = true;
-      user.unauthenticated = false;
     }
 
     // TODO: verify captcha_code before deleting
@@ -1257,7 +1253,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         return returnOperationStatus(412, 'wrong activation code');
       }
       user.active = true;
-      user.unauthenticated = false;
       user.activation_code = '';
 
       user.password_hash = password.hash(request.password);
@@ -1406,7 +1401,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
 
       user.active = true;
-      user.unauthenticated = false;
 
       user.activation_code = '';
       const updateStatus = await super.update(UserList.fromPartial({
@@ -1578,7 +1572,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // if user is inactive activate user
       if (!user.active) {
         user.active = true;
-        user.unauthenticated = false;
       }
       const resultPasswordChecker = await this.checkPasswordStrength(newPassword);
       const minScore: number = this.cfg.get('service:passwordComplexityMinScore');
