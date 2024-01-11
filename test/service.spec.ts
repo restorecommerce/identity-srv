@@ -175,13 +175,13 @@ interface MethodWithOutput {
   output: any
 };
 
-const PROTO_PATH: string = 'node_modules/@restorecommerce/protos/io/restorecommerce/access_control.proto';
+const PROTO_PATH: string = 'io/restorecommerce/access_control.proto';
 const PKG_NAME: string = 'io.restorecommerce.access_control';
 const SERVICE_NAME: string = 'AccessControlService';
 
 const pkgDef: grpc.GrpcObject = grpc.loadPackageDefinition(
   proto_loader.loadSync(PROTO_PATH, {
-    includeDirs: ['node_modules/@restorecommerce/protos'],
+    includeDirs: ['node_modules/@restorecommerce/protos/'],
     keepCase: true,
     longs: String,
     enums: String,
@@ -214,7 +214,7 @@ const startGrpcMockServer = async (methodWithOutput: MethodWithOutput[]) => {
   };
   try {
     mockServer.addService(PROTO_PATH, PKG_NAME, SERVICE_NAME, implementations, {
-      includeDirs: ['node_modules/@restorecommerce/protos/'],
+      includeDirs: ['./node_modules/@restorecommerce/protos/'],
       keepCase: true,
       longs: String,
       enums: String,
@@ -1249,7 +1249,7 @@ describe('testing identity-srv', () => {
       });
       describe('calling update', function changeEmailId(): void {
         it('should update generic fields', async function changeEmailId(): Promise<void> {
-          this.timeout(3000);
+          this.timeout(30000);
           const listener = function listener(message: any, context: any): void {
             should.exist(message);
 

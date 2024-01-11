@@ -30,7 +30,7 @@
   "logger": {
     "console": {
       "handleExceptions": false,
-      "level": "fatal",
+      "level": "crit",
       "colorize": true,
       "prettyPrint": true
     },
@@ -342,7 +342,7 @@
       {
         "name": "grpcIdentity",
         "provider": "grpc",
-        "addr": "0.0.0.0:50051"
+        "addr": "localhost:50051"
       }
     ]
   },

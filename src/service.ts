@@ -94,12 +94,10 @@ import {
   Matcher,
   Match,
 } from '@zxcvbn-ts/core/dist/types';
-import { TokenData } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token';
 
 export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
 export class UserService extends ServiceBase<UserListResponse, UserList> implements UserServiceImplementation {
-
   db: Arango;
   topics: any;
   logger: Logger;
@@ -166,6 +164,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // if config is set to false in config
       this.uniqueEmailConstraint = false;
     }
+    this.initMatcher();
   }
 
   async stop(): Promise<void> {
@@ -881,7 +880,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     return false;
   }
 
-  private async checkPasswordStrength(password: string): Promise<ZxcvbnResult> {
+  private initMatcher() {
+    if (Object.keys(zxcvbnOptions.matchers).length > 0) return;
     const minLength: number = this.cfg.get('service:passwordMinLength');
     const minLengthMatcher: Matcher = {
       Matching: class MatchMinLength {
@@ -1033,8 +1033,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       translations: zxcvbnEnPackage.translations,
     };
     zxcvbnOptions.setOptions(options);
-    const result = await zxcvbnAsync(password);
+    return zxcvbnOptions;
+  }
 
+  private async checkPasswordStrength(password: string): Promise<ZxcvbnResult> {
+    const result = await zxcvbnAsync(password);
     return result;
   };
 
