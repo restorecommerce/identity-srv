@@ -1,3 +1,8 @@
+### 1.4.7 (January 18th, 2024)
+
+- up deps
+- add user.properties
+
 ### 1.4.6 (November 26th, 2023)
 
 - removed deprecated method in chassis-srv (collection.load)
