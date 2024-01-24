@@ -58,6 +58,9 @@ import {
   UserListWithRoleResponse,
   UserResponse,
   UserType
+  UserType,
+  TenantRequest,
+  TenantResponse
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import {
   RoleList,
@@ -69,6 +72,7 @@ import {
   DeleteResponse,
   Filter_Operation,
   FilterOp_Operator,
+  Filter_ValueType,
   ReadRequest
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
 import { OperationStatusObj } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/status';
@@ -2916,6 +2920,48 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
       return returnOperationStatus(200, 'success');
     }
+  }
+
+  async getUnauthenticatedSubjectTokenForTenant(request: TenantRequest, context): Promise<DeepPartial<TenantResponse>> {
+    if (!request.domain) {
+      return TenantResponse.fromPartial({});
+    }
+
+    const users = await super.read(ReadRequest.fromPartial({
+      filters: [
+        {
+          filters: [
+            {
+              field: "active",
+              operation: Filter_Operation.eq,
+              type: Filter_ValueType.BOOLEAN,
+              value: "true"
+            },
+            {
+              field: "user_type",
+              operation: Filter_Operation.eq,
+              type: Filter_ValueType.STRING,
+              value: "TECHNICAL_USER"
+            }
+          ],
+          operator: FilterOp_Operator.and
+        }
+      ]
+    }), context) as DeepPartial<UserListResponse>;
+
+    if (!users.items || users.items.length == 0) {
+      return TenantResponse.fromPartial({});
+    }
+
+    const filtered = users.items.find(u => u.payload?.properties?.findIndex(p => {
+      return p.id === 'urn:restorecommerce:acs:names:network:src:domain' && p.value === request.domain
+    }) >= 0);
+
+    const token = filtered.payload.tokens.find(t => t.name === 'unauthenticated_token');
+
+    return Promise.resolve(TenantResponse.fromPartial({
+      token: token?.token
+    }));
   }
 }
 
