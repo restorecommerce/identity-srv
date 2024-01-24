@@ -147,7 +147,7 @@ export class Worker {
     this.cfg = cfg ?? createServiceConfig(process.cwd());
     const loggerCfg = this.cfg.get('logger');
     loggerCfg.esTransformer = (msg) => {
-      msg.fields = msg.fields ?? JSON.stringify(msg.fields);
+      msg.fields = JSON.stringify(msg.fields);
       return msg;
     };
     this.logger = createLogger(loggerCfg);
