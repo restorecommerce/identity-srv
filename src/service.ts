@@ -2931,16 +2931,16 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         {
           filters: [
             {
-              field: "active",
+              field: 'active',
               operation: Filter_Operation.eq,
               type: Filter_ValueType.BOOLEAN,
-              value: "true"
+              value: 'true'
             },
             {
-              field: "user_type",
+              field: 'user_type',
               operation: Filter_Operation.eq,
               type: Filter_ValueType.STRING,
-              value: "TECHNICAL_USER"
+              value: 'TECHNICAL_USER'
             }
           ],
           operator: FilterOp_Operator.and
@@ -2953,7 +2953,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     const filtered = users.items.find(u => u.payload?.properties?.findIndex(p => {
-      return p.id === 'urn:restorecommerce:acs:names:network:src:domain' && p.value === request.domain
+      return p.id === 'urn:restorecommerce:acs:names:network:src:domain' && p.value === request.domain;
     }) >= 0);
 
     const token = filtered.payload.tokens.find(t => t.name === 'unauthenticated_token');
