@@ -57,7 +57,6 @@ import {
   UserListResponse,
   UserListWithRoleResponse,
   UserResponse,
-  UserType
   UserType,
   TenantRequest,
   TenantResponse
