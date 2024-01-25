@@ -10,7 +10,7 @@ import * as grpc from '@grpc/grpc-js';
 import { updateConfig } from '@restorecommerce/acs-client';
 import {
   UserServiceDefinition,
-  UserServiceClient, User, DeepPartial
+  UserServiceClient, User, DeepPartial, UserType
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import {
   RoleServiceDefinition,
@@ -1824,6 +1824,75 @@ describe('testing identity-srv', () => {
           result.activation_code.should.not.be.empty();
           JSON.parse(result.data.value.toString()).testKey.should.equal('testValue');
           await userService.unregister({ identifier: 'test.user1' });
+        });
+      });
+
+      describe('testing unauthenticated users', function registerUser(): void {
+        it('should create unauthenticated users and retrieve their tokens', async () => {
+          const aaaa = await userService.create({items: [
+              {
+                id: 'example-unauthenticated-user',
+                active: true,
+                user_type: UserType.TECHNICAL_USER,
+                name: 'exampleuser',
+                email: 'test@example.com',
+                first_name: 'unauthenticated',
+                last_name: 'unauthenticated',
+                properties: [
+                  {
+                    id: 'urn:restorecommerce:acs:names:network:src:domain',
+                    value: 'example.com'
+                  }
+                ],
+                tokens: [
+                  {
+                    name: 'unauthenticated_token',
+                    token: 'aaaa'
+                  }
+                ]
+              },
+              {
+                id: 'foo-unauthenticated-user',
+                active: true,
+                user_type: UserType.TECHNICAL_USER,
+                name: 'unauthenticated',
+                email: 'test@foo.com',
+                first_name: 'unauthenticated',
+                last_name: 'unauthenticated',
+                properties: [
+                  {
+                    id: 'urn:restorecommerce:acs:names:network:src:domain',
+                    value: 'foo.com'
+                  }
+                ],
+                tokens: [
+                  {
+                    name: 'unauthenticated_token',
+                    token: 'bbbb'
+                  }
+                ]
+              }
+          ]});
+
+          const exampleToken = await userService.getUnauthenticatedSubjectTokenForTenant({
+            domain: 'example.com'
+          });
+
+          exampleToken.token.should.equal('aaaa');
+
+          const fooToken = await userService.getUnauthenticatedSubjectTokenForTenant({
+            domain: 'foo.com'
+          });
+
+          fooToken.token.should.equal('bbbb');
+
+          const missingToken = await userService.getUnauthenticatedSubjectTokenForTenant({
+            domain: 'hello.com'
+          });
+
+          missingToken.should.deepEqual({});
+
+          await userService.delete({ ids: ['example-unauthenticated-user', 'foo-unauthenticated-user'] });
         });
       });
     });
