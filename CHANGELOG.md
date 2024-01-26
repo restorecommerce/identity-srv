@@ -1,3 +1,7 @@
+### 1.5.0 (January 26th, 2024)
+
+- add unauthenticated technical user lookup
+
 ### 1.4.7 (January 18th, 2024)
 
 - up deps
