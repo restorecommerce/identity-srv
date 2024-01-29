@@ -1,6 +1,6 @@
 import { Logger } from 'winston';
 import { OAuth2 } from 'oauth';
-import { checkAccessRequest, fetch } from './utils';
+import { checkAccessRequest } from './utils';
 import { UserService } from './service';
 import { AuthZAction, Operation } from '@restorecommerce/acs-client';
 import * as _ from 'lodash';
@@ -24,6 +24,7 @@ import {
 import {
   Response_Decision
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
+import fetch from 'node-fetch';
 
 export const accountResolvers: { [key: string]: (access_token: string) => Promise<string> } = {
   google: async access_token => {

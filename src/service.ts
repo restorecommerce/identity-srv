@@ -3,7 +3,6 @@ import * as uuid from 'uuid';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import {
   checkAccessRequest,
-  fetch,
   getACSFilters,
   getDefaultFilter,
   getLoginIdentifierFilter,
@@ -97,6 +96,7 @@ import {
   Matcher,
   Match,
 } from '@zxcvbn-ts/core/dist/types';
+import fetch from 'node-fetch';
 
 export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
@@ -274,7 +274,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     // update last_login
     const aql_last_login = `FOR u IN users
     FILTER u.id == @docID
-     UPDATE u WITH { 
+     UPDATE u WITH {
       tokens: (
           FOR tokenObj in u.tokens
             RETURN tokenObj.token == @token
