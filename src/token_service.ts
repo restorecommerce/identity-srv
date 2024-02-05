@@ -19,6 +19,7 @@ import {
 import {
   Response_Decision
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
+import { Filter_Operation, ReadRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
 
 const unmarshallProtobufAny = (msg: Any): any => JSON.parse(msg.value.toString());
 
@@ -53,49 +54,28 @@ export class TokenService implements TokenServiceImplementation {
       return marshallProtobufAny(response);
     }
 
-    // using techUser to update user Tokens
-    let tokenTechUser: any = {};
-    const techUsersCfg = this.cfg.get('techUsers');
-    if (techUsersCfg && techUsersCfg.length > 0) {
-      tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
-    }
-    let acsResponse: DecisionResponse;
     let tokenData = request;
     // unmarshall payload
     const payload = unmarshallProtobufAny(tokenData.payload);
-    tokenData.payload = payload;
-    tokenTechUser.scope = payload?.claims?.data?.default_scope;
-    try {
-      if (!context) { context = {}; };
-      request = await createMetadata(tokenData, this.cfg.get('authorization:urns'), this.userService, tokenTechUser);
-      context.subject = tokenTechUser;
-      context.resources = request;
-      acsResponse = await checkAccessRequest(context, [{ resource: 'token', id: request.id }], AuthZAction.MODIFY,
-        Operation.isAllowed);
-    } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for token upsert', err);
-      const response = { status: { code: err.code, message: err.message } };
-      return marshallProtobufAny(response);
-    }
-    if (acsResponse.decision != Response_Decision.PERMIT) {
-      const response = { status: { code: acsResponse.operation_status.code, message: acsResponse.operation_status.message } };
-      return marshallProtobufAny(response);
-    }
-
     const type = tokenData.type;
-    tokenData.payload = marshallProtobufAny(payload);
-
     let response;
     try {
-      // pass tech user for subject find operation
-      const userData = await this.userService.find(FindRequest.fromPartial({ id: payload.accountId, subject: tokenTechUser }), {});
+      // Make a direct request to DB
+      const filters = [{
+        filters: [{
+          field: 'id',
+          operation: Filter_Operation.eq,
+          value: payload?.accountId
+        }]
+      }];
+      const userData = await this.userService.superRead(ReadRequest.fromPartial({ filters }), {});
       if (userData?.items?.length > 0) {
         let user = userData.items[0].payload;
         let expiredTokenList = [];
         if (user?.tokens?.length > 0) {
           // remove expired tokens
           expiredTokenList = (user.tokens).filter(obj => {
-            if (obj.expires_in.getTime() < new Date().getTime()) {
+            if (obj?.expires_in && (obj.expires_in.getTime() < new Date().getTime())) {
               // since AQL is used to remove object - convert DateObject to time in ms
               (obj as any).expires_in = obj.expires_in ? obj.expires_in.getTime() : undefined;
               (obj as any).last_login = obj.last_login ? obj.last_login.getTime() : undefined;
