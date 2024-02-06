@@ -1,3 +1,7 @@
+### 1.5.1 (Februrary 6th, 2024)
+
+- bump minor dep versions
+
 ### 1.5.0 (January 26th, 2024)
 
 - add unauthenticated technical user lookup
