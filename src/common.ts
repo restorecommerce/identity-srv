@@ -1,7 +1,7 @@
-import * as _ from 'lodash';
-import { UserService } from './service';
-import { FindByTokenRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
-import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
+import * as _ from 'lodash-es';
+import { UserService } from './service.js';
+import { FindByTokenRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
+import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
 
 /**
  * reads metadata from DB and updates owner information in resource if action is UPDATE / DELETE

@@ -1,23 +1,23 @@
 import {
   AuthZAction, accessRequest, DecisionResponse, Operation, PolicySetRQResponse, ACSClientContext
 } from '@restorecommerce/acs-client';
-import * as _ from 'lodash';
+import * as _ from 'lodash-es';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { createClient, createChannel } from '@restorecommerce/grpc-client';
 import { createLogger } from '@restorecommerce/logger';
-import * as bcrypt from 'bcryptjs';
+import bcrypt from 'bcryptjs';
 import {
   DeepPartial,
   FilterOp, FilterOp_Operator,
   Filter_Operation
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 import {
   UserServiceDefinition,
   UserServiceClient
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   Response_Decision
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 
 // Create a ids client instance
 let idsClientInstance: UserServiceClient;

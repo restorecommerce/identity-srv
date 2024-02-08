@@ -8,21 +8,21 @@ import {
   Operation
 } from '@restorecommerce/acs-client';
 import { Topic } from '@restorecommerce/kafka-client';
-import { checkAccessRequest, returnOperationStatus } from './utils';
-import * as _ from 'lodash';
+import { checkAccessRequest, returnOperationStatus } from './utils.js';
+import * as _ from 'lodash-es';
 import {
   AuthenticationLogServiceImplementation,
   AuthenticationLogListResponse,
   AuthenticationLogList
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/authentication_log';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/authentication_log.js';
 import {
   DeepPartial, DeleteRequest, DeleteResponse, ReadRequest,
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
-import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
+import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 import {
   Response_Decision
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
-import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
+import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
 
 export class AuthenticationLogService extends ServiceBase<AuthenticationLogListResponse, AuthenticationLogList> implements AuthenticationLogServiceImplementation {
 

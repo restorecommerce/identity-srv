@@ -1,4 +1,4 @@
-import * as _ from 'lodash';
+import * as _ from 'lodash-es';
 import * as uuid from 'uuid';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import {
@@ -13,7 +13,7 @@ import {
   returnOperationStatus,
   returnStatus,
   unmarshallProtobufAny
-} from './utils';
+} from './utils.js';
 import { ResourcesAPIBase, ServiceBase, FilterValueType } from '@restorecommerce/resource-base-interface';
 import { Logger } from 'winston';
 import {
@@ -27,10 +27,10 @@ import {
   updateConfig
 } from '@restorecommerce/acs-client';
 import { createClient, RedisClientType } from 'redis';
-import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common';
-import { validateAllChar, validateEmail, validateFirstChar, validateStrLen, validateSymbolRepeat } from './validation';
-import { TokenService } from './token_service';
-import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base';
+import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common.js';
+import { validateAllChar, validateEmail, validateFirstChar, validateStrLen, validateSymbolRepeat } from './validation.js';
+import { TokenService } from './token_service.js';
+import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base.js';
 import {
   ActivateRequest,
   ChangeEmailRequest,
@@ -59,12 +59,12 @@ import {
   UserType,
   TenantRequest,
   TenantResponse
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   RoleList,
   RoleListResponse,
   RoleServiceImplementation
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role.js';
 import {
   DeleteRequest,
   DeleteResponse,
@@ -72,19 +72,19 @@ import {
   FilterOp_Operator,
   Filter_ValueType,
   ReadRequest
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
-import { OperationStatusObj } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/status';
-import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta';
-import { Attribute } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/attribute';
-import { Effect } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rule';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
+import { OperationStatusObj } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/status.js';
+import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta.js';
+import { Attribute } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/attribute.js';
+import { Effect } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rule.js';
 import {
   Response_Decision
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 import {
   RoleAssociation,
   Subject,
   Tokens
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
 import { zxcvbnOptions, zxcvbnAsync, ZxcvbnResult } from '@zxcvbn-ts/core';
 import * as zxcvbnCommonPackage from '@zxcvbn-ts/language-common';
 import * as zxcvbnEnPackage from '@zxcvbn-ts/language-en';
@@ -1017,7 +1017,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       },
     };
 
-    const matcherPwned = matcherPwnedFactory(fetch, zxcvbnOptions);
+    const matcherPwned = matcherPwnedFactory(fetch as any, zxcvbnOptions);
     zxcvbnOptions.addMatcher('pwned', matcherPwned);
     zxcvbnOptions.addMatcher('minLength', minLengthMatcher);
     zxcvbnOptions.addMatcher('number', numberMatcher);
@@ -1771,7 +1771,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         if (!user.id) {
           // return returnStatus(400, 'Subject identifier missing for update operation');
           updateWithStatus.items.push(returnStatus(400, 'Subject identifier missing for update operation'));
-          items = _.filter(items, (item) => item.id);
+          items = _.filter(items, (item) => item.id) as User[];
           continue;
         }
         const filters = [{
@@ -2952,9 +2952,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return TenantResponse.fromPartial({});
     }
 
-    const filtered = users.items.find(u => u.payload?.properties?.findIndex(p => {
+    const filtered = users.items.find(u => u?.payload?.properties?.findIndex(p => {
       return p.id === 'urn:restorecommerce:acs:names:network:src:domain' && p.value === request.domain;
     }) >= 0);
+
+    if (!filtered) {
+      return TenantResponse.fromPartial({});
+    }
 
     const token = filtered.payload.tokens.find(t => t.name === 'unauthenticated_token');
 

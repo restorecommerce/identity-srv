@@ -1,5 +1,5 @@
-import * as should from 'should';
-import * as _ from 'lodash';
+import should from 'should';
+import _ from 'lodash-es';
 import { createChannel, createClient } from '@restorecommerce/grpc-client';
 import { Events, Topic } from '@restorecommerce/kafka-client';
 import { Worker } from '../src/worker';

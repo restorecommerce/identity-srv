@@ -1,24 +1,24 @@
 import { Logger } from 'winston';
 import { ACSAuthZ, AuthZAction, DecisionResponse, Operation, PolicySetRQResponse } from '@restorecommerce/acs-client';
-import { checkAccessRequest } from './utils';
-import * as _ from 'lodash';
-import { UserService } from './service';
+import { checkAccessRequest } from './utils.js';
+import * as _ from 'lodash-es';
+import { UserService } from './service.js';
 import * as uuid from 'uuid';
-import { createMetadata } from './common';
+import { createMetadata } from './common.js';
 import {
   DeepPartial, GrantId,
   Identifier,
   TokenServiceImplementation,
   TokenData
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token';
-import { Any } from '@restorecommerce/rc-grpc-clients/dist/generated-server/google/protobuf/any';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token.js';
+import { Any } from '@restorecommerce/rc-grpc-clients/dist/generated-server/google/protobuf/any.js';
 import {
   FindByTokenRequest,
   FindRequest, UserList, User
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   Response_Decision
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 
 const unmarshallProtobufAny = (msg: Any): any => JSON.parse(msg.value.toString());
 
@@ -393,7 +393,7 @@ export class TokenService implements TokenServiceImplementation {
           const userData = await this.find(Identifier.fromPartial({ id: token, subject }), context);
           if (!_.isEmpty(userData)) {
             let tokenData = unmarshallProtobufAny(userData);
-            await this.destroy(Identifier.fromPartial({ id: tokens, type: tokenData.kind, subject }), context);
+            await this.destroy(Identifier.fromPartial({ id: tokens as any, type: tokenData.kind, subject }), context);
           }
         }
       }

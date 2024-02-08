@@ -1,10 +1,10 @@
-import * as _ from 'lodash';
-import { returnOperationStatus, getUserServiceClient } from './../../utils';
+import { find } from 'lodash-es';
+import { returnOperationStatus, getUserServiceClient } from './../../utils.js';
 import {
   DeleteRequest,
   Filter_ValueType,
   Filter_Operation
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 
 export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): Promise<any> => {
   try {
@@ -37,7 +37,7 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
     let tokenTechUser: any = {};
     const techUsersCfg = cfg.get('techUsers');
     if (techUsersCfg && techUsersCfg.length > 0) {
-      tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
+      tokenTechUser = find(techUsersCfg, { id: 'upsert_user_tokens' });
     }
 
     const users = await idsClient.read({ filters, subject: { token: tokenTechUser.token } }, {});

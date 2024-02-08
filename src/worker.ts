@@ -1,54 +1,54 @@
 import { createServiceConfig } from '@restorecommerce/service-config';
-import * as _ from 'lodash';
+import * as _ from 'lodash-es';
 import { Events, registerProtoMeta } from '@restorecommerce/kafka-client';
 import { createLogger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { Logger } from 'winston';
-import { UserService, RoleService } from './service';
+import { UserService, RoleService } from './service.js';
 import { ACSAuthZ, initAuthZ, updateConfig, authZ as FallbackAuthZ, initializeCache } from '@restorecommerce/acs-client';
 import { createClient, RedisClientType } from 'redis';
-import { AuthenticationLogService } from './authlog_service';
-import { TokenService } from './token_service';
-import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base';
-import 'source-map-support/register';
-import { OAuthService } from './oauth_service';
-import { OAuthServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/oauth';
-import { BindConfig } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc';
-import { HealthDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/health/v1/health';
+import { AuthenticationLogService } from './authlog_service.js';
+import { TokenService } from './token_service.js';
+import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base.js';
+import 'source-map-support/register.js';
+import { OAuthService } from './oauth_service.js';
+import { OAuthServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/oauth.js';
+import { BindConfig } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc.js';
+import { HealthDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/health/v1/health.js';
 import {
   UserServiceDefinition,
   protoMetadata as userMeta
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   protoMetadata as jobMeta
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/job';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/job.js';
 import {
   RoleServiceDefinition,
   protoMetadata as roleMeta
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role.js';
 import {
   AuthenticationLogServiceDefinition,
   protoMetadata as authenticationLogMeta
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/authentication_log';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/authentication_log.js';
 import {
   TokenServiceDefinition,
   protoMetadata as tokenMeta
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token.js';
 import {
   CommandInterfaceServiceDefinition,
   protoMetadata as commandInterfaceMeta
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/commandinterface';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/commandinterface.js';
 import {
   protoMetadata as renderingMeta
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rendering';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rendering.js';
 import {
   protoMetadata as reflectionMeta
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/reflection/v1alpha/reflection';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/reflection/v1alpha/reflection.js';
 import {
   protoMetadata as notificationReqMeta
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/notification_req';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/notification_req.js';
 import { ServerReflectionService } from 'nice-grpc-server-reflection';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { runWorker } from '@restorecommerce/scs-jobs';
 
 registerProtoMeta(
@@ -213,7 +213,7 @@ export class Worker {
           if (process.env.EXTERNAL_JOBS_REQUIRE_DIR) {
             require_dir = process.env.EXTERNAL_JOBS_REQUIRE_DIR;
           }
-          (async () => require(require_dir + '/' + externalFile).default(cfg, logger, events, runWorker))().catch(err => {
+          (async () => (await import(require_dir + '/' + externalFile)).default(cfg, logger, events, runWorker))().catch(err => {
             logger.error(`Error scheduling job ${externalFile}`, { err: err.message });
           });
         }
@@ -365,20 +365,3 @@ export class Worker {
     ]);
   }
 }
-
-if (require.main === module) {
-  const worker = new Worker();
-  const logger = worker.logger;
-  worker.start().then().catch((err) => {
-    logger.error('startup error', err);
-    process.exit(1);
-  });
-
-  process.on('SIGINT', () => {
-    worker.stop().then().catch((err) => {
-      logger.error('shutdown error', err);
-      process.exit(1);
-    });
-  });
-}
-

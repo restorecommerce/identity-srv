@@ -1,9 +1,9 @@
 import { Logger } from 'winston';
 import { OAuth2 } from 'oauth';
-import { checkAccessRequest } from './utils';
-import { UserService } from './service';
+import { checkAccessRequest } from './utils.js';
+import { UserService } from './service.js';
 import { AuthZAction, Operation } from '@restorecommerce/acs-client';
-import * as _ from 'lodash';
+import * as _ from 'lodash-es';
 import * as uuid from 'uuid';
 import * as jose from 'jose';
 import {
@@ -12,18 +12,18 @@ import {
   GenerateLinksResponse,
   OAuthServiceImplementation,
   ServicesResponse
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/oauth';
-import { Empty } from '@restorecommerce/rc-grpc-clients/dist/generated/google/protobuf/empty';
-import { WithRequestID } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc/middlewares';
-import { createMetadata } from './common';
-import { FindByTokenRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/oauth.js';
+import { Empty } from '@restorecommerce/rc-grpc-clients/dist/generated/google/protobuf/empty.js';
+import { WithRequestID } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc/middlewares.js';
+import { createMetadata } from './common.js';
+import { FindByTokenRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   Filter_Operation,
   ReadRequest
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 import {
   Response_Decision
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 import fetch from 'node-fetch';
 
 export const accountResolvers: { [key: string]: (access_token: string) => Promise<string> } = {
