@@ -136,9 +136,9 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         // update meta information from existing Object in case if its
         // not provided in request
         if (!auth_log?.meta) {
-          auth_log.meta = authLogDB.payload.meta;
+          auth_log.meta = authLogDB?.payload?.meta;
         } else if (auth_log.meta && _.isEmpty(auth_log?.meta?.owners)) {
-          auth_log.meta.owners = authLogDB.payload.meta.owners;
+          auth_log.meta.owners = authLogDB?.payload?.meta?.owners;
         }
         // check for ACS if owners information is changed
         if (!_.isEqual(auth_log?.meta?.owners, authLogDB?.payload?.meta?.owners)) {
@@ -180,7 +180,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         ...context,
         subject: request.subject,
         resources: request.items
-      }, [{ resource: 'authentication_log', id: request.items.map(e => e.id) }], AuthZAction.MODIFY, Operation.isAllowed);
+      }, [{ resource: 'authentication_log', id: request?.items?.map(e => e?.id) }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err) {
       this.logger.error('Error occurred requesting access-control-srv for authentication_log upsert', err);
       return returnOperationStatus(err.code, err.message);
@@ -302,28 +302,32 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
           resource.meta.owners = item?.meta?.owners;
         } else if (result?.items?.length === 0 && !resource?.meta?.owners) {
           let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+          if (subject?.id) {
+            ownerAttributes.push(
+              {
+                id: urns.ownerIndicatoryEntity,
+                value: urns.user,
+                attributes: [{
+                  id: urns.ownerInstance,
+                  value: subject.id
+                }]
+              });
+          }
+          resource.meta.owners = ownerAttributes;
+        }
+      } else if (action === AuthZAction.CREATE && !resource.meta.owners) {
+        let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+        if (subject?.id) {
           ownerAttributes.push(
             {
               id: urns.ownerIndicatoryEntity,
               value: urns.user,
               attributes: [{
                 id: urns.ownerInstance,
-                value: subject.id
+                value: subject?.id
               }]
             });
-          resource.meta.owners = ownerAttributes;
         }
-      } else if (action === AuthZAction.CREATE && !resource.meta.owners) {
-        let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
-        ownerAttributes.push(
-          {
-            id: urns.ownerIndicatoryEntity,
-            value: urns.user,
-            attributes: [{
-              id: urns.ownerInstance,
-              value: subject.id
-            }]
-          });
         resource.meta.owners = ownerAttributes;
       }
     }

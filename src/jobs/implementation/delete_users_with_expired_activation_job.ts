@@ -43,22 +43,22 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
     const users = await idsClient.read({ filters, subject: { token: tokenTechUser.token } }, {});
     logger.info('Retrieved users: ', users);
 
-    if (users.total_count > 0) {
-      const usersToDelete = users.items.filter((user) => {
-        if (user.payload.meta.created !== null && user.payload.activation_code !== undefined || user.payload.activation_code === '') {
+    if (users?.total_count > 0) {
+      const usersToDelete = users?.items?.filter((user) => {
+        if (user?.payload?.meta?.created !== null && user?.payload?.activation_code !== undefined || user?.payload?.activation_code === '') {
           const createdTimestamp = new Date(user.payload.meta.created).getTime();
           return createdTimestamp < expirationTimestamp;
         }
         return false;
       });
 
-      if (usersToDelete.length === 0) {
+      if (usersToDelete?.length === 0) {
         logger.info('No expired inactivated user accounts found');
         return returnOperationStatus(200, 'No expired inactivated user accounts found');
       }
 
       // Extract user IDs to delete
-      const userIDsToDelete = usersToDelete.map((user) => user.payload.id);
+      const userIDsToDelete = usersToDelete?.map((user) => user?.payload?.id);
 
       // Call the delete function to delete expired inactivated user accounts
       const deleteStatusArr = await idsClient.delete(DeleteRequest.fromPartial({ ids: userIDsToDelete, subject: { token: tokenTechUser.token } }), {});
