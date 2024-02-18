@@ -2396,16 +2396,22 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const roleObj = result.items[0].payload;
       const id = roleObj.id;
 
-      // note: inefficient, a custom AQL query should be the final solution
-      let custom_queries, custom_arguments;
-      if (acsResponse?.custom_query_args?.length > 0) {
-        custom_queries = acsResponse.custom_query_args[0].custom_queries;
-        custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
+      const acsFilters = getACSFilters(acsResponse, 'user');
+      const readRequest = ReadRequest.fromPartial({
+      });
+
+      if (acsResponse?.filters && acsFilters) {
+        if (!readRequest.filters) {
+          readRequest.filters = [];
+        }
+        readRequest.filters.push(...acsFilters);
       }
-      const userResult = await super.read(ReadRequest.fromPartial({
-        custom_queries,
-        custom_arguments
-      }), context);
+
+      if (acsResponse?.custom_query_args?.length > 0) {
+        readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
+        readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
+      }
+      const userResult = await super.read(readRequest, context);
       if (_.isEmpty(userResult) || _.isEmpty(userResult.items) || userResult.total_count == 0) {
         return returnOperationStatus(404, 'No users were found in the system');
       }

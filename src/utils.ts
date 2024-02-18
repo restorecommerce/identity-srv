@@ -18,6 +18,7 @@ import {
 import {
   Response_Decision
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
+import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
 
 // Create a ids client instance
 let idsClientInstance: UserServiceClient;
@@ -27,7 +28,7 @@ export const getUserServiceClient = (): UserServiceClient => {
     // identity-srv client to resolve subject ID by token
     const grpcIDSConfig = cfg.get('client:user');
     const loggerCfg = cfg.get('logger');
-    loggerCfg.esTransformer = (msg) => {
+    loggerCfg.esTransformer = (msg: any) => {
       msg.fields = JSON.stringify(msg.fields);
       return msg;
     };
@@ -63,7 +64,7 @@ export async function checkAccessRequest(ctx: ACSClientContext, resource: Resour
 /* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
 export async function checkAccessRequest(ctx: ACSClientContext, resource: Resource[], action: AuthZAction,
   operation: Operation, useCache = true): Promise<DecisionResponse | PolicySetRQResponse> {
-  let subject = ctx.subject;
+  const subject = ctx.subject as Subject;
   let dbSubject;
   // resolve subject id using findByToken api and update subject with id
   if (subject && subject.token) {
@@ -78,7 +79,7 @@ export async function checkAccessRequest(ctx: ACSClientContext, resource: Resour
 
   let result: DecisionResponse | PolicySetRQResponse;
   try {
-    result = await accessRequest(subject, resource, action, ctx, operation, 'arangoDB', useCache);
+    result = await accessRequest(subject, resource, action, ctx, { operation, useCache });
   } catch (err) {
     return {
       decision: Response_Decision.DENY,
@@ -92,12 +93,12 @@ export async function checkAccessRequest(ctx: ACSClientContext, resource: Resour
 }
 
 export const password = {
-  hash: (pw): string => {
+  hash: (pw: string): string => {
     const salt = bcrypt.genSaltSync(10);
     const hash = bcrypt.hashSync(pw, salt);
     return hash;
   },
-  verify: (password_hash, pw) => {
+  verify: (password_hash: string, pw: string) => {
     return bcrypt.compareSync(pw, password_hash);
   }
 };
@@ -119,7 +120,7 @@ export const unmarshallProtobufAny = (msg: any, logger: any): any => {
   }
 };
 
-export const getDefaultFilter = (identifier): DeepPartial<FilterOp[]> => {
+export const getDefaultFilter = (identifier: string): DeepPartial<FilterOp[]> => {
   return [{
     filters: [
       {
@@ -136,7 +137,7 @@ export const getDefaultFilter = (identifier): DeepPartial<FilterOp[]> => {
   }];
 };
 
-export const getNameFilter = (userName) => {
+export const getNameFilter = (userName: string) => {
   return [{
     filters: [{
       field: 'name',
@@ -146,7 +147,7 @@ export const getNameFilter = (userName) => {
   }];
 };
 
-export const getLoginIdentifierFilter = (loginIdentifiers, value) => {
+export const getLoginIdentifierFilter = (loginIdentifiers, value: string) => {
   if (typeof loginIdentifiers === 'string') {
     return [{
       filters: [{
