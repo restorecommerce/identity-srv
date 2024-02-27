@@ -245,7 +245,7 @@ export class Worker {
     const identityServiceEventListener = async (msg: any,
       context: any, config: any, eventName: string) => {
       if (eventName === RENDER_RESPONSE_EVENT) {
-        if (this.userService.emailEnabled) {
+        if (this?.userService?.emailEnabled) {
           await this.userService.sendEmail(msg);
         }
       } else if (eventName === CONTRACT_CANCELLED) {
