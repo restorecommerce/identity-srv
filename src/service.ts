@@ -399,7 +399,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           else if (user) {
             logger.debug('found user from token', users);
             // validate token expiry and delete if expired
-            const dbToken = user.tokens.find(t => t.token === token);
+            const dbToken = user?.tokens?.find(t => t.token === token);
             // if expires_in does not exist or if its set to value 0 - token valid without time frame
             if (!dbToken) {
               logger.error('Token missing in User Data!', { user });
@@ -443,7 +443,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
     }
     catch (e) {
-      this.logger.error('Fatal error', { error: e });
+      this.logger.error('Fatal error', { error: e.stack, code: e.code, message: e.message });
       return {
         status: {
           code: 500,
@@ -2375,7 +2375,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             field: 'name',
             operation: Filter_Operation.eq,
             value: role
-          },{
+          }, {
             field: 'id',
             operation: Filter_Operation.eq,
             value: role
@@ -2958,7 +2958,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return TenantResponse.fromPartial({});
     }
 
-    const filtered = users.items.find(u => u?.payload?.properties?.findIndex(p => {
+    const filtered = users?.items?.find(u => u?.payload?.properties?.findIndex(p => {
       return p.id === 'urn:restorecommerce:acs:names:network:src:domain' && p.value === request.domain;
     }) >= 0);
 
@@ -2966,7 +2966,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return TenantResponse.fromPartial({});
     }
 
-    const token = filtered.payload.tokens.find(t => t.name === 'unauthenticated_token');
+    const token = filtered?.payload?.tokens?.find(t => t.name === 'unauthenticated_token');
 
     return Promise.resolve(TenantResponse.fromPartial({
       token: token?.token
