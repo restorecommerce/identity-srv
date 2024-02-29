@@ -76,17 +76,17 @@
   },
   "scripts": {
     "start": "node lib/start.cjs",
-    "dev": "cross-env NODE_ENV=development nodemon --watch './src/**/*.ts' --exec node --loader ts-node/esm ./src/start.ts",
+    "dev": "cross-env NODE_ENV=development node lib/start.cjs",
     "test": "npm run lint && c8 --reporter=text npm run mocha",
     "lint": "eslint src --ext .ts",
     "mocha": "cross-env NODE_ENV=test mocha --full-trace --exit --timeout 30000",
     "test-debug": "npm run mocha -- --inspect-brk",
     "lcov-report": "c8 report --reporter=lcov",
     "coveralls": "c8 report --reporter=text-lcov | coveralls",
-    "build:tsc": "esbuild ./src/start.ts --bundle --platform=node --outfile=lib/start.cjs --minify --tree-shaking=true --sourcemap=inline",
-    "build:jobs": "find ./src/jobs -maxdepth 1 -type f -exec bash -c 'esbuild {} --bundle --platform=node --outfile=lib/jobs/$(basename {} .ts).js --minify --tree-shaking=true --sourcemap=inline' \\;",
+    "build:es": "esbuild ./src/start.ts --bundle --platform=node --outfile=lib/start.cjs --minify --tree-shaking=true --sourcemap=inline",
+    "build:jobs": "find ./src/jobs -maxdepth 1 -type f -exec bash -c 'esbuild {} --bundle --platform=node --outfile=lib/jobs/$(basename {} .ts).cjs --minify --tree-shaking=true --sourcemap=inline' \\;",
     "build:clean": "rimraf lib",
-    "build": "npm-run-all lint build:clean build:tsc build:jobs"
+    "build": "npm-run-all lint build:clean build:es build:jobs"
   },
   "engines": {
     "node": ">= 20.8.0"
