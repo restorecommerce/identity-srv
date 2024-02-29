@@ -19,7 +19,7 @@ import {
 import {
   Response_Decision
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
-import { Filter_Operation, ReadRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
+import { Filter_Operation, ReadRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 
 const unmarshallProtobufAny = (msg: Any): any => JSON.parse(msg.value.toString());
 
