@@ -2,7 +2,7 @@ import { deleteUsersWithExpiredActivation } from './implementation/delete_users_
 import { DELETE_USERS_WITH_EXPIRED_ACTIVATION } from '../service.js';
 
 export default async (cfg, logger, events, runWorker) => {
-  await runWorker('identitySrvQueue', 1, cfg, logger, events, async (job) => {
+  await runWorker('identity-srv-queue', 1, cfg, logger, events, async (job) => {
     if (job.type === DELETE_USERS_WITH_EXPIRED_ACTIVATION) {
       await deleteUsersWithExpiredActivation(cfg, logger);
     }
