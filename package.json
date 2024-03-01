@@ -108,14 +108,14 @@
       [
         "@semantic-release-plus/docker",
         {
-          "name": "docker.io/restorecommerce/invoicing-srv",
+          "name": "docker.io/restorecommerce/identity-srv",
           "skipLogin": true
         }
       ],
       [
         "@semantic-release-plus/docker",
         {
-          "name": "ghcr.io/restorecommerce/invoicing-srv",
+          "name": "ghcr.io/restorecommerce/identity-srv",
           "skipLogin": true
         }
       ]
