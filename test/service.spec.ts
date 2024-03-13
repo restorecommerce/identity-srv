@@ -10,7 +10,7 @@ import * as grpc from '@grpc/grpc-js';
 import { updateConfig } from '@restorecommerce/acs-client';
 import {
   UserServiceDefinition,
-  UserServiceClient, User, DeepPartial, UserType
+  UserServiceClient, User, DeepPartial, UserType, FindByTokenRequest
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
 import {
   RoleServiceDefinition,
@@ -21,6 +21,8 @@ import { createClient as RedisCreateClient, RedisClientType } from 'redis';
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
 import { Rule, Effect } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rule';
 import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta';
+import { createMetadata } from '../src/common';
+import { UserService } from '../src/service.js';
 
 /*
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
@@ -272,6 +274,73 @@ describe('testing identity-srv', () => {
     this.timeout(60000);
     await worker.stop();
     await events.stop();
+  });
+
+  describe('createMetadata', () => {
+    let userService: UserService;
+  
+    before(() => {
+      // Mock UserService
+      userService = {
+        findByToken: async (request: FindByTokenRequest, metadata: any): Promise<any> => {
+          // Mock implementation of findByToken method
+          // Return a mock User object
+          return { payload: { id: 'mockedUserId' } } as User;
+        }
+      };
+    });
+  
+    it('should add metadata with subject ID', async () => {
+      // Mock data
+      const resources = [{ id: 'resource1' }, { id: 'resource2' }];
+      const urns = {
+        ownerIndicatoryEntity: 'mockOwnerIndicatoryEntityUrn',
+        ownerInstance: 'mockOwnerInstanceUrn',
+        user: 'mockUserUrn'
+      };
+      const subject: Subject = { id: 'mockedSubjectId' };
+  
+      // Call createMetadata function
+      const updatedResources = await createMetadata(resources, urns, userService, subject);
+  
+      // Assertions
+      // Ensure metadata is added correctly with subject ID
+      updatedResources.forEach(resource => {
+        resource.meta.should.have.property('owners');
+        // resource.meta.owners.should.be.an('array').with.length(1);
+        resource.meta.owners[0].id.should.equal(urns.ownerIndicatoryEntity);
+        resource.meta.owners[0].value.should.equal(urns.user);
+        // resource.meta.owners[0].attributes.should.be.an('array').with.length(1);
+        resource.meta.owners[0].attributes[0].id.should.equal(urns.ownerInstance);
+        resource.meta.owners[0].attributes[0].value.should.equal(subject.id);
+      });
+    });
+  
+    it('should add metadata with subject token', async () => {
+      // Mock data
+      const resources = [{ id: 'resource1' }, { id: 'resource2' }];
+      const urns = {
+        ownerIndicatoryEntity: 'mockOwnerIndicatoryEntityUrn',
+        ownerInstance: 'mockOwnerInstanceUrn',
+        user: 'mockUserUrn'
+      };
+      const subject: Subject = { token: 'mockedToken' };
+  
+      // Call createMetadata function
+      const updatedResources = await createMetadata(resources, urns, userService, subject);
+  
+      // Assertions
+      // Ensure metadata is added correctly with subject token
+      updatedResources.forEach(resource => {
+        resource.meta.should.have.property('owners');
+        // resource.meta.owners.should.be.an('array').with.length(1);
+        resource.meta.owners[0].id.should.equal(urns.ownerIndicatoryEntity);
+        resource.meta.owners[0].value.should.equal(urns.user);
+        // resource.meta.owners[0].attributes.should.be.an('array').with.length(1);
+        resource.meta.owners[0].attributes[0].id.should.equal(urns.ownerInstance);
+        resource.meta.owners[0].attributes[0].value.should.equal('mockedUserId'); // Mocked user ID from userService
+      });
+    });
   });
 
   describe('testing Role service', () => {
