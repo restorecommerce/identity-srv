@@ -775,7 +775,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         if (user?.role_associations?.length > 0) {
           const userNameId = user?.name ? user.name : user?.id;
           const validationResponse = this.validateUserRoleAssociations(user.role_associations, hrScopes, userNameId, subject, user.id);
-          if (!_.isEmpty(validationResponse)) {
+          if (validationResponse.status.code != 200) {
             return validationResponse;
           }
           if (!_.isEmpty(user?.tokens)) {
@@ -817,7 +817,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           });
         }
         // validate the userRole and userScope with hrScopes
-        if (userRole && hrScopes.length > 0) {
+        if (userRole && hrScopes?.length > 0) {
           for (let hrScope of hrScopes) {
             if (userScope && this.checkTargetScopeExists(hrScope, userScope)) {
               // check if userScope is valid in hrScope
@@ -866,6 +866,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }
       }
     }
+    return returnStatus(200, 'success');
   }
 
   private checkTargetScopeExists(hrScope: HierarchicalScope, targetScope: string): boolean {
@@ -873,7 +874,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // found the target scope object, iterate and put the orgs in reducedUserScope array
       this.logger.debug(`Valid target scope:`, targetScope);
       return true;
-    } else if (hrScope?.children.length > 0) {
+    } else if (hrScope?.children?.length > 0) {
       for (let childNode of hrScope?.children) {
         if (this.checkTargetScopeExists(childNode, targetScope)) {
           return true;
