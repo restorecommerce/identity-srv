@@ -91,7 +91,7 @@
     "build:es": "esbuild ./src/start.ts --bundle --platform=node --outfile=lib/start.cjs --minify --tree-shaking=true --sourcemap=inline",
     "build:jobs": "find ./src/jobs -maxdepth 1 -type f -exec sh -c 'esbuild {} --bundle --platform=node --outfile=lib/jobs/$(basename {} .ts).cjs --minify --tree-shaking=true --sourcemap=inline' \\;",
     "build:clean": "rimraf lib",
-    "build": "npm-run-all lint build:clean build:es",
+    "build": "npm-run-all lint build:clean build:es build:jobs",
     "prepare": "node -e \"try { require('husky').install() } catch (e) {}\""
   },
   "engines": {

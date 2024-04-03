@@ -2869,9 +2869,17 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         return returnOperationStatus(412, `activation request to an active user ${identifier}`);
       }
       if (this.emailEnabled && !user.guest) {
-        await this.fetchHbsTemplates();
-        const renderRequest = this.makeActivationEmailData(user);
-        await this.topics.rendering.emit('renderRequest', renderRequest);
+        // generating activation code
+        user.activation_code = this.idGen();
+        const updateStatus = await super.update(UserList.fromPartial({
+          items: [user]
+        }), context);
+        if (updateStatus?.items[0]?.status?.message === 'success') {
+          // sending activation code via email
+          await this.fetchHbsTemplates();
+          const renderRequest = this.makeActivationEmailData(user);
+          await this.topics.rendering.emit('renderRequest', renderRequest);
+        }
       }
       return returnOperationStatus(200, 'success');
     } else if (users.total_count === 0) {
