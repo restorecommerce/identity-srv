@@ -45,9 +45,9 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
 
     if (users.total_count > 0) {
       const usersToDelete = users.items.filter((user) => {
-        if (user.payload.meta.created !== null && user.payload.activation_code !== undefined || user.payload.activation_code === '') {
-          const createdTimestamp = new Date(user.payload.meta.created).getTime();
-          return createdTimestamp < expirationTimestamp;
+        if (user.payload.meta.modified !== null && user.payload.activation_code !== undefined || user.payload.activation_code === '') {
+          const modifiedTimestamp = new Date(user.payload.meta.modified).getTime();
+          return modifiedTimestamp < expirationTimestamp;
         }
         return false;
       });
