@@ -66,7 +66,7 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
     let tokenTechUser: any = {};
     const techUsersCfg = cfg.get('techUsers');
     if (techUsersCfg && techUsersCfg.length > 0) {
-      tokenTechUser = techUsersCfg?.filter((obj: any) => obj.id === 'upsert_user_tokens');
+      tokenTechUser = techUsersCfg?.find((obj: any) => obj.id === 'upsert_user_tokens');
     }
 
     const users = await idsClient.read({ filters, subject: { token: tokenTechUser.token } }, {});
