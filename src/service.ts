@@ -615,7 +615,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                   verficationResponse.status.code,
                   verficationResponse.status.message,
                   verficationResponse.status.id)
-                );
+              );
               usersList = _.filter(usersList, (item) => (item.id != userID));
             }
           }
@@ -2792,7 +2792,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * @param entity entity name
    * @param action resource action
    */
-  async createMetadata<T extends { id?: string, meta?: Meta }>(
+  async createMetadata<T extends { id?: string; meta?: Meta }>(
     res: T | T[],
     action: string,
     subject?: Subject
