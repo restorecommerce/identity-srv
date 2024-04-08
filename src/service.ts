@@ -95,15 +95,15 @@ import {
   MatchExtended,
   Matcher,
   Match,
-} from '@zxcvbn-ts/core/dist/types';
+} from '@zxcvbn-ts/core/dist/types.js';
 import fetch from 'node-fetch';
+import { TokenData } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token.js';
 
 export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
 export class UserService extends ServiceBase<UserListResponse, UserList> implements UserServiceImplementation {
   db: Arango;
   topics: any;
-  logger: Logger;
   cfg: any;
   registrationSubjectTpl: string;
   changePWEmailSubjectTpl: string;
@@ -122,8 +122,15 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   tokenRedisClient: RedisClientType<any, any>;
   uniqueEmailConstraint: boolean;
 
-  constructor(cfg: any, topics: any, db: any, logger: Logger,
-    isEventsEnabled: boolean, roleService: RoleService, authZ: ACSAuthZ) {
+  constructor(
+    cfg: any,
+    topics: any,
+    db: any,
+    logger: Logger,
+    isEventsEnabled: boolean,
+    roleService: RoleService,
+    authZ: ACSAuthZ
+  ) {
     let resourceFieldConfig;
     if (cfg.get('fieldHandlers')) {
       resourceFieldConfig = cfg.get('fieldHandlers');
@@ -137,8 +144,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }
       }
     }
-    super('user', topics['user.resource'], logger, new ResourcesAPIBase(db, 'users', resourceFieldConfig),
-      isEventsEnabled);
+    super(
+      'user',
+      topics['user.resource'],
+      logger,
+      new ResourcesAPIBase(db, 'users', resourceFieldConfig),
+      isEventsEnabled
+    );
     this.cfg = cfg;
     this.db = db;
     this.topics = topics;
@@ -178,7 +190,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   /**
    * Endpoint to search for users containing any of the provided field values.
    */
-  async find(request: FindRequest, context): Promise<DeepPartial<UserListResponse>> {
+  async find(request: FindRequest, context: any): Promise<DeepPartial<UserListResponse>> {
     let { id, name, email, subject } = request;
     let acsResponse: PolicySetRQResponse;
     try {
@@ -187,82 +199,90 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       context.resources = [];
       acsResponse = await checkAccessRequest(context, [{ resource: 'user' }],
         AuthZAction.READ, Operation.whatIsAllowed) as PolicySetRQResponse;
-    } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for find', { code: err.code, message: err.message, stack: err.stack });
+    }
+    catch (err: any) {
+      this.logger.error(
+        'Error occurred requesting access-control-srv for find',
+        {
+          code: err.code,
+          message: err.message,
+          stack: err.stack
+        }
+      );
       return returnOperationStatus(err.code, err.message);
     }
-    if (acsResponse.decision != Response_Decision.PERMIT) {
+
+    if (acsResponse.decision !== Response_Decision.PERMIT) {
       return { operation_status: acsResponse.operation_status };
     }
-    if (acsResponse.decision === Response_Decision.PERMIT) {
-      const logger = this.logger;
-      const filterStructure: any = {
-        filters: [{
-          filters: []
-        }]
-      };
-      if (id) {
-        // Object.assign(filterStructure, { id: { $eq: id } });
-        filterStructure.filters[0].filters.push({
-          field: 'id',
-          operation: Filter_Operation.eq,
-          value: id
-        });
-      }
-      if (name) {
-        // Object.assign(filterStructure, { name: { $eq: name } });
-        filterStructure.filters[0].filters.push({
-          field: 'name',
-          operation: Filter_Operation.eq,
-          value: name
-        });
-      }
-      if (email) {
-        // Object.assign(filterStructure, { email: { $eq: email } });
-        filterStructure.filters[0].filters.push({
-          field: 'email',
-          operation: Filter_Operation.eq,
-          value: email
-        });
-      }
-      if (filterStructure?.filters[0]?.filters?.length > 1) {
-        filterStructure.filters[0].operator = FilterOp_Operator.or;
-      }
 
-      // add ACS filters if subject is not tech user
-      let acsFilterObj, techUser;
-      const techUsersCfg = this.cfg.get('techUsers');
-      if (techUsersCfg?.length > 0) {
-        techUser = _.find(techUsersCfg, { id: subject.id });
-      }
-      let filters = getACSFilters(acsResponse, 'user');
-      if (!techUser && filters) {
-        acsFilterObj = filters;
-      }
-
-      if (acsFilterObj) {
-        if (_.isArray(acsFilterObj)) {
-          for (let acsFilter of acsFilterObj) {
-            filterStructure.filters.push(acsFilter);
-          }
-        } else {
-          filterStructure.filters.push(acsFilterObj);
-        }
-      }
-      const readRequest = ReadRequest.fromPartial({});
-      readRequest.filters = filterStructure?.filters;
-      if (acsResponse?.custom_query_args?.length > 0) {
-        readRequest.custom_queries = acsResponse?.custom_query_args[0]?.custom_queries;
-        readRequest.custom_arguments = acsResponse?.custom_query_args[0]?.custom_arguments;
-      }
-      const users = await super.read(readRequest, context);
-      if (users.total_count > 0) {
-        logger.silly('found user(s)', { users });
-        return users;
-      }
-      logger.silly('user(s) could not be found for request', request);
-      return returnOperationStatus(404, 'user not found');
+    const logger = this.logger;
+    const filterStructure: any = {
+      filters: [{
+        filters: []
+      }]
+    };
+    if (id) {
+      // Object.assign(filterStructure, { id: { $eq: id } });
+      filterStructure.filters[0].filters.push({
+        field: 'id',
+        operation: Filter_Operation.eq,
+        value: id
+      });
     }
+    if (name) {
+      // Object.assign(filterStructure, { name: { $eq: name } });
+      filterStructure.filters[0].filters.push({
+        field: 'name',
+        operation: Filter_Operation.eq,
+        value: name
+      });
+    }
+    if (email) {
+      // Object.assign(filterStructure, { email: { $eq: email } });
+      filterStructure.filters[0].filters.push({
+        field: 'email',
+        operation: Filter_Operation.eq,
+        value: email
+      });
+    }
+    if (filterStructure?.filters[0]?.filters?.length > 1) {
+      filterStructure.filters[0].operator = FilterOp_Operator.or;
+    }
+
+    // add ACS filters if subject is not tech user
+    let acsFilterObj, techUser;
+    const techUsersCfg = this.cfg.get('techUsers');
+    if (techUsersCfg?.length > 0) {
+      techUser = _.find(techUsersCfg, { id: subject.id });
+    }
+    let filters = getACSFilters(acsResponse, 'user');
+    if (!techUser && filters) {
+      acsFilterObj = filters;
+    }
+
+    if (acsFilterObj) {
+      if (_.isArray(acsFilterObj)) {
+        for (let acsFilter of acsFilterObj) {
+          filterStructure.filters.push(acsFilter);
+        }
+      } else {
+        filterStructure.filters.push(acsFilterObj);
+      }
+    }
+    const readRequest = ReadRequest.fromPartial({});
+    readRequest.filters = filterStructure?.filters;
+    if (acsResponse?.custom_query_args?.length > 0) {
+      readRequest.custom_queries = acsResponse?.custom_query_args[0]?.custom_queries;
+      readRequest.custom_arguments = acsResponse?.custom_query_args[0]?.custom_arguments;
+    }
+    const users = await super.read(readRequest, context);
+    if (users.total_count > 0) {
+      logger.silly('found user(s)', { users });
+      return users;
+    }
+    logger.silly('user(s) could not be found for request', request);
+    return returnOperationStatus(404, 'user not found');
   }
 
   /**
@@ -291,7 +311,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     return await res_last_login.all();
   }
 
-  async updateUserTokens(id, token, expiredTokens?: any) {
+  async updateUserTokens(id: string, token: Tokens, expiredTokens?: Tokens[]) {
     // temporary hack to update tokens on user(to fix issue when same user login multiple times simultaneously)
     // tokens get overwritten with update operation on simultaneours req
     if (token && token.interactive) {
@@ -329,7 +349,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
   }
 
-  async removeToken(id, tokenObj) {
+  async removeToken(id: string, tokenObj: Tokens[]) {
     // Remove token using AQL query
     if (tokenObj?.length > 0) {
       const token_remove = `FOR doc in users FILTER doc.id == @docID UPDATE doc WITH
@@ -442,7 +462,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         return { status: { code: 400, message: 'Token not provided' } };
       }
     }
-    catch (e) {
+    catch (e: any) {
       this.logger.error('Fatal error', { error: e.stack, code: e.code, message: e.message });
       return {
         status: {
@@ -469,17 +489,29 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   /**
    * Extends ServiceBase.read()
    */
-  async read(request: ReadRequest, context): Promise<DeepPartial<UserListWithRoleResponse>> {
+  async read(request: ReadRequest, context: any): Promise<DeepPartial<UserListWithRoleResponse>> {
     let subject = request.subject;
     let acsResponse: PolicySetRQResponse;
     try {
-      acsResponse = await checkAccessRequest({
-        ...context,
-        subject: request.subject,
-        resources: []
-      }, [{ resource: 'user' }], AuthZAction.READ, Operation.whatIsAllowed) as PolicySetRQResponse;
-    } catch (err) {
-      this.logger.error('Error occurred requesting access-control-srv for read', { code: err.code, message: err.message, stack: err.stack });
+      acsResponse = await checkAccessRequest(
+        {
+          ...context,
+          subject: request.subject,
+          resources: []
+        },
+        [{ resource: 'user' }],
+        AuthZAction.READ,
+        Operation.whatIsAllowed,
+      ) as PolicySetRQResponse;
+    } catch (err: any) {
+      this.logger.error(
+        'Error occurred requesting access-control-srv for read',
+        {
+          code: err.code,
+          message: err.message,
+          stack: err.stack
+        }
+      );
       return {
         operation_status: {
           code: err.code,
@@ -528,7 +560,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     return users;
   }
 
-  superRead(request: ReadRequest, context): Promise<DeepPartial<UserListResponse>> {
+  superRead(request: ReadRequest, context: any): Promise<DeepPartial<UserListResponse>> {
     return super.read(request, context);
   }
 
@@ -537,7 +569,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    */
   async create(request: UserList, context: any): Promise<DeepPartial<UserListResponse>> {
     let usersList = request.items;
-    const insertedUsers = { items: [], total_count: 0, operation_status: { code: 0, message: '' } };
+    const insertedUsers = {
+      items: new Array<UserResponse>(),
+      total_count: 0,
+      operation_status: { code: 0, message: '' }
+    };
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
     let subject = request.subject;
@@ -548,9 +584,16 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       if (!context) { context = {}; };
       context.subject = subject;
       context.resources = acsResources;
-      acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(item => item.id) }], AuthZAction.CREATE,
-        Operation.isAllowed);
-    } catch (err) {
+      acsResponse = await checkAccessRequest(
+        context,
+        [{
+          resource: 'user',
+          id: acsResources.map(item => item.id)
+        }],
+        AuthZAction.CREATE,
+        Operation.isAllowed
+      );
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for create', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -566,12 +609,16 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             // error verifying role associations
             const userID = item.id;
             if (!_.isEmpty(verficationResponse) && verficationResponse?.status?.message) {
-              insertedUsers.items.push(returnStatus(verficationResponse.status.code,
-                verficationResponse.status.message, verficationResponse.status.id));
+              insertedUsers.items.push(
+                returnStatus(
+                  verficationResponse.status.code,
+                  verficationResponse.status.message,
+                  verficationResponse.status.id)
+                );
               usersList = _.filter(usersList, (item) => (item.id != userID));
             }
           }
-        } catch (err) {
+        } catch (err: any) {
           this.logger.error('Error caught verifying user role associations', { code: err.code, message: err.message, stack: err.stack });
           const errMessage = err.details ? err.details : err.message;
           // for unhandled promise rejection
@@ -643,9 +690,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // the user role associations if not skip validation
       let acsResponse: DecisionResponse | PolicySetRQResponse;
       try {
-        let ctx = { subject, resources: [] };
+        let ctx = { subject, resources: new Array() };
         acsResponse = await checkAccessRequest(ctx, [{ resource: 'user' }], AuthZAction.MODIFY, Operation.whatIsAllowed);
-      } catch (err) {
+      } catch (err: any) {
         this.logger.error('Error making wahtIsAllowedACS request for verifying role associations', { code: err.code, message: err.message, stack: err.stack });
         return returnStatus(err.code, err.message, usersList[0].id);
       }
@@ -682,7 +729,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           }
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error caught calling ACS', { code: err.code, message: err.message, stack: err.stack });
       return returnStatus(err.code, err.message);
     }
@@ -1083,7 +1130,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     try {
       this.validUsername(user?.name, minLength, maxLength, logger);
-    } catch (err) {
+    } catch (err: any) {
       const errorMessage = `Error while validating username: ${user.name}, ` +
         `error: ${err.name}, message:${err.details}`;
       logger.error(errorMessage);
@@ -1167,7 +1214,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * Endpoint register, register a user or guest user.
    * @return type is any since it can be guest or user type
    */
-  async register(request: RegisterRequest, context): Promise<DeepPartial<UserResponse>> {
+  async register(request: RegisterRequest, context: any): Promise<DeepPartial<UserResponse>> {
     const user: User = User.fromPartial(request);
     const register = this.cfg.get('service:register');
     if (!register) {
@@ -1195,7 +1242,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     // TODO: verify captcha_code before deleting
-    delete user['captcha_code'];
+    delete (user as any).captcha_code;
     // set default role_associations from configuration
     if (this.cfg.get('defaultRegisterUserRoles')) {
       user.role_associations = this.cfg.get('defaultRegisterUserRoles');
@@ -1216,7 +1263,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     return createdUser;
   }
 
-  async confirmUserInvitation(request: ConfirmUserInvitationRequest, context): Promise<DeepPartial<OperationStatusObj>> {
+  async confirmUserInvitation(request: ConfirmUserInvitationRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
     // find the actual user object from DB using the UserInvitationReq identifier
     // activate user and update password
     const identifier = request.identifier;
@@ -1246,7 +1293,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           meta: user.meta
         }
       }, [{ resource: 'user', id: user.id, property: ['active', 'activation_code', 'password_hash'] }], AuthZAction.MODIFY, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for confirmUserInvitation', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -1335,7 +1382,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   /**
    * Endpoint to activate a User
    */
-  async activate(request: ActivateRequest, context): Promise<DeepPartial<OperationStatusObj>> {
+  async activate(request: ActivateRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
     const logger = this.logger;
     const identifier = request.identifier;
     const activationCode = request.activation_code;
@@ -1380,7 +1427,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         subject,
         resources: { id: user.id, active: true, activation_code: activationCode, meta: user.meta }
       }, [{ resource: 'user', id: user.id, property: ['active', 'activation_code'] }], AuthZAction.MODIFY, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for activate', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -1424,7 +1471,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   /**
    * Endpoint to change user password for authenticated user
    */
-  async changePassword(request: ChangePasswordRequest, context): Promise<DeepPartial<OperationStatusObj>> {
+  async changePassword(request: ChangePasswordRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
     const logger = this.logger;
     const pw = request.password;
     const newPw = request.new_password;
@@ -1456,7 +1503,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         subject,
         resources: { id: user.id, password: pw, new_password: newPw, meta: user.meta }
       }, [{ resource: 'user', id: user.id, property: ['password', 'new_password'] }], AuthZAction.MODIFY, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for changePassword', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -1495,7 +1542,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * A UUID is generated and a confirmation email is
    * sent out to the user's defined email address.
    */
-  async requestPasswordChange(request: RequestPasswordChangeRequest, context): Promise<DeepPartial<OperationStatusObj>> {
+  async requestPasswordChange(request: RequestPasswordChangeRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
     const logger = this.logger;
     const identifier = request.identifier;
     // check for the identifier against name or email
@@ -1533,7 +1580,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   /**
    * Endpoint which is called after the user confirms a password change request.
    */
-  async confirmPasswordChange(request: ConfirmPasswordChangeRequest, context): Promise<DeepPartial<OperationStatusObj>> {
+  async confirmPasswordChange(request: ConfirmPasswordChangeRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
     const logger = this.logger;
     const { identifier, activation_code } = request;
     const newPassword = request.password;
@@ -1561,7 +1608,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           meta: user.meta
         }
       }, [{ resource: 'user', id: user.id, property: ['activation_code', 'password_hash'] }], AuthZAction.MODIFY, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for confirmPasswordChange', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -1602,7 +1649,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   /**
    * Endpoint to change email Id.
    */
-  async requestEmailChange(request: ChangeEmailRequest, context): Promise<DeepPartial<OperationStatusObj>> {
+  async requestEmailChange(request: ChangeEmailRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
     const logger = this.logger;
     const identifier = request.identifier;
     const new_email = request.new_email;
@@ -1624,7 +1671,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         subject,
         resources: { id: user.id, identifier, new_email, meta: user.meta }
       }, [{ resource: 'user', id: user.id, property: ['identifier', 'new_email'] }], AuthZAction.MODIFY, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for requestEmailChange', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -1656,7 +1703,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   /**
    * Endpoint to confirm email change.
    */
-  async confirmEmailChange(request: ConfirmEmailChangeRequest, context): Promise<DeepPartial<OperationStatusObj>> {
+  async confirmEmailChange(request: ConfirmEmailChangeRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
     const logger = this.logger;
     const identifier = request.identifier;
     const activationCode = request.activation_code;
@@ -1685,7 +1732,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           meta: user.meta
         }
       }, [{ resource: 'user', id: user.id, property: ['email', 'activation_code'] }], AuthZAction.MODIFY, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for confirmEmailChange', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -1731,7 +1778,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY,
         Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -1757,7 +1804,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               }
             }
           }
-        } catch (err) {
+        } catch (err: any) {
           const errMessage = err.details ? err.details : err.message;
           this.logger.error('Error validating role associations', { code: err.code, message: errMessage, stack: err.stack });
           // for unhandled promise rejection
@@ -1815,7 +1862,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             context.resources = user;
             acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: user.id }], AuthZAction.MODIFY,
               Operation.isAllowed, false);
-          } catch (err) {
+          } catch (err: any) {
             this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
             // return returnStatus(err.code, err.message);
             updateWithStatus.items.push(returnStatus(err.code, err.message, user.id));
@@ -2047,7 +2094,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         subject,
         resources: acsResources
       }, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY, Operation.whatIsAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for upsert', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -2074,7 +2121,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               }
             }
           }
-        } catch (err) {
+        } catch (err: any) {
           const errMessage = err.details ? err.details : err.message;
           // for unhandled promise rejection
           return returnOperationStatus(400, errMessage);
@@ -2126,7 +2173,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * Endpoint verifyPassword, checks if the provided password and user matches
    * the one found in the database.
    */
-  async login(request: LoginRequest, context): Promise<DeepPartial<UserResponse>> {
+  async login(request: LoginRequest, context: any): Promise<DeepPartial<UserResponse>> {
     if (_.isEmpty(request) ||
       (_.isEmpty(request.identifier) || (_.isEmpty(request.password) &&
         _.isEmpty(request.token)))
@@ -2192,7 +2239,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * Endpoint unregister, delete a user
    * belonging to the user.
    */
-  async unregister(request: UnregisterRequest, context): Promise<DeepPartial<OperationStatusObj>> {
+  async unregister(request: UnregisterRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
     const logger = this.logger;
     const identifier = request.identifier;
     logger.silly('unregister', identifier);
@@ -2217,7 +2264,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.DELETE,
         Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv unregistering user', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -2272,7 +2319,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], action,
         Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for delete', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -2321,7 +2368,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
   }
 
-  async deleteUsersByOrg(request: OrgIDRequest, context): Promise<DeepPartial<DeleteUsersByOrgResponse>> {
+  async deleteUsersByOrg(request: OrgIDRequest, context: any): Promise<DeepPartial<DeleteUsersByOrgResponse>> {
     const orgIDs = request.org_ids;
     let subject = request.subject;
     let acsResponse: PolicySetRQResponse;
@@ -2331,7 +2378,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       context.resources = { id: orgIDs };
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: orgIDs }], AuthZAction.DELETE,
         Operation.isAllowed) as PolicySetRQResponse;
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for deleteUsersByOrg', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -2346,7 +2393,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
   }
 
-  async findByRole(request: FindByRoleRequest, context): Promise<DeepPartial<UserListResponse>> {
+  async findByRole(request: FindByRoleRequest, context: any): Promise<DeepPartial<UserListResponse>> {
     const role: string = request.role;
     if (!role) {
       return returnOperationStatus(400, 'missing role name');
@@ -2361,7 +2408,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         subject,
         resources: []
       }, [{ resource: 'user' }], AuthZAction.READ, Operation.whatIsAllowed) as PolicySetRQResponse;
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for findByRole', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -2501,7 +2548,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }
 
         this.emailEnabled = true;
-      } catch (err) {
+      } catch (err: any) {
         this.emailEnabled = false;
         if (err.code == 'ECONNREFUSED' || err.message == 'ECONNREFUSED') {
           this.logger.error('An error occurred while attempting to load email templates from'
@@ -2618,7 +2665,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     try {
       this.cfg.set('authorization:enabled', false);
       updateConfig(this.cfg);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error caught disabling authorization:', { code: err.code, message: err.message, stack: err.stack });
       this.cfg.set('authorization:enabled', this.authZCheck);
     }
@@ -2628,7 +2675,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     try {
       this.cfg.set('authorization:enabled', this.authZCheck);
       updateConfig(this.cfg);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error caught enabling authorization', { code: err.code, message: err.message, stack: err.stack });
       this.cfg.set('authorization:enabled', this.authZCheck);
     }
@@ -2737,75 +2784,47 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * @param entity entity name
    * @param action resource action
    */
-  async createMetadata(res: any, action: string, subject?: Subject): Promise<any> {
-    let resources = _.cloneDeep(res);
-    let orgOwnerAttributes = [];
-    if (resources && !_.isArray(resources)) {
-      resources = [resources];
-    }
+  async createMetadata<T extends { id?: string, meta?: Meta }>(
+    res: T | T[],
+    action: string,
+    subject?: Subject
+  ): Promise<T[]> {
+    // res = _.cloneDeep(res);
+    const resources = Array.isArray(res) ? res : [res];
     const urns = this.cfg.get('authorization:urns');
-    if (subject && subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
-      // add user and subject scope as default owners
-      orgOwnerAttributes.push(
-        {
-          id: urns.ownerIndicatoryEntity,
-          value: urns.organization,
-          attributes: [{
-            id: urns.ownerInstance,
-            value: subject.scope
-          }]
-        });
-    }
+    // add user and subject scope as default owners
+    const orgOwnerAttributes = subject?.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)
+      ? [{
+        id: urns.ownerIndicatoryEntity,
+        value: urns.organization,
+        attributes: [{
+          id: urns.ownerInstance,
+          value: subject.scope
+        }]
+      }]
+      : [];
 
-    if (resources) {
-      for (let resource of resources) {
-        if (!resource.meta) {
-          resource.meta = {};
+    for (let resource of resources) {
+      resource.meta ??= {};
+      if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
+        const filters = [{
+          filters: [{
+            field: 'id',
+            operation: Filter_Operation.eq,
+            value: resource.id
+          }]
+        }];
+        const result = await super.read(ReadRequest.fromPartial({ filters }), {});
+        // update owners info
+        if (result?.items?.length === 1) {
+          const item = result.items[0].payload;
+          resource.meta.owners = item.meta.owners;
         }
-        if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
-          const filters = [{
-            filters: [{
-              field: 'id',
-              operation: Filter_Operation.eq,
-              value: resource.id
-            }]
-          }];
-          let result = await super.read(ReadRequest.fromPartial({ filters }), {});
-          // update owners info
-          if (result?.items?.length === 1) {
-            let item = result.items[0].payload;
-            resource.meta.owners = item.meta.owners;
-          } else if (result?.items?.length === 0) {
-            if (_.isEmpty(resource.id)) {
-              resource.id = uuid.v4().replace(/-/g, '');
-            }
-            let ownerAttributes;
-            if (!resource.meta.owners) {
-              ownerAttributes = _.cloneDeep(orgOwnerAttributes);
-            } else {
-              ownerAttributes = resource.meta.owners;
-            }
-            ownerAttributes.push(
-              {
-                id: urns.ownerIndicatoryEntity,
-                value: urns.user,
-                attributes: [{
-                  id: urns.ownerInstance,
-                  value: resource.id
-                }]
-              });
-            resource.meta.owners = ownerAttributes;
-          }
-        } else if (action === AuthZAction.CREATE) {
+        else if (result?.items?.length === 0) {
           if (_.isEmpty(resource.id)) {
             resource.id = uuid.v4().replace(/-/g, '');
           }
-          let ownerAttributes;
-          if (!resource.meta.owners) {
-            ownerAttributes = _.cloneDeep(orgOwnerAttributes);
-          } else {
-            ownerAttributes = resource.meta.owners;
-          }
+          const ownerAttributes = resource.meta?.owners ?? orgOwnerAttributes;
           ownerAttributes.push(
             {
               id: urns.ownerIndicatoryEntity,
@@ -2817,6 +2836,21 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             });
           resource.meta.owners = ownerAttributes;
         }
+      } else if (action === AuthZAction.CREATE) {
+        if (_.isEmpty(resource.id)) {
+          resource.id = uuid.v4().replace(/-/g, '');
+        }
+        const ownerAttributes = resource.meta?.owners ?? orgOwnerAttributes;
+        ownerAttributes.push(
+          {
+            id: urns.ownerIndicatoryEntity,
+            value: urns.user,
+            attributes: [{
+              id: urns.ownerInstance,
+              value: resource.id
+            }]
+          });
+        resource.meta.owners = ownerAttributes;
       }
     }
     return resources;
@@ -2858,7 +2892,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     };
   }
 
-  async sendActivationEmail(request: SendActivationEmailRequest, context): Promise<DeepPartial<OperationStatusObj>> {
+  async sendActivationEmail(request: SendActivationEmailRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
     const { identifier, subject } = request;
     // check for the identifier against name or email in DB
     const filters = getDefaultFilter(identifier);
@@ -2889,7 +2923,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
   }
 
-  async sendInvitationEmail(request: SendInvitationEmailRequest, context): Promise<DeepPartial<OperationStatusObj>> {
+  async sendInvitationEmail(request: SendInvitationEmailRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
     const { identifier, invited_by_user_identifier, subject } = request;
     let user;
     // check for the identifier against name or email in DB
@@ -2910,7 +2944,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       context.resources = { id: user.id, identifier, invited_by_user_identifier, meta: user.meta };
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: user.id }],
         AuthZAction.MODIFY, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for sendInvitationEmail', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -2936,7 +2970,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
   }
 
-  async getUnauthenticatedSubjectTokenForTenant(request: TenantRequest, context): Promise<DeepPartial<TenantResponse>> {
+  async getUnauthenticatedSubjectTokenForTenant(request: TenantRequest, context: any): Promise<DeepPartial<TenantResponse>> {
     if (!request.domain) {
       return TenantResponse.fromPartial({});
     }
@@ -3036,7 +3070,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         subject,
         resources: acsResources
       }, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.CREATE, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for creating role', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -3048,7 +3082,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
       let createRoleResponse;
       try {
         createRoleResponse = super.create(request, context);
-      } catch (err) {
+      } catch (err: any) {
         return returnOperationStatus(err.code, err.message);
       }
       return createRoleResponse;
@@ -3067,7 +3101,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         subject,
         resources: []
       }, [{ resource: 'role' }], AuthZAction.READ, Operation.whatIsAllowed) as PolicySetRQResponse;
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for read', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -3103,7 +3137,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         subject,
         resources: acsResources
       }, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -3144,7 +3178,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
             context.resources = role;
             acsResponse = await checkAccessRequest(context, [{ resource: 'role', id: role.id }], AuthZAction.MODIFY,
               Operation.isAllowed, false);
-          } catch (err) {
+          } catch (err: any) {
             this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
             return returnOperationStatus(err.code, err.message);
           }
@@ -3174,7 +3208,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         subject,
         resources: acsResources
       }, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for upsert', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -3214,7 +3248,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         subject,
         resources: acsResources
       }, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.DELETE, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for delete', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
     }
@@ -3364,7 +3398,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     try {
       this.cfg.set('authorization:enabled', false);
       updateConfig(this.cfg);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error caught disabling authorization', { code: err.code, message: err.message, stack: err.stack });
       this.cfg.set('authorization:enabled', this.authZCheck);
     }
@@ -3374,7 +3408,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     try {
       this.cfg.set('authorization:enabled', this.authZCheck);
       updateConfig(this.cfg);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error caught enabling authorization', { code: err.code, message: err.message, stack: err.stack });
       this.cfg.set('authorization:enabled', this.authZCheck);
     }
