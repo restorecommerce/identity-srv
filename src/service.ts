@@ -61,6 +61,7 @@ import {
   TenantResponse
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
+  Role,
   RoleList,
   RoleListResponse,
   RoleServiceImplementation
@@ -551,11 +552,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     const users = await super.read(readRequest, context) as UserListWithRoleResponse;
     const roles = await this.roleService.read(ReadRequest.fromPartial({ subject }), context);
-    const rolesList = roles?.items?.map(e => e.payload);
+    const rolesList: Role[] = roles?.items?.map(e => e.payload);
     users?.items?.forEach(userObj => {
-      userObj.payload.roles = userObj?.payload?.role_associations?.flatMap(
-        roleAssoc => rolesList?.filter(r => r.id === roleAssoc?.role)
-      );
+      userObj.payload.roles = userObj?.payload?.role_associations?.map(
+        roleAssoc => rolesList?.find(r => r?.id === roleAssoc?.role)
+      ).filter(r => !!r);
     });
     return users;
   }
@@ -1787,7 +1788,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     if (acsResponse.decision === Response_Decision.PERMIT) {
-      let updateWithStatus = { items: [], operation_status: {} };
+      const updateWithStatus: UserListResponse = { items: [] };
       if (this.cfg.get('authorization:enabled')) {
         try {
           const roleAssocsModified = await this.roleAssocsModified(items, context);
@@ -1798,8 +1799,12 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               // error verifying role associations
               const userID = item.id;
               if (!_.isEmpty(verficationResponse) && verficationResponse?.status?.message) {
-                updateWithStatus.items.push(returnStatus(verficationResponse.status.code,
-                  verficationResponse.status.message, verficationResponse.status.id));
+                updateWithStatus.items.push(
+                  returnStatus(
+                    verficationResponse.status.code,
+                    verficationResponse.status.message,
+                    verficationResponse.status.id
+                  ));
                 items = _.filter(items, (item) => (item.id != userID));
               }
             }
@@ -1993,12 +1998,15 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
   }
 
-  private nestedAttributesEqual(dbAttributes, userAttributes) {
+  private nestedAttributesEqual(
+    dbAttributes: Attribute[],
+    userAttributes: Attribute[]
+  ) {
     if (!userAttributes) {
       return true;
     }
     if (dbAttributes?.length > 0 && userAttributes?.length > 0) {
-      return userAttributes.every((obj) => dbAttributes.some((dbObj => dbObj.value === obj.value)));
+      return userAttributes.every((obj: Attribute) => dbAttributes.some(((dbObj: Attribute) => dbObj.value === obj.value)));
     } else if (dbAttributes?.length != userAttributes?.length) {
       return false;
     }
@@ -2104,7 +2112,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     if (acsResponse.decision === Response_Decision.PERMIT) {
-      let upsertWithStatus = { items: [], total_count: 0, operation_status: {} };
+      const upsertWithStatus: UserListResponse = { items: [] };
       if (this.cfg.get('authorization:enabled')) {
         try {
           const roleAssocsModified = await this.roleAssocsModified(usersList, context);
@@ -2293,7 +2301,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const logger = this.logger;
     let userIDs = request.ids;
     let resources = [];
-    let acsResources = [];
+    let acsResources = new Array<any>();
     let subject = request.subject;
     let action;
     if (userIDs) {
@@ -2497,7 +2505,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
   }
 
-  private setAuthenticationHeaders(token) {
+  private setAuthenticationHeaders(token: string) {
     return {
       Authorization: `Bearer ${token}`
     };
@@ -2856,8 +2864,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     return resources;
   }
 
-  private async makeUserForInvitationData(user, invited_by_user_identifier): Promise<any> {
-    let invitedByUser;
+  private async makeUserForInvitationData(user: User, invited_by_user_identifier: string): Promise<any> {
+    let invitedByUser: User;
     const filters = [{
       filters: [
         {
@@ -2875,7 +2883,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }];
     const invitedByUsers = await super.read(ReadRequest.fromPartial({ filters }), {});
     if (invitedByUsers.total_count === 1) {
-      invitedByUser = invitedByUsers.items[0];
+      invitedByUser = invitedByUsers.items[0]?.payload;
     } else {
       return returnOperationStatus(404, `user with identifier ${invited_by_user_identifier} not found`);
     }
@@ -2908,7 +2916,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         const updateStatus = await super.update(UserList.fromPartial({
           items: [user]
         }), context);
-        if (updateStatus?.items[0]?.status?.message === 'success') {
+        if (updateStatus?.items[0]?.status?.code === 200) {
           // sending activation code via email
           await this.fetchHbsTemplates();
           const renderRequest = this.makeActivationEmailData(user);
@@ -3018,8 +3026,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 }
 
 export class RoleService extends ServiceBase<RoleListResponse, RoleList> implements RoleServiceImplementation {
-
-  logger: Logger;
   redisClient: RedisClientType<any, any>;
   cfg: any;
   authZ: ACSAuthZ;
@@ -3069,7 +3075,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         ...context,
         subject,
         resources: acsResources
-      }, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.CREATE, Operation.isAllowed);
+      }, [{ resource: 'role', id: acsResources.map((e: any) => e.id) }], AuthZAction.CREATE, Operation.isAllowed);
     } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for creating role', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
@@ -3136,7 +3142,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         ...context,
         subject,
         resources: acsResources
-      }, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY, Operation.isAllowed);
+      }, [{ resource: 'role', id: acsResources.map((e: any) => e.id) }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
@@ -3207,7 +3213,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         ...context,
         subject,
         resources: acsResources
-      }, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY, Operation.isAllowed);
+      }, [{ resource: 'role', id: acsResources.map((e: any) => e.id) }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for upsert', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
@@ -3247,7 +3253,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         ...context,
         subject,
         resources: acsResources
-      }, [{ resource: 'role', id: acsResources.map(e => e.id) }], AuthZAction.DELETE, Operation.isAllowed);
+      }, [{ resource: 'role', id: acsResources.map((e: any) => e.id) }], AuthZAction.DELETE, Operation.isAllowed);
     } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for delete', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
