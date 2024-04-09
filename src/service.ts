@@ -2864,9 +2864,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
       if (this.emailEnabled && !user.guest) {
         // generating activation code
-        const renderRequest = this.makeActivationEmailData(user);
         user.activation_code = this.idGen();
-        await this.topics.rendering.emit('renderRequest', renderRequest);
         const updateStatus = await super.update(UserList.fromPartial({
           items: [user]
         }), context);
