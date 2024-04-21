@@ -2,10 +2,11 @@ let meta = node.meta
 let owner = meta.owners
 let found = (
     for o in owner
-    filter o.id == "urn:restorecommerce:acs:names:ownerIndicatoryEntity" && o.value == @entity
-    let nestedAttributes = o.attributes
-    for ownerInst in nestedAttributes
-      filter ownerInst.id == "urn:restorecommerce:acs:names:ownerInstance" && ownerInst.value in @instance    
-    return true
+    for arg in @customArguments
+      filter o.id == "urn:restorecommerce:acs:names:ownerIndicatoryEntity" && o.value == arg.entity
+      let nestedAttributes = o.attributes
+      for ownerInst in nestedAttributes
+        filter ownerInst.id == "urn:restorecommerce:acs:names:ownerInstance" && ownerInst.value in arg.instance    
+      return true
 )
 filter true in found

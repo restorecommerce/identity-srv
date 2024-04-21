@@ -5,10 +5,11 @@ let foundAssoc = (
         let attributes = roleAssoc.attributes
         let inAttributes = (
             for a in attributes
-                filter a.id == "urn:restorecommerce:acs:names:roleScopingEntity" && a.value == @scopingEntity
+              for arg in @customArguments
+                filter a.id == "urn:restorecommerce:acs:names:roleScopingEntity" && a.value == arg.scopingEntity
                 let nestedAttributes = a.attributes
                 for scopInst in nestedAttributes
-                    filter scopInst.id == "urn:restorecommerce:acs:names:roleScopingInstance" && scopInst.value in @scopingInstances
+                    filter scopInst.id == "urn:restorecommerce:acs:names:roleScopingInstance" && scopInst.value in arg.scopingInstances
                 limit 1
                 return true
         )

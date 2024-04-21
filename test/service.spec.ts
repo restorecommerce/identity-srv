@@ -132,6 +132,26 @@ const permitRoleRule: Rule = {
   effect: Effect.PERMIT
 };
 
+const permitUserRoleRule: Rule = {
+  id: 'permit_user_role_id',
+  target: {
+    actions: [],
+    resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:role.Role', attributes: [] }],
+    subjects: [
+      {
+        id: 'urn:restorecommerce:acs:names:role',
+        value: 'user-r-id',
+        attributes: []
+      },
+      {
+        id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+        value: 'urn:restorecommerce:acs:model:organization.Organization',
+        attributes: []
+      }]
+  },
+  effect: Effect.PERMIT
+};
+
 let userRolePolicySetRQ = {
   policy_sets:
     [{
@@ -361,6 +381,7 @@ describe('testing identity-srv', () => {
           registerResult.status.message.should.equal('success');
           userRolePolicySetRQ.policy_sets[0].policies[0].rules[0] = permitUserRule;
           userRolePolicySetRQ.policy_sets[0].policies[1].rules[0] = permitRoleRule;
+          userRolePolicySetRQ.policy_sets[0].policies[1].rules[1] = permitUserRoleRule;
           // start mock acs-srv - needed for read operation since acs-client makes a req to acs-srv
           // to get applicable policies although acs-lookup is disabled
           await startGrpcMockServer([{ method: 'WhatIsAllowed', output: userRolePolicySetRQ },
@@ -1733,13 +1754,13 @@ describe('testing identity-srv', () => {
           testUser.role_associations[0].role = 'super-admin-r-id';
           const result = await userService.create({ items: [testUser], subject });
           result.items[0].status.code.should.equal(403);
-          result.items[0].status.message.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id,admin-r-id does not have permissions');
+          result.items[0].status.message.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id,admin-r-id,user-r-id does not have permissions');
           result.items[0].status.id.should.equal('testuser');
           result.operation_status.code.should.equal(200);
           result.operation_status.message.should.equal('success');
         });
 
-        it('should throw an error when hierarchical do not match creator role', async () => {
+        it('should throw an error when hierarchical scope do not match creator role', async () => {
           testUser.role_associations[0].role = 'user-r-id';
           // auth_context not containing valid creator role (admin-r-id)
           subjectResolved.hierarchical_scopes = [
@@ -1760,8 +1781,8 @@ describe('testing identity-srv', () => {
           let hrScopeskey = `cache:${subject.id}:${subject.token}:hrScopes`;
           await redisClient.set(hrScopeskey, JSON.stringify(subjectResolved.hierarchical_scopes));
           const result = await userService.create({ items: [testUser], subject });
-          result.items[0].status.code.should.equal(401);
-          result.items[0].status.message.should.equal('No Hierarchical Scopes could be found');
+          result.items[0].status.code.should.equal(403);
+          result.items[0].status.message.should.equal('The target role user-r-id cannot be assigned to user test.user as user role  does not have permissions');
           result.items[0].status.id.should.equal('testuser');
           result.operation_status.code.should.equal(200);
           result.operation_status.message.should.equal('success');

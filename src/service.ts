@@ -2699,8 +2699,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         custom_arguments: {
           value: Buffer.from(JSON.stringify({
             userRole: roleID,
-            scopingEntity: this.cfg.get('urns:organization'),
-            scopingInstances: [org]
+            customArguments: [{
+              scopingEntity: this.cfg.get('urns:organization'),
+              scopingInstances: [org]
+            }]
           }))
         }
       }), {});
@@ -2813,7 +2815,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       : [];
 
     for (let resource of resources) {
-      resource.meta ??= {};
+      resource.meta ??= { };
       if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
         const filters = [{
           filters: [{
