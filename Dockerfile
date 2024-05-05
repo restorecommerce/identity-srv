@@ -1,5 +1,5 @@
 ### Build
-FROM node:20.11.1-alpine3.19 as build
+FROM node:22.1.0-alpine3.19 as build
 ENV NO_UPDATE_NOTIFIER=true
 
 USER node
@@ -13,7 +13,7 @@ RUN npm run build
 
 
 ### Deployment
-FROM node:20.11.1-alpine3.19 as deployment
+FROM node:22.1.0-alpine3.19 as deployment
 
 ENV NO_UPDATE_NOTIFIER=true
 
@@ -22,7 +22,7 @@ ARG APP_HOME=/home/node/srv
 WORKDIR $APP_HOME
 
 COPY --chown=node:node filter_ownership.aql filter_role_association.aql $APP_HOME
-COPY --chown=node:node ./email_templates $APP_HOME/email_templates 
+COPY --chown=node:node ./email_templates $APP_HOME/email_templates
 COPY --chown=node:node ./cfg $APP_HOME/cfg
 COPY --chown=node:node --from=build $APP_HOME/lib $APP_HOME/lib
 

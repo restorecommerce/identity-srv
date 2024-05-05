@@ -69,7 +69,6 @@
     "eslint-plugin-prefer-arrow-functions": "^3.3.2",
     "husky": "^9.0.11",
     "mocha": "^10.4.0",
-    "nodemon": "^3.1.0",
     "npm-run-all": "^4.1.5",
     "rimraf": "^5.0.5",
     "should": "^13.2.3",
@@ -82,7 +81,7 @@
   },
   "scripts": {
     "start": "node lib/start.cjs",
-    "dev": "cross-env NODE_ENV=development node lib/start.cjs",
+    "dev": "cross-env NODE_ENV=development node --watch lib/start.cjs",
     "test": "npm run lint && c8 --reporter=text npm run mocha",
     "lint": "eslint src --ext .ts",
     "mocha": "cross-env NODE_ENV=test mocha --full-trace --exit --timeout 30000",
@@ -96,7 +95,7 @@
     "prepare": "node -e \"try { require('husky').install() } catch (e) {}\""
   },
   "engines": {
-    "node": ">= 20.8.0"
+    "node": ">= 22.0.0"
   },
   "type": "module",
   "release": {
