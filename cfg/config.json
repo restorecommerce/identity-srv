@@ -59,6 +59,9 @@
         },
         {
           "fieldPath": "payload.[0].options"
+        },
+        {
+          "fieldPath": "decodedMsg.responses"
         }
       ],
       "omitFields": [
