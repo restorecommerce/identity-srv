@@ -72,7 +72,8 @@ import {
   Filter_Operation,
   FilterOp_Operator,
   Filter_ValueType,
-  ReadRequest
+  ReadRequest,
+  Resource
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 import { OperationStatusObj } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/status.js';
 import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta.js';
@@ -98,7 +99,6 @@ import {
   Match,
 } from '@zxcvbn-ts/core/dist/types.js';
 import fetch from 'node-fetch';
-import { TokenData } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token.js';
 
 export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
@@ -155,7 +155,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     this.cfg = cfg;
     this.db = db;
     this.topics = topics;
-    this.logger = logger;
     this.roleService = roleService;
     this.authZ = authZ;
     const redisConfig = cfg.get('redis');
@@ -3053,7 +3052,6 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
       }
     }
     super('role', roleTopic, logger, new ResourcesAPIBase(db, 'roles', resourceFieldConfig), isEventsEnabled);
-    this.logger = logger;
     const redisConfig = cfg.get('redis');
     redisConfig.database = cfg.get('redis:db-indexes:db-subject');
     this.redisClient = createClient(redisConfig);
@@ -3093,7 +3091,11 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     if (acsResponse.decision === Response_Decision.PERMIT) {
       let createRoleResponse;
       try {
-        createRoleResponse = super.create(request, context);
+        createRoleResponse = super.create({
+          items: acsResources,
+          total_count: acsResources.length,
+          subject,
+        }, context);
       } catch (err: any) {
         return returnOperationStatus(err.code, err.message);
       }
@@ -3199,7 +3201,11 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
           }
         }
       }
-      return super.update(request, context);
+      return super.update({
+        items: acsResources,
+        total_count: acsResources.length,
+        subject,
+      }, context);
     }
   }
 
@@ -3230,7 +3236,11 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     }
 
     if (acsResponse.decision === Response_Decision.PERMIT) {
-      return super.upsert(request, context);
+      return super.upsert({
+        items: acsResources,
+        total_count: acsResources.length,
+        subject,
+      }, context);
     }
   }
 
@@ -3245,7 +3255,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     let acsResources;
     if (!_.isEmpty(roleIDs)) {
       Object.assign(resources, { id: roleIDs });
-      acsResources = await this.createMetadata({ id: roleIDs }, AuthZAction.DELETE, subject);
+      acsResources = await this.createMetadata<any>({ id: roleIDs }, AuthZAction.DELETE, subject);
     }
     if (request.collection) {
       acsResources = [{ collection: request.collection }];
@@ -3317,7 +3327,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
    * @param entity entity name
    * @param action resource action
    */
-  async createMetadata(res: any, action: string, subject?: Subject): Promise<any> {
+  async createMetadata<T extends Resource>(res: T | T[], action: string, subject?: Subject): Promise<T[]> {
     let resources = _.cloneDeep(res);
     let orgOwnerAttributes = [];
     if (!_.isArray(resources)) {
