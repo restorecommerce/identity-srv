@@ -2808,8 +2808,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         resource.id = uuid.v4().replace(/-/g, '');
       }
 
-      if (!resource.meta?.owners) {
-        resource.meta ??= {};
+      if (!resource.meta) {
+        resource.meta = {};
         resource.meta.owners = [];
 
         resource.meta.owners.push(
@@ -3347,8 +3347,8 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         resource.id = uuid.v4().replace(/-/g, '');
       }
 
-      if (!resource.meta?.owners) {
-        resource.meta ??= {};
+      if (!resource.meta) {
+        resource.meta = {};
         resource.meta.owners = [];
 
         if (subject?.scope) {
