@@ -3091,11 +3091,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     if (acsResponse.decision === Response_Decision.PERMIT) {
       let createRoleResponse;
       try {
-        createRoleResponse = super.create({
-          items: acsResources,
-          total_count: acsResources.length,
-          subject,
-        }, context);
+        createRoleResponse = super.create(request, context);
       } catch (err: any) {
         return returnOperationStatus(err.code, err.message);
       }
@@ -3201,11 +3197,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
           }
         }
       }
-      return super.update({
-        items: acsResources,
-        total_count: acsResources.length,
-        subject,
-      }, context);
+      return super.update(request, context);
     }
   }
 
@@ -3236,11 +3228,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     }
 
     if (acsResponse.decision === Response_Decision.PERMIT) {
-      return super.upsert({
-        items: acsResources,
-        total_count: acsResources.length,
-        subject,
-      }, context);
+      return super.upsert(request, context);
     }
   }
 
@@ -3327,16 +3315,19 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
    * @param entity entity name
    * @param action resource action
    */
-  async createMetadata<T extends Resource>(res: T | T[], action: string, subject?: Subject): Promise<T[]> {
-    let resources = _.cloneDeep(res);
-    let orgOwnerAttributes = [];
-    if (!_.isArray(resources)) {
+  async createMetadata<T extends Resource>(resources: T | T[], action: string, subject?: Subject): Promise<T[]> {
+    const urns = this.cfg.get('authorization:urns');
+    if (!Array.isArray(resources)) {
       resources = [resources];
     }
-    const urns = this.cfg.get('authorization:urns');
-    if (subject && subject.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
-      // add user and subject scope as default owners
-      orgOwnerAttributes.push(
+
+    const orgOwnerAttributes = (
+      subject?.scope
+      && (
+        action === AuthZAction.CREATE
+        || action === AuthZAction.MODIFY
+      )
+    ) ? [
         {
           id: urns.ownerIndicatoryEntity,
           value: urns.organization,
@@ -3344,75 +3335,84 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
             id: urns.ownerInstance,
             value: subject.scope
           }]
-        });
+        }
+      ]
+      : [];
+
+    const setDefaultMeta = (resource: T) => {
+      if (!resource.id?.length) {
+        resource.id = uuid.v4().replace(/-/g, '');
+      }
+
+      resource.meta = {
+        owners: [
+          ...orgOwnerAttributes
+        ]
+      };
+
+      if (subject?.id) {
+        resource.meta.owners.push(
+          {
+            id: urns.ownerIndicatoryEntity,
+            value: urns.user,
+            attributes: [{
+              id: urns.ownerInstance,
+              value: resource.id
+            }]
+          }
+        );
+      }
+    };
+
+    if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
+      const ids = [
+        ...new Set(
+          resources.map(
+            r => r.id
+          ).filter(
+            id => id
+          )
+        ).values()
+      ];
+      const filters = ReadRequest.fromPartial({
+        filters: [
+          {
+            filters: [
+              {
+                field: 'id',
+                operation: Filter_Operation.in,
+                value: JSON.stringify(ids),
+                type: Filter_ValueType.ARRAY
+              }
+            ]
+          }
+        ],
+        limit: ids.length
+      });
+
+      const result_map = await super.read(filters, {}).then(
+        resp => new Map(
+          resp.items?.map(
+            item => [item.payload?.id, item?.payload]
+          )
+        )
+      );
+
+      for (let resource of resources) {
+        if (result_map.has(resource?.id)) {
+          resource.meta = result_map.get(resource?.id).meta;
+        }
+        else {
+          setDefaultMeta(resource);
+        }
+      }
+    }
+    else if (action === AuthZAction.CREATE) {
+      for (let resource of resources) {
+        setDefaultMeta(resource);
+      }
     }
 
-    for (let resource of resources) {
-      if (!resource.meta) {
-        resource.meta = {};
-      }
-      if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
-        const filters = [{
-          filters: [{
-            field: 'id',
-            operation: Filter_Operation.eq,
-            value: resource.id
-          }]
-        }];
-        let result = await super.read(ReadRequest.fromPartial({
-          filters
-        }), {});
-        // update owners info
-        if (result?.items?.length === 1) {
-          let item = result.items[0].payload;
-          resource.meta.owners = item.meta.owners;
-        } else if (result?.items?.length === 0) {
-          if (_.isEmpty(resource.id)) {
-            resource.id = uuid.v4().replace(/-/g, '');
-          }
-          let ownerAttributes;
-          if (!resource.meta.owners) {
-            ownerAttributes = _.cloneDeep(orgOwnerAttributes);
-          } else {
-            ownerAttributes = resource.meta.owners;
-          }
-          if (subject && subject.id) {
-            ownerAttributes.push(
-              {
-                id: urns.ownerIndicatoryEntity,
-                value: urns.user,
-                attributes: [{
-                  id: urns.ownerInstance,
-                  value: resource.id
-                }]
-              });
-          }
-          resource.meta.owners = ownerAttributes;
-        }
-      } else if (action === AuthZAction.CREATE && !resource.meta.owners) {
-        if (_.isEmpty(resource.id)) {
-          resource.id = uuid.v4().replace(/-/g, '');
-        }
-        let ownerAttributes;
-        if (!resource.meta.owners) {
-          ownerAttributes = _.cloneDeep(orgOwnerAttributes);
-        } else {
-          ownerAttributes = resource.meta.owners;
-        }
-        if (subject && subject.id) {
-          ownerAttributes.push(
-            {
-              id: urns.ownerIndicatoryEntity,
-              value: urns.user,
-              attributes: [{
-                id: urns.ownerInstance,
-                value: subject.id
-              }]
-            });
-        }
-        resource.meta.owners = ownerAttributes;
-      }
-    }
     return resources;
   }
 
