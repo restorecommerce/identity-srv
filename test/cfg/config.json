@@ -372,5 +372,6 @@
         "access_token_path": "https://oauth2.googleapis.com/token"
       }
     }
-  }
+  },
+  "seed_account_file": "./test/seed-accounts.json"
 }

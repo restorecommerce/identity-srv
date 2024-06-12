@@ -565,6 +565,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     return super.read(request, context);
   }
 
+  superUpsert(request: UserList, context: any): Promise<DeepPartial<UserListResponse>> {
+    return super.upsert(request, context);
+  }
+
   /**
    * Extends ServiceBase.create()
    */

@@ -17,7 +17,7 @@ import { BindConfig } from '@restorecommerce/chassis-srv/lib/microservice/transp
 import { HealthDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/health/v1/health.js';
 import {
   UserServiceDefinition,
-  protoMetadata as userMeta
+  protoMetadata as userMeta, UserList
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   protoMetadata as jobMeta
@@ -348,6 +348,47 @@ export class Worker {
         readiness: async () => !!await (db as Arango).db.version()
       })
     } as BindConfig<HealthDefinition>);
+
+    // Import static seed accounts
+    const seedAccountFile = this.cfg.get('seed_account_file');
+    if (seedAccountFile) {
+      this.logger.info('Loading seed account file:', seedAccountFile);
+      await new Promise<void>((resolve, reject) => {
+        fs.readFile(seedAccountFile, (err, data) => {
+          if (err) {
+            this.logger.error('Failed loading seed account file:', err);
+            reject(err);
+            return;
+          }
+
+          const seedAccounts = JSON.parse(data.toString());
+          this.logger.info(`Loaded ${seedAccounts.length} seed accounts`);
+
+          const defaultSeedAccount = seedAccounts.find((p: any) => p?.tokens?.find((t: any) => t?.default_technical_token));
+          if (!defaultSeedAccount) {
+            logger.error('Failed to find default seed account');
+            reject(new Error('Failed to find default seed account'));
+          }
+
+          this.userService.superUpsert(UserList.fromPartial({
+            items: seedAccounts,
+          }), undefined)
+            .then(() => {
+              this.logger.info('Loading default seed account token into redis');
+
+              const token = defaultSeedAccount.tokens.find((t: any) => t.default_technical_token).token;
+
+              cis.redisClient.set('default_account_api_token', token)
+                .then(() => resolve())
+                .catch(reject);
+            })
+            .catch(err => {
+              this.logger.error('Failed upserting seed account file:', err);
+              reject(err);
+            });
+        });
+      });
+    }
 
     // Start server
     await server.start();
