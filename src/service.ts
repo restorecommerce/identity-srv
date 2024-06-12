@@ -2873,7 +2873,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       );
 
       for (let resource of resources) {
-        if (result_map.has(resource?.id)) {
+        if (!resource.meta && result_map.has(resource?.id)) {
           resource.meta = result_map.get(resource?.id).meta;
         }
         else {
@@ -3414,7 +3414,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
       );
 
       for (let resource of resources) {
-        if (result_map.has(resource?.id)) {
+        if (!resource.meta && result_map.has(resource?.id)) {
           resource.meta = result_map.get(resource?.id).meta;
         }
         else {
