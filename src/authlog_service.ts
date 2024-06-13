@@ -25,8 +25,6 @@ import {
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
 
 export class AuthenticationLogService extends ServiceBase<AuthenticationLogListResponse, AuthenticationLogList> implements AuthenticationLogServiceImplementation {
-
-  logger: Logger;
   cfg: any;
   authZ: ACSAuthZ;
 
@@ -46,7 +44,6 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
       }
     }
     super('authentication_log', authLogTopic, logger, new ResourcesAPIBase(db, 'authentication_logs', resourceFieldConfig), isEventsEnabled);
-    this.logger = logger;
     this.authZ = authZ;
     this.cfg = cfg;
   }
@@ -72,7 +69,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         subject: request.subject,
         resources: []
       }, [{ resource: 'authentication_log' }], AuthZAction.READ, Operation.whatIsAllowed) as PolicySetRQResponse;
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for authentication_log read', err);
       return returnOperationStatus(err.code, err.message);
     }
@@ -108,7 +105,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         subject: request.subject,
         resources: items
       }, [{ resource: 'authentication_log', id: items.map(e => e.id) }], AuthZAction.MODIFY, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for authentication_log update', err);
       return returnOperationStatus(err.code, err.message);
     }
@@ -152,7 +149,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
               subject: request.subject,
               resources: auth_log
             }, [{ resource: 'authentication_log', id: auth_log.id }], AuthZAction.MODIFY, Operation.isAllowed, false);
-          } catch (err) {
+          } catch (err: any) {
             this.logger.error('Error occurred requesting access-control-srv for authentication_log update', err);
             return returnOperationStatus(err.code, err.message);
           }
@@ -181,7 +178,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         subject: request.subject,
         resources: request.items
       }, [{ resource: 'authentication_log', id: request?.items?.map(e => e?.id) }], AuthZAction.MODIFY, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for authentication_log upsert', err);
       return returnOperationStatus(err.code, err.message);
     }
@@ -218,7 +215,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         subject: request.subject,
         resources: acsResources
       }, [{ resource: 'authentication_log', id: authLogIDs }], AuthZAction.DELETE, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for authentication_log delete', err);
       return returnOperationStatus(err.code, err.message);
     }

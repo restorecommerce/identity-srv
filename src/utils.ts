@@ -1,7 +1,8 @@
-import {
-  AuthZAction, accessRequest, DecisionResponse, Operation, PolicySetRQResponse, ACSClientContext
-} from '@restorecommerce/acs-client';
 import * as _ from 'lodash-es';
+import {
+  AuthZAction, accessRequest, DecisionResponse, Operation, PolicySetRQResponse, ACSClientContext,
+  ACSClientOptions
+} from '@restorecommerce/acs-client';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { createClient, createChannel } from '@restorecommerce/grpc-client';
 import { createLogger } from '@restorecommerce/logger';
@@ -9,7 +10,8 @@ import bcrypt from 'bcryptjs';
 import {
   DeepPartial,
   FilterOp, FilterOp_Operator,
-  Filter_Operation
+  Filter_Operation,
+  Resource
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 import {
   UserServiceDefinition,
@@ -19,6 +21,7 @@ import {
   Response_Decision
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
+import { UserService } from './service.js';
 
 // Create a ids client instance
 let idsClientInstance: UserServiceClient;
@@ -40,14 +43,75 @@ export const getUserServiceClient = (): UserServiceClient => {
   return idsClientInstance;
 };
 
-export interface Resource {
+export interface ACSResource {
   resource: string;
   id?: string | string[]; // for what is allowed operation id is not mandatory
   property?: string[];
 }
 
-export async function checkAccessRequest(ctx: ACSClientContext, resource: Resource[], action: AuthZAction, operation: Operation.isAllowed, useCache?: boolean): Promise<DecisionResponse>;
-export async function checkAccessRequest(ctx: ACSClientContext, resource: Resource[], action: AuthZAction, operation: Operation.whatIsAllowed, useCache?: boolean): Promise<PolicySetRQResponse>;
+/* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
+export async function resolveSubject(subject: Subject) {
+  if (subject) {
+    const idsClient = getUserServiceClient();
+    const resp = await idsClient?.findByToken({ token: subject.token });
+    if (resp?.payload?.id) {
+      subject.id = resp.payload.id;
+    }
+  }
+  return subject;
+}
+
+/**
+ * reads metadata from DB and updates owner information in resource if action is UPDATE / DELETE
+ */
+export const createMetadata = async <T extends Resource>(
+  resources: T | T[],
+  urns: any,
+  subject?: Subject
+): Promise<T[]> => {
+  if (!Array.isArray(resources)) {
+    resources = [resources];
+  }
+
+  let orgOwnerAttributes = [];
+  for (let resource of resources ?? []) {
+    if (!resource.meta) {
+      resource.meta = {};
+      if (subject?.id) {
+        orgOwnerAttributes.push(
+          {
+            id: urns.ownerIndicatoryEntity,
+            value: urns.user,
+            attributes: [{
+              id: urns.ownerInstance,
+              value: subject.id
+            }]
+          }
+        );
+      } else if (subject?.token) {
+        // when no subjectID is provided find the subjectID using findByToken
+        subject = await resolveSubject(subject);
+        if (subject?.id) {
+          orgOwnerAttributes.push(
+            {
+              id: urns.ownerIndicatoryEntity,
+              value: urns.user,
+              attributes: [{
+                id: urns.ownerInstance,
+                value: subject.id
+              }]
+            });
+        }
+      }
+      resource.meta.owners = orgOwnerAttributes;
+    }
+  }
+
+  return resources;
+};
+
+export async function checkAccessRequest(ctx: ACSClientContext, resource: ACSResource[], action: AuthZAction, operation: Operation.isAllowed, useCache?: boolean): Promise<DecisionResponse>;
+export async function checkAccessRequest(ctx: ACSClientContext, resource: ACSResource[], action: AuthZAction, operation: Operation.whatIsAllowed, useCache?: boolean): Promise<PolicySetRQResponse>;
 
 /**
  * Perform an access request using inputs from a GQL request
@@ -57,26 +121,30 @@ export async function checkAccessRequest(ctx: ACSClientContext, resource: Resour
  * @param action The action to perform
  * @param entity The entity type to check access against
  */
-/* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
-export async function checkAccessRequest(ctx: ACSClientContext, resource: Resource[], action: AuthZAction,
-  operation: Operation, useCache = true): Promise<DecisionResponse | PolicySetRQResponse> {
+export async function checkAccessRequest(
+  ctx: ACSClientContext,
+  resource: ACSResource[],
+  action: AuthZAction,
+  operation: Operation,
+  useCache = true
+): Promise<DecisionResponse | PolicySetRQResponse> {
   const subject = ctx.subject as Subject;
-  let dbSubject;
   // resolve subject id using findByToken api and update subject with id
-  if (subject && subject.token) {
-    const idsClient = await getUserServiceClient();
-    if (idsClient) {
-      dbSubject = await idsClient.findByToken({ token: subject.token });
-      if (dbSubject && dbSubject.payload && dbSubject.payload.id) {
-        subject.id = dbSubject.payload.id;
-      }
-    }
+  if (!subject?.id && subject?.token) {
+    await resolveSubject(subject);
   }
 
   let result: DecisionResponse | PolicySetRQResponse;
   try {
-    result = await accessRequest(subject, resource, action, ctx, { operation, useCache, roleScopingEntityURN: cfg?.get('authorization:urns:roleScopingEntityURN') });
-  } catch (err) {
+    result = await accessRequest(
+      subject, resource, action, ctx,
+      {
+        operation,
+        useCache,
+        roleScopingEntityURN: cfg?.get('authorization:urns:roleScopingEntityURN')
+      } as ACSClientOptions
+    );
+  } catch (err: any) {
     return {
       decision: Response_Decision.DENY,
       operation_status: {

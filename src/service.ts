@@ -9,6 +9,7 @@ import {
   getNameFilter,
   marshallProtobufAny,
   password,
+  resolveSubject,
   returnCodeMessage,
   returnOperationStatus,
   returnStatus,
@@ -580,8 +581,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     };
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
-    let subject = request.subject;
     // update meta data for owners information
+    const subject = await resolveSubject(request.subject);
     const acsResources = await this.createMetadata(usersList, AuthZAction.CREATE, subject);
     let acsResponse: DecisionResponse;
     try {
@@ -1772,8 +1773,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return returnOperationStatus(400, 'No items were provided for update');
     }
     let items = request.items;
-    let subject = request.subject;
     // update meta data for owners information
+    const subject = await resolveSubject(request.subject);
     const acsResources = await this.createMetadata(request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
@@ -2093,7 +2094,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     let usersList = request.items;
-    let subject = request.subject;
+    const subject = await resolveSubject(request.subject);
     const acsResources = await this.createMetadata(request.items, AuthZAction.MODIFY, subject);
     let acsResponse: PolicySetRQResponse;
     try {
@@ -2254,7 +2255,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const logger = this.logger;
     const identifier = request.identifier;
     logger.silly('unregister', identifier);
-    let subject = request.subject;
 
     const filters = getDefaultFilter(identifier);
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
@@ -2266,7 +2266,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return returnOperationStatus(400, `Invalid identifier provided for unregistering, multiple users found for identifier ${identifier}`);
     }
 
-    let resources = users.items.map((e) => e.payload);
+    const resources = users.items.map((e) => e.payload);
+    const subject = await resolveSubject(request.subject);
     const acsResources = await this.createMetadata(resources, AuthZAction.DELETE, subject);
     let acsResponse: DecisionResponse;
     try {
@@ -2301,11 +2302,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * Endpoint delete, to delete a user or list of users
    */
   async delete(request: DeleteRequest, context: any): Promise<DeepPartial<DeleteResponse>> {
-    const logger = this.logger;
-    let userIDs = request.ids;
     let resources = [];
+    const logger = this.logger;
+    const userIDs = request.ids;
     let acsResources = new Array<any>();
-    let subject = request.subject;
+    const subject = await resolveSubject(request.subject);
     let action;
     if (userIDs) {
       action = AuthZAction.DELETE;
@@ -2317,7 +2318,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         resources = [{ id: userIDs }];
       }
       Object.assign(resources, { id: userIDs });
-      acsResources = await this.createMetadata(resources, action, subject);
+      acsResources = await this.createMetadata<any>(resources, action, subject);
     }
     if (request.collection) {
       action = AuthZAction.DROP;
@@ -3092,7 +3093,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     if (!request || !request.items || request?.items?.length == 0) {
       return returnOperationStatus(400, 'No role was provided for creation');
     }
-    let subject = request.subject;
+    const subject = await resolveSubject(request.subject);
     const acsResources = await this.createMetadata(request.items, AuthZAction.CREATE, subject);
     let acsResponse: DecisionResponse;
     try {
@@ -3158,8 +3159,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     }
 
     const items = request.items;
-    let subject = request.subject;
-    // update owners information
+    const subject = await resolveSubject(request.subject);
     const acsResources = await this.createMetadata(request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
@@ -3230,7 +3230,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
       return returnOperationStatus(400, 'No items were provided for upsert');
     }
 
-    let subject = request.subject;
+    const subject = await resolveSubject(request.subject);
     const acsResources = await this.createMetadata(request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
@@ -3260,8 +3260,8 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     const logger = this.logger;
     let roleIDs = request.ids;
     let resources = {};
-    let subject = request.subject;
     let acsResources;
+    const subject = await resolveSubject(request.subject);
     if (!_.isEmpty(roleIDs)) {
       Object.assign(resources, { id: roleIDs });
       acsResources = await this.createMetadata<any>({ id: roleIDs }, AuthZAction.DELETE, subject);

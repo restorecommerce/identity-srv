@@ -1,10 +1,9 @@
+import * as _ from 'lodash-es';
 import { Logger } from 'winston';
 import { ACSAuthZ, AuthZAction, DecisionResponse, Operation, PolicySetRQResponse } from '@restorecommerce/acs-client';
-import { checkAccessRequest } from './utils.js';
-import * as _ from 'lodash-es';
+import { checkAccessRequest, createMetadata } from './utils.js';
 import { UserService } from './service.js';
 import * as uuid from 'uuid';
-import { createMetadata } from './common.js';
 import {
   DeepPartial, GrantId,
   Identifier,
@@ -20,6 +19,7 @@ import {
   Response_Decision
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 import { Filter_Operation, ReadRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
+import { Tokens } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
 
 const unmarshallProtobufAny = (msg: Any): any => JSON.parse(msg.value.toString());
 
@@ -33,22 +33,17 @@ const marshallProtobufAny = (msg: any): Any => {
 };
 
 export class TokenService implements TokenServiceImplementation {
-  logger: Logger;
-  cfg: any;
-  authZ: ACSAuthZ;
-  userService: UserService;
-  constructor(cfg: any, logger: any, authZ: ACSAuthZ, userService: UserService) {
-    this.logger = logger;
-    this.authZ = authZ;
-    this.cfg = cfg;
-    this.userService = userService;
-  }
+  constructor(
+    private readonly cfg: any,
+    private readonly logger: any,
+    private readonly userService: UserService
+  ) {}
 
   /**
    * Store / Upsert accessToken Data to User entity
    *
   **/
-  async upsert(request: TokenData, context): Promise<DeepPartial<Any>> {
+  async upsert(request: TokenData, context: any): Promise<DeepPartial<Any>> {
     if (!request || !request.id) {
       const response = { status: { code: 400, message: 'No id was provided for create / upsert' } };
       return marshallProtobufAny(response);
@@ -71,7 +66,7 @@ export class TokenService implements TokenServiceImplementation {
       const userData = await this.userService.superRead(ReadRequest.fromPartial({ filters }), {});
       if (userData?.items?.length > 0) {
         let user = userData.items[0].payload;
-        let expiredTokenList = [];
+        let expiredTokenList = new Array<Tokens>();
         if (user?.tokens?.length > 0) {
           // remove expired tokens
           expiredTokenList = (user.tokens).filter(obj => {
@@ -103,7 +98,7 @@ export class TokenService implements TokenServiceImplementation {
           this.logger.debug('Removing expired token list', expiredTokenList);
           await this.userService.updateUserTokens(user.id, token, expiredTokenList);
           this.logger.info('Token updated successfully on user entity', { token, id: user.id });
-        } catch (err) {
+        } catch (err: any) {
           this.logger.error('Error Updating Token', err);
         }
         response = {
@@ -121,7 +116,7 @@ export class TokenService implements TokenServiceImplementation {
         };
       }
       return marshallProtobufAny(response);
-    } catch (err) {
+    } catch (err: any) {
       response = {
         status: {
           code: err.code,
@@ -136,7 +131,7 @@ export class TokenService implements TokenServiceImplementation {
   /**
    * Find access token data from User entity by tokenID
   **/
-  async find(request: Identifier, context): Promise<Any> {
+  async find(request: Identifier, context: any): Promise<Any> {
     const subject = request.subject;
     if (!request || !request.id) {
       const response = { status: { code: 400, message: 'No id was provided for find' } };
@@ -149,7 +144,7 @@ export class TokenService implements TokenServiceImplementation {
         subject,
         resources: []
       }, [{ resource: 'token' }], AuthZAction.READ, Operation.whatIsAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for token find', err);
       const response = { status: { code: err.code, message: err.message } };
       return marshallProtobufAny(response);
@@ -197,18 +192,18 @@ export class TokenService implements TokenServiceImplementation {
   /**
    * Delete access token data from User entity
   **/
-  async destroy(request: Identifier, context): Promise<DeepPartial<Any>> {
+  async destroy(request: Identifier, context: any): Promise<DeepPartial<Any>> {
     if (!request || !request.id) {
       const response = { status: { code: 400, message: 'Key was not provided for delete operation' } };
       return marshallProtobufAny(response);
     }
     context.subject = request.subject;
-    const resources = await createMetadata(request, this.cfg.get('authorization:urns'), this.userService, request.subject);
+    const resources = await createMetadata(request, this.cfg.get('authorization:urns'), request.subject);
     context.resources = resources;
     let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest(context, [{ resource: 'token', id: request.id }], AuthZAction.DELETE, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for token destroy', err);
       const response = { status: { code: err.code, message: err.message } };
       return marshallProtobufAny(response);
@@ -266,7 +261,7 @@ export class TokenService implements TokenServiceImplementation {
             response = { status: { code: 404, message: `Token ${request.id} not found` } };
           }
         }
-      } catch (err) {
+      } catch (err: any) {
         this.logger.error(response);
         response = {
           status: {
@@ -283,7 +278,7 @@ export class TokenService implements TokenServiceImplementation {
   /**
   * Consume access token
   **/
-  async consume(request: Identifier, context): Promise<DeepPartial<Any>> {
+  async consume(request: Identifier, context: any): Promise<DeepPartial<Any>> {
     if (!request || !request.id) {
       const response = { status: { code: 400, message: 'ID was not provided for consume operation' } };
       return marshallProtobufAny(response);
@@ -299,7 +294,7 @@ export class TokenService implements TokenServiceImplementation {
         },
         resources: []
       }, [{ resource: 'token' }], AuthZAction.READ, Operation.whatIsAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for token consume', err);
       const response = { status: { code: err.code, message: err.message } };
       return marshallProtobufAny(response);
@@ -322,7 +317,7 @@ export class TokenService implements TokenServiceImplementation {
       };
       let response = { status: { code: 200, message: `AccessToken with ID ${request.id} consumed` } };
       return marshallProtobufAny(response);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error consuming token', { message: err.message });
       let response = { status: { code: err.code, message: err.message } };
       return marshallProtobufAny(response);
@@ -333,7 +328,7 @@ export class TokenService implements TokenServiceImplementation {
   * Delete access token data using grant_id
   *
   **/
-  async revokeByGrantId(request: GrantId, context): Promise<DeepPartial<Any>> {
+  async revokeByGrantId(request: GrantId, context: any): Promise<DeepPartial<Any>> {
     if (!request || !request.grant_id) {
       const response = { status: { code: 400, message: 'GrantId was not provided for revoke operation' } };
       return marshallProtobufAny(response);
@@ -346,14 +341,14 @@ export class TokenService implements TokenServiceImplementation {
       tokens = JSON.parse(tokens);
     }
     Object.assign(subject, { tokens });
-    const resources = await createMetadata(request, this.cfg.get('authorization:urns'), this.userService, subject);
+    const resources = await createMetadata<any>(request, this.cfg.get('authorization:urns'), subject);
     let acsResponse: DecisionResponse;
     try {
       if (!context) { context = {}; };
       context.subject = subject;
       context.resources = resources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'token', id: request.grant_id }], AuthZAction.DELETE, Operation.isAllowed);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for token revoke by grant id', err);
       const response = { status: { code: err.code, message: err.message } };
       return marshallProtobufAny(response);

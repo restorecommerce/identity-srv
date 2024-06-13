@@ -95,7 +95,7 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
       return { operation_status: { code: 200, message: 'No inactivated user accounts found' } };
     }
 
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error in delete_expired_users_job', {code: error.code, message: error.message, stack: error.stack });
     return { operation_status: { code: 500, message: 'Internal Server Error' } };
   }

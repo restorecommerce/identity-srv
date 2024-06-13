@@ -13,7 +13,7 @@ import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arang
 import 'source-map-support/register.js';
 import { OAuthService } from './oauth_service.js';
 import { OAuthServiceDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/oauth.js';
-import { BindConfig } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc.js';
+import { BindConfig } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc/index.js';
 import { HealthDefinition } from '@restorecommerce/rc-grpc-clients/dist/generated-server/grpc/health/v1/health.js';
 import {
   UserServiceDefinition,
@@ -78,7 +78,7 @@ class UserCommandInterface extends chassis.CommandInterface {
         config: any, eventName: string): Promise<any> {
         try {
           await db.delete(`${resource}s`, { id: message.id });
-        } catch (err) {
+        } catch (err: any) {
           that.logger.error('Exception caught while restoring unregistered User',
             message);
         }
@@ -89,7 +89,7 @@ class UserCommandInterface extends chassis.CommandInterface {
         try {
           await db.update(`${resource}s`, { id: message.id },
             message);
-        } catch (err) {
+        } catch (err: any) {
           that.logger.error('Exception caught while restoring modified User',
             message);
         }
@@ -99,7 +99,7 @@ class UserCommandInterface extends chassis.CommandInterface {
         config: any, eventName: string): Promise<any> {
         try {
           await db.insert(`${resource}s`, message);
-        } catch (err) {
+        } catch (err: any) {
           that.logger.error('Exception caught while restoring registered User',
             message);
         }
@@ -109,7 +109,7 @@ class UserCommandInterface extends chassis.CommandInterface {
         config: any, eventName: string): Promise<any> {
         try {
           await db.insert(`${resource}s`, message);
-        } catch (err) {
+        } catch (err: any) {
           that.logger.error('Exception caught while restoring registered User',
             message);
         }
@@ -195,7 +195,7 @@ export class Worker {
     let externalJobFiles;
     try {
       externalJobFiles = fs.readdirSync(process.env.EXTERNAL_JOBS_DIR || './lib/jobs');
-    } catch (err) {
+    } catch (err: any) {
       if (err.message.includes('no such file or directory')) {
         logger.info('No files for external job processors found');
       } else {
@@ -288,7 +288,7 @@ export class Worker {
     const authLogService = new AuthenticationLogService(cfg, db, this.topics['authlog.resource'], logger, true, this.authZ);
 
     // token service
-    const tokenService = new TokenService(cfg, logger, this.authZ, this.userService);
+    const tokenService = new TokenService(cfg, logger, this.userService);
 
     // oauth service
     const oauthServices = cfg.get('oauth:services');

@@ -1,6 +1,6 @@
 import { Logger } from 'winston';
 import { OAuth2 } from 'oauth';
-import { checkAccessRequest } from './utils.js';
+import { checkAccessRequest, createMetadata } from './utils.js';
 import { UserService } from './service.js';
 import { AuthZAction, Operation } from '@restorecommerce/acs-client';
 import * as _ from 'lodash-es';
@@ -15,7 +15,6 @@ import {
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/oauth.js';
 import { Empty } from '@restorecommerce/rc-grpc-clients/dist/generated/google/protobuf/empty.js';
 import { WithRequestID } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc/middlewares.js';
-import { createMetadata } from './common.js';
 import { FindByTokenRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   Filter_Operation,
@@ -88,13 +87,13 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
     }
   }
 
-  async availableServices(request: Empty, context): Promise<DeepPartial<ServicesResponse>> {
+  async availableServices(request: Empty, context: any): Promise<DeepPartial<ServicesResponse>> {
     return {
       services: Object.keys(this.clients)
     };
   }
 
-  async generateLinks(request: Empty, context): Promise<DeepPartial<GenerateLinksResponse>> {
+  async generateLinks(request: Empty, context: any): Promise<DeepPartial<GenerateLinksResponse>> {
     const nonce = 'nonce'; // TODO Generate, store and compare unique nonce
     return {
       links: Object.entries(this.clients).reduce((result, entry) => {
@@ -111,7 +110,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
     };
   }
 
-  async exchangeCode(request: ExchangeCodeRequest, context): Promise<DeepPartial<ExchangeCodeResponse>> {
+  async exchangeCode(request: ExchangeCodeRequest, context: any): Promise<DeepPartial<ExchangeCodeResponse>> {
     const oauthService = request.service;
     if (!(oauthService in this.clients)) {
       throw new Error('Unknown service: ' + oauthService);
@@ -174,7 +173,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         {
           ...context,
           subject: tokenTechUser,
-          resources: await createMetadata(request, this.cfg.get('authorization:urns'), this.userService, tokenTechUser)
+          resources: await createMetadata<any>(request, this.cfg.get('authorization:urns'), tokenTechUser)
         },
         [{ resource: 'token', id: context.id }], AuthZAction.MODIFY, Operation.isAllowed
       );
@@ -189,7 +188,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
           }
         };
       }
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for token upsert', err);
       return { user: { status: { code: err.code, message: err.message } } };
     }
@@ -249,7 +248,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       // append auth token on user entity
       await this.userService.updateUserTokens(user.id, authToken);
       this.logger.info('Token updated successfully on user entity', { id: user.id });
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error Updating Token', err);
       return { user: { status: { code: err.code, message: err.message } } };
     }
@@ -259,7 +258,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
     return { email, user: { payload: user, status: { code: 200, message: 'success' } }, token: authToken };
   }
 
-  async getToken(request: GetTokenRequest, context): Promise<DeepPartial<GetTokenResponse>> {
+  async getToken(request: GetTokenRequest, context: any): Promise<DeepPartial<GetTokenResponse>> {
     const oauthService = request.service;
     if (!(oauthService in this.clients)) {
       throw new Error('Unknown service: ' + oauthService);
@@ -339,7 +338,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       // append access token on user entity
       await this.userService.updateUserTokens(user.payload.id, newAccessToken, toRemove);
       this.logger.info('Token updated successfully on user entity', {id: user.payload.id});
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error('Error Updating Token', err);
       return {status: {code: err.code, message: err.message}};
     }
