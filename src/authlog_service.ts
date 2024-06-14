@@ -1,5 +1,6 @@
+import * as _ from 'lodash-es';
+import * as uuid from 'uuid';
 import { ServiceBase, ResourcesAPIBase } from '@restorecommerce/resource-base-interface';
-import { Logger } from 'winston';
 import {
   ACSAuthZ,
   AuthZAction,
@@ -8,8 +9,7 @@ import {
   Operation
 } from '@restorecommerce/acs-client';
 import { Topic } from '@restorecommerce/kafka-client';
-import { checkAccessRequest, returnOperationStatus } from './utils.js';
-import * as _ from 'lodash-es';
+import { checkAccessRequest, resolveSubject, returnOperationStatus } from './utils.js';
 import {
   AuthenticationLogServiceImplementation,
   AuthenticationLogListResponse,
@@ -17,12 +17,14 @@ import {
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/authentication_log.js';
 import {
   DeepPartial, DeleteRequest, DeleteResponse, ReadRequest,
+  Resource,
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 import {
   Response_Decision
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
+import { Filter_ValueType } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/filter.js';
 
 export class AuthenticationLogService extends ServiceBase<AuthenticationLogListResponse, AuthenticationLogList> implements AuthenticationLogServiceImplementation {
   cfg: any;
@@ -53,7 +55,8 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
       return returnOperationStatus(400, 'No role was provided for creation');
     }
 
-    request.items = await this.createMetadata(request.items, AuthZAction.CREATE, request.subject);
+    const subject = await resolveSubject(request.subject);
+    request.items = await this.createMetadata(request.items, AuthZAction.CREATE, subject);
     return super.create(request, context);
   }
 
@@ -97,12 +100,13 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
     }
 
     // update owners information
-    let items = await this.createMetadata(request.items, AuthZAction.MODIFY, request.subject);
+    const subject = await resolveSubject(request.subject);
+    let items = await this.createMetadata(request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest({
         ...context,
-        subject: request.subject,
+        subject,
         resources: items
       }, [{ resource: 'authentication_log', id: items.map(e => e.id) }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err: any) {
@@ -170,12 +174,13 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
       return returnOperationStatus(400, 'No items were provided for upsert');
     }
 
-    request.items = await this.createMetadata(request.items, AuthZAction.MODIFY, request.subject);
+    const subject = await resolveSubject(request.subject);
+    request.items = await this.createMetadata(request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest({
         ...context,
-        subject: request.subject,
+        subject,
         resources: request.items
       }, [{ resource: 'authentication_log', id: request?.items?.map(e => e?.id) }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err: any) {
@@ -199,11 +204,11 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
     const logger = this.logger;
     let authLogIDs = request.ids;
     let resources = {};
-    let subject = request.subject;
     let acsResources;
+    const subject = await resolveSubject(request.subject);
     if (authLogIDs) {
       Object.assign(resources, { id: authLogIDs });
-      acsResources = await this.createMetadata({ id: authLogIDs }, AuthZAction.DELETE, subject);
+      acsResources = await this.createMetadata<any>({ id: authLogIDs }, AuthZAction.DELETE, subject);
     }
     if (request?.collection) {
       acsResources = [{ collection: request.collection }];
@@ -260,74 +265,98 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
    * @param entity entity name
    * @param action resource action
    */
-  async createMetadata(res: any, action: string, subject?: Subject): Promise<any> {
-    let resources = _.cloneDeep(res);
-    let orgOwnerAttributes = [];
-    if (!_.isArray(resources)) {
+  async createMetadata<T extends Resource>(resources: T | T[], action: string, subject?: Subject): Promise<T[]> {
+    const urns = this.cfg.get('authorization:urns');
+    if (!Array.isArray(resources)) {
       resources = [resources];
     }
-    const urns = this.cfg.get('authorization:urns');
-    if (subject?.scope && (action === AuthZAction.CREATE || action === AuthZAction.MODIFY)) {
-      // add user and subject scope as default owners
-      orgOwnerAttributes.push(
-        {
-          id: urns.ownerIndicatoryEntity,
-          value: urns.organization,
-          attributes: [{
-            id: urns.ownerInstance,
-            value: subject.scope
-          }]
-        });
-    }
 
-    for (let resource of resources || []) {
+    const setDefaultMeta = (resource: T) => {
+      if (!resource.id?.length) {
+        resource.id = uuid.v4().replace(/-/g, '');
+      }
+
       if (!resource.meta) {
         resource.meta = {};
-      }
-      if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
-        const filters = [{
-          filters: [{
-            field: 'id',
-            operation: Filter_Operation.eq,
-            value: resource?.id
-          }]
-        }];
-        let result = await super.read(ReadRequest.fromPartial({ filters }), context);
-        // update owners info
-        if (result?.items?.length === 1) {
-          let item = result.items[0].payload;
-          resource.meta.owners = item?.meta?.owners;
-        } else if (result?.items?.length === 0 && !resource?.meta?.owners) {
-          let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
-          if (subject?.id) {
-            ownerAttributes.push(
-              {
-                id: urns.ownerIndicatoryEntity,
-                value: urns.user,
-                attributes: [{
-                  id: urns.ownerInstance,
-                  value: subject.id
-                }]
-              });
-          }
-          resource.meta.owners = ownerAttributes;
+        resource.meta.owners = [];
+
+        if (subject?.scope) {
+          resource.meta.owners.push(
+            {
+              id: urns.ownerIndicatoryEntity,
+              value: urns.organization,
+              attributes: [{
+                id: urns.ownerInstance,
+                value: subject.scope
+              }]
+            }
+          );
         }
-      } else if (action === AuthZAction.CREATE && !resource.meta.owners) {
-        let ownerAttributes = _.cloneDeep(orgOwnerAttributes);
+
         if (subject?.id) {
-          ownerAttributes.push(
+          resource.meta.owners.push(
             {
               id: urns.ownerIndicatoryEntity,
               value: urns.user,
               attributes: [{
                 id: urns.ownerInstance,
-                value: subject?.id
+                value: subject.id
               }]
-            });
+            }
+          );
         }
-        resource.meta.owners = ownerAttributes;
+      }
+    };
+
+    if (action === AuthZAction.MODIFY || action === AuthZAction.DELETE) {
+      const ids = [
+        ...new Set(
+          resources.map(
+            r => r.id
+          ).filter(
+            id => id
+          )
+        ).values()
+      ];
+      const filters = ReadRequest.fromPartial({
+        filters: [
+          {
+            filters: [
+              {
+                field: 'id',
+                operation: Filter_Operation.in,
+                value: JSON.stringify(ids),
+                type: Filter_ValueType.ARRAY
+              }
+            ]
+          }
+        ],
+        limit: ids.length
+      });
+
+      const result_map = await super.read(filters, {}).then(
+        resp => new Map(
+          resp.items?.map(
+            item => [item.payload?.id, item?.payload]
+          )
+        )
+      );
+
+      for (let resource of resources) {
+        if (!resource.meta && result_map.has(resource?.id)) {
+          resource.meta = result_map.get(resource?.id).meta;
+        }
+        else {
+          setDefaultMeta(resource);
+        }
       }
     }
+    else if (action === AuthZAction.CREATE) {
+      for (let resource of resources) {
+        setDefaultMeta(resource);
+      }
+    }
+
     return resources;
   }
 }

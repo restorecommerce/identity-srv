@@ -22,6 +22,7 @@ import {
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
 import { UserService } from './service.js';
+import { OperationStatus, Status } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/status.js';
 
 // Create a ids client instance
 let idsClientInstance: UserServiceClient;
@@ -184,34 +185,33 @@ export const unmarshallProtobufAny = (msg: any, logger: any): any => {
   }
 };
 
-export const getDefaultFilter = (identifier: string): DeepPartial<FilterOp[]> => {
-  return [{
-    filters: [
-      {
-        field: 'name',
-        operation: Filter_Operation.eq,
-        value: identifier
-      },
-      {
-        field: 'email',
-        operation: Filter_Operation.eq,
-        value: identifier
-      }],
-    operator: FilterOp_Operator.or
-  }];
-};
-
-export const getNameFilter = (userName: string) => {
-  return [{
-    filters: [{
+export const getDefaultFilter = (identifier: string): DeepPartial<FilterOp[]> => [{
+  filters: [
+    {
       field: 'name',
       operation: Filter_Operation.eq,
-      value: userName
-    }]
-  }];
-};
+      value: identifier
+    },
+    {
+      field: 'email',
+      operation: Filter_Operation.eq,
+      value: identifier
+    }],
+  operator: FilterOp_Operator.or
+}];
 
-export const getLoginIdentifierFilter = (loginIdentifiers, value: string) => {
+export const getNameFilter = (userName: string) => [{
+  filters: [{
+    field: 'name',
+    operation: Filter_Operation.eq,
+    value: userName
+  }]
+}];
+
+export const getLoginIdentifierFilter = (
+  loginIdentifiers: any,
+  value: string
+): FilterOp[] => {
   if (typeof loginIdentifiers === 'string') {
     return [{
       filters: [{
@@ -220,54 +220,46 @@ export const getLoginIdentifierFilter = (loginIdentifiers, value: string) => {
         value
       }]
     }];
-  } else if (_.isArray(loginIdentifiers)) {
-    let filters = [{ filters: [], operator: FilterOp_Operator.or }];
-    for (let identifier of loginIdentifiers) {
-      filters[0].filters.push(
-        {
-          field: identifier,
+  } else if (Array.isArray(loginIdentifiers)) {
+    return [{
+      filters: loginIdentifiers.map(
+        field => ({
+          field,
           operation: Filter_Operation.eq,
           value
-        });
-    }
-    return filters;
+        })
+      ),
+      operator: FilterOp_Operator.or
+    }];
   }
 };
 
-export const returnOperationStatus = (code: number, message: string) => {
-  if (!code) {
-    code = 500; // defaults to internal server error if no code is provided
-  }
-  return {
-    operation_status: {
-      code,
-      message
-    }
-  };
-};
-
-export const returnStatus = (code: number, message: string, id?: string) => {
-  if (!code) {
-    code = 500; // defaults to internal server error if no code is provided
-  }
-  return {
-    status: {
-      id,
-      code,
-      message
-    }
-  };
-};
-
-export const returnCodeMessage = (code: number, message: string) => {
-  if (!code) {
-    code = 500; // defaults to internal server error if no code is provided
-  }
-  return {
-    code,
+export const returnOperationStatus = (code: number, message: string) => ({
+  operation_status: {
+    code: code ?? 500,
     message
-  };
-};
+  } as OperationStatus
+});
+
+export const returnStatus = (
+  code: number,
+  message: string,
+  id?: string
+) => ({
+  status: {
+    id,
+    code: code ?? 500,
+    message
+  } as Status
+});
+
+export const returnCodeMessage = (
+  code: number,
+  message: string
+): OperationStatus => ({
+  code: code ?? 500,
+  message
+});
 
 interface CodeIdMsgObj {
   code: number;
@@ -275,13 +267,11 @@ interface CodeIdMsgObj {
   id?: string;
 }
 
-export const returnStatusArray = (codeIdMsgObj: CodeIdMsgObj[]) => {
-  let statusArray = { status: [] };
-  for (let codeMsgObj of codeIdMsgObj) {
-    statusArray.status.push(codeMsgObj);
-  }
-  return statusArray;
-};
+export const returnStatusArray = (
+  codeIdMsgObj: CodeIdMsgObj[]
+) => ({
+  status: [...codeIdMsgObj]
+});
 
 /**
  * accessResponse returned from `acs-client` contains the filters for the list of
@@ -291,13 +281,10 @@ export const returnStatusArray = (codeIdMsgObj: CodeIdMsgObj[]) => {
  * @param accessResponse ACS response
  * @param enitity enitity name
  */
-export const getACSFilters = (accessResponse: PolicySetRQResponse, resource: string): FilterOp[] => {
-  let acsFilters = [];
-  const resourceFilterMap = accessResponse?.filters;
-  const resourceFilter = resourceFilterMap?.filter((e) => e?.resource === resource);
-  // for a given entity there should be one filter map
-  if (resourceFilter?.length === 1 && resourceFilter[0]?.filters[0]?.filters?.length > 0) {
-    acsFilters = resourceFilter[0].filters;
-  }
-  return acsFilters;
-};
+export const getACSFilters = (
+  accessResponse: PolicySetRQResponse,
+  resource: string
+): FilterOp[] => accessResponse?.filters?.find(
+  (e) => e?.resource === resource
+    && e?.filters[0]?.filters?.length
+)?.filters ?? [];

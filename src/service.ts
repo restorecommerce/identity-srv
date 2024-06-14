@@ -170,7 +170,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     this.tokenRedisClient.on('error', (err) => logger.error('Redis client error in token cache store', err));
     this.tokenRedisClient.connect().then((val) =>
       logger.info('Redis client connection successful for token cache store')).catch(err => logger.error('Redis connection error', err));
-    this.tokenService = new TokenService(cfg, logger, authZ, this);
+    this.tokenService = new TokenService(cfg, logger, this);
     this.emailEnabled = this.cfg.get('service:enableEmail');
     const isConfigSet = this.cfg.get('service:uniqueEmailConstraint');
     if (isConfigSet === undefined || isConfigSet) {
@@ -574,10 +574,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    */
   async create(request: UserList, context: any): Promise<DeepPartial<UserListResponse>> {
     let usersList = request.items;
-    const insertedUsers = {
-      items: new Array<UserResponse>(),
+    const insertedUsers: UserListResponse = {
+      items: [],
       total_count: 0,
-      operation_status: { code: 0, message: '' }
+      operation_status: {
+        code: 500,
+        message: 'Unknown Error!'
+      }
     };
     // verify the assigned role_associations with the HR scope data before creating
     // extract details from auth_context of request and update the context Object
@@ -2382,7 +2385,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
   async deleteUsersByOrg(request: OrgIDRequest, context: any): Promise<DeepPartial<DeleteUsersByOrgResponse>> {
     const orgIDs = request.org_ids;
-    let subject = request.subject;
+    const subject = request.subject;
     let acsResponse: PolicySetRQResponse;
     try {
       if (!context) { context = {}; };
