@@ -121,6 +121,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       redirect_uri: this.cfg.get('oauth:redirect_uri_base') + oauthService,
     }, (err, access_token, refresh_token, result) => {
       if (err) {
+        this.logger.error('Oauth failed:', { err });
         reject(err);
         return;
       }
@@ -130,10 +131,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         refresh_token,
         result
       });
-    })).catch(err => {
-      console.error(err);
-      throw err;
-    });
+    }));
 
     const email = await accountResolvers[oauthService](data['access_token']);
 
@@ -156,42 +154,9 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
     }
 
     const user = users.items[0].payload;
-
-    let tokenTechUser: any = {};
-    const techUsersCfg = this.cfg.get('techUsers');
-    if (techUsersCfg && techUsersCfg.length > 0) {
-      tokenTechUser = _.find(techUsersCfg, { id: 'upsert_user_tokens' });
-    }
-    tokenTechUser.scope = user.default_scope;
-
     const resultTokens = (user.tokens || []).filter(t => {
       return t.name === oauthService + '-access_token' || t.name === oauthService + '-refresh_token';
     });
-
-    try {
-      const acsResponse = await checkAccessRequest(
-        {
-          ...context,
-          subject: tokenTechUser,
-          resources: await createMetadata<any>(request, this.cfg.get('authorization:urns'), tokenTechUser)
-        },
-        [{ resource: 'token', id: context.id }], AuthZAction.MODIFY, Operation.isAllowed
-      );
-
-      if (acsResponse.decision != Response_Decision.PERMIT) {
-        return {
-          user: {
-            status: {
-              code: acsResponse.operation_status.code,
-              message: acsResponse.operation_status.message
-            }
-          }
-        };
-      }
-    } catch (err: any) {
-      this.logger.error('Error occurred requesting access-control-srv for token upsert', err);
-      return { user: { status: { code: err.code, message: err.message } } };
-    }
 
     const userCopy = {
       ...user

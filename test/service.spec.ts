@@ -1,3 +1,4 @@
+import {} from 'mocha';
 import should from 'should';
 import _ from 'lodash-es';
 import { createChannel, createClient } from '@restorecommerce/grpc-client';
@@ -18,9 +19,9 @@ import {
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
 import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
 import { createClient as RedisCreateClient, RedisClientType } from 'redis';
-import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth';
 import { Rule, Effect } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rule';
 import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta';
+import { PolicySetRQ } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/policy_set';
 
 /*
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
@@ -50,7 +51,6 @@ async function connect(clientCfg: string, resourceName: string): Promise<any> { 
 
   if (events) {
     await events.stop();
-    events = undefined;
   }
 
   events = new Events({
@@ -187,7 +187,7 @@ let userRolePolicySetRQ = {
           ],
           has_rules: true
         }]
-    }]
+    } as PolicySetRQ]
 };
 
 interface MethodWithOutput {
@@ -222,13 +222,13 @@ const startGrpcMockServer = async (methodWithOutput: MethodWithOutput[]) => {
   const implementations = {
     isAllowed: (call: any, callback: any) => {
       const isAllowedResponse = methodWithOutput.filter(e => e.method === 'IsAllowed');
-      const response: any = new proto.Response.constructor(isAllowedResponse[0].output);
+      const response: any = new proto.Response.constructor(isAllowedResponse![0]!.output);
       callback(null, response);
     },
     whatIsAllowed: (call: any, callback: any) => {
       // check the request object and provide UserPolicies / RolePolicies
       const whatIsAllowedResponse = methodWithOutput.filter(e => e.method === 'WhatIsAllowed');
-      const response: any = new proto.ReverseQuery.constructor(whatIsAllowedResponse[0].output);
+      const response: any = new proto.ReverseQuery.constructor(whatIsAllowedResponse![0]!.output);
       callback(null, response);
     }
   };
@@ -291,7 +291,7 @@ describe('testing identity-srv', () => {
     stopGrpcMockServer();
     this.timeout(60000);
     await worker.stop();
-    await events.stop();
+    await events?.stop();
   });
 
   describe('testing Role service', () => {
@@ -323,16 +323,16 @@ describe('testing identity-srv', () => {
           items: roles
         });
         should.exist(result);
-        should.exist(result.items);
-        should.exist(result.operation_status);
-        result.items.should.have.length(3);
+        should.exist(result!.items);
+        should.exist(result!.operation_status);
+        result!.items!.should.have.length(3);
         // validate overall status
-        result.operation_status.code.should.equal(200);
-        result.operation_status.message.should.equal('success');
+        result!.operation_status!.code!.should.equal(200);
+        result!.operation_status!.message!.should.equal('success');
         // validate individual status
-        _.forEach(result.items, (item) => {
-          item.status.code.should.equal(200);
-          item.status.message.should.equal('success');
+        _.forEach(result!.items, (item) => {
+          item!.status!.code!.should.equal(200);
+          item!.status!.message!.should.equal('success');
         });
       });
     });
@@ -357,8 +357,8 @@ describe('testing identity-srv', () => {
         it('should register a user', async function registerUser(): Promise<void> {
           this.timeout(30000);
           const listener = function listener(message: any, context: any): void {
-            user.name.should.equal(message.name);
-            user.email.should.equal(message.email);
+            user.name!.should.equal(message!.name);
+            user.email!.should.equal(message!.email);
           };
           await topic.on('registered', listener);
           const registerResult = await (userService.register(user));
@@ -366,22 +366,22 @@ describe('testing identity-srv', () => {
           should.exist(registerResult.status);
           const result = registerResult.payload;
           should.exist(result);
-          should.exist(result.id);
-          testUserID = result.id;
-          testUserName = result.name;
-          should.exist(result.name);
-          result.name.should.equal(user.name);
-          should.exist(result.password_hash);
-          should.exist(result.email);
-          result.email.should.equal(user.email);
-          result.active.should.be.false();
-          result.activation_code.should.not.be.empty();
+          should.exist(result!.id);
+          testUserID = result!.id;
+          testUserName = result!.name;
+          should.exist(result!.name);
+          result!.name!.should.equal(user.name);
+          should.exist(result!.password_hash);
+          should.exist(result!.email);
+          result!.email!.should.equal(user.email);
+          result!.active!.should.be.false();
+          result!.activation_code!.should.not.be.empty();
           // validate status
-          registerResult.status.code.should.equal(200);
-          registerResult.status.message.should.equal('success');
-          userRolePolicySetRQ.policy_sets[0].policies[0].rules[0] = permitUserRule;
-          userRolePolicySetRQ.policy_sets[0].policies[1].rules[0] = permitRoleRule;
-          userRolePolicySetRQ.policy_sets[0].policies[1].rules[1] = permitUserRoleRule;
+          registerResult.status!.code!.should.equal(200);
+          registerResult.status!.message!.should.equal('success');
+          userRolePolicySetRQ.policy_sets![0]!.policies![0]!.rules![0] = permitUserRule;
+          userRolePolicySetRQ.policy_sets![0]!.policies!![1]!.rules![0] = permitRoleRule;
+          userRolePolicySetRQ.policy_sets![0]!.policies!![1]!.rules![1] = permitUserRoleRule;
           // start mock acs-srv - needed for read operation since acs-client makes a req to acs-srv
           // to get applicable policies although acs-lookup is disabled
           await startGrpcMockServer([{ method: 'WhatIsAllowed', output: userRolePolicySetRQ },
@@ -390,26 +390,26 @@ describe('testing identity-srv', () => {
             filters: [{
               field: 'id',
               operation: Filter_Operation.eq,
-              value: result.id
+              value: result!.id
             }]
           }];
           const readResult = await userService.read({ filters });
           should.exist(readResult);
-          should.exist(readResult.items);
+          should.exist(readResult!.items);
           // validate role
-          if (readResult.items[0].payload.roles) {
-            readResult.items[0].payload.roles[0].id.should.equal('user-r-id');
-            readResult.items[0].payload.roles[0].assignable_by_roles[0].should.equal('admin-r-id');
-            readResult.items[0].payload.roles[0].name.should.equal('normal_user');
-            readResult.items[0].payload.roles[0].description.should.equal('Normal user');
-            delete readResult.items[0].payload.roles;
+          if (readResult!.items![0]!.payload!.roles) {
+            readResult!.items![0]!.payload!.roles![0]!.id!.should.equal('user-r-id');
+            readResult!.items![0]!.payload!.roles![0]!.assignable_by_roles![0]!.should.equal('admin-r-id');
+            readResult!.items![0]!.payload!.roles![0]!.name!.should.equal('normal_user');
+            readResult!.items![0]!.payload!.roles![0]!.description!.should.equal('Normal user');
+            delete readResult!.items![0]!.payload!.roles;
           }
           await topic.removeListener('registered', listener);
         });
         it('should re-send activation email for registered user', async function sendActivationEmail(): Promise<void> {
           this.timeout(60000);
           const listener = function listener(message: any, context: any): void {
-            message.id.should.equal(`identity#test@ms.restorecommerce.io`);
+            message!.id!.should.equal(`identity#test@ms.restorecommerce.io`);
           };
 
           const renderingTopic = await events.topic('io.restorecommerce.rendering');
@@ -417,9 +417,9 @@ describe('testing identity-srv', () => {
           await renderingTopic.on('renderRequest', listener);
           const result = await userService.sendActivationEmail({ identifier: user.name });
           should.exist(result);
-          should.exist(result.operation_status);
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          should.exist(result!.operation_status);
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
           await renderingTopic.$wait(offset);
           await renderingTopic.removeListener('renderRequest', listener);
         });
@@ -440,10 +440,10 @@ describe('testing identity-srv', () => {
           should.exist(registerResult.status);
           const result = registerResult.payload;
           should.exist(result);
-          result.id.should.equal('guest_id');
-          result.guest.should.equal(true);
-          registerResult.status.code.should.equal(200);
-          registerResult.status.message.should.equal('success');
+          result!.id!.should.equal('guest_id');
+          result!.guest!.should.equal(true);
+          registerResult.status!.code!.should.equal(200);
+          registerResult.status!.message!.should.equal('success');
           await userService.unregister({ identifier: 'guest_user' });
         });
 
@@ -452,8 +452,8 @@ describe('testing identity-srv', () => {
           should.exist(registerResult);
           should.not.exist(registerResult.payload);
           should.exist(registerResult.status);
-          registerResult.status.code.should.equal(409);
-          registerResult.status.message.should.equal('user does already exist');
+          registerResult.status!.code!.should.equal(409);
+          registerResult.status!.message!.should.equal('user does already exist');
         });
 
         it('should not create a user with an invalid username format - should test character repetition', async function registerUser(): Promise<void> {
@@ -470,10 +470,10 @@ describe('testing identity-srv', () => {
           const testInvalidUser = async (invalidUser: any) => {
             const result = await userService.register(invalidUser);
             should.exist(result);
-            should.not.exist(result.payload);
-            should.exist(result.status);
-            result.status.code.should.equal(400);
-            result.status.message.should.startWith('Error while validating username:');
+            should.not.exist(result!.payload);
+            should.exist(result!.status);
+            result!.status!.code!.should.equal(400);
+            result!.status!.message!.should.startWith('Error while validating username:');
           };
 
           const invalidUser = _.cloneDeep(user);
@@ -500,10 +500,10 @@ describe('testing identity-srv', () => {
           const testInvalidUser = async (invalidUser: any) => {
             const result = await userService.register(invalidUser);
             should.exist(result);
-            should.not.exist(result.payload);
-            should.exist(result.status);
-            result.status.code.should.equal(400);
-            result.status.message.should.startWith('Error while validating username:');
+            should.not.exist(result!.payload);
+            should.exist(result!.status);
+            result!.status!.code!.should.equal(400);
+            result!.status!.message!.should.startWith('Error while validating username:');
           };
 
           const invalidUser = _.cloneDeep(user);
@@ -532,10 +532,10 @@ describe('testing identity-srv', () => {
           const testInvalidUser = async (invalidUser: any) => {
             const result = await userService.register(invalidUser);
             should.exist(result);
-            should.not.exist(result.payload);
-            should.exist(result.status);
-            result.status.code.should.equal(400);
-            result.status.message.should.startWith('Error while validating username:');
+            should.not.exist(result!.payload);
+            should.exist(result!.status);
+            result!.status!.code!.should.equal(400);
+            result!.status!.message!.should.startWith('Error while validating username:');
           };
 
           const invalidUser = _.cloneDeep(user);
@@ -553,10 +553,10 @@ describe('testing identity-srv', () => {
           const testInvalidUser = async (invalidUser: any) => {
             const result = await userService.register(invalidUser);
             should.exist(result);
-            should.not.exist(result.payload);
-            should.exist(result.status);
-            result.status.code.should.equal(400);
-            result.status.message.should.startWith('Error while validating username:');
+            should.not.exist(result!.payload);
+            should.exist(result!.status);
+            result!.status!.code!.should.equal(400);
+            result!.status!.message!.should.startWith('Error while validating username:');
           };
 
           const invalidUser = _.cloneDeep(user);
@@ -594,10 +594,10 @@ describe('testing identity-srv', () => {
           const testInvalidUser = async (invalidUser: any) => {
             const result = await userService.register(invalidUser);
             should.exist(result);
-            should.not.exist(result.payload);
-            should.exist(result.status);
-            result.status.code.should.equal(400);
-            result.status.message.should.startWith('Error while validating username:');
+            should.not.exist(result!.payload);
+            should.exist(result!.status);
+            result!.status!.code!.should.equal(400);
+            result!.status!.message!.should.startWith('Error while validating username:');
           };
 
           const invalidUser = _.cloneDeep(user);
@@ -616,10 +616,10 @@ describe('testing identity-srv', () => {
           delete invalidUser.first_name;
           const result = await userService.register(invalidUser);
           should.exist(result);
-          should.exist(result.status);
-          should.not.exist(result.payload);
-          result.status.code.should.equal(400);
-          result.status.message.should.equal('User register requires both first and last name');
+          should.exist(result!.status);
+          should.not.exist(result!.payload);
+          result!.status!.code!.should.equal(400);
+          result!.status!.message!.should.equal('User register requires both first and last name');
         });
       });
 
@@ -725,140 +725,140 @@ describe('testing identity-srv', () => {
         it('should not create a user with empty password', async function createUser(): Promise<void> {
           const result = await userService.create({ items: [testuser2] });
           should.exist(result);
-          should.not.exist(result.items[0].payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('argument password is empty');
+          should.not.exist(result!.items![0]!.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('argument password is empty');
         });
 
         it('should not create a user with a weak password', async function createUser(): Promise<void> {
           const result = await userService.create({ items: [testuser3] });
           should.exist(result);
-          should.not.exist(result?.items[0]?.payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common.,If you use this password elsewhere, you should change it. & Your password was exposed by a data breach on the Internet. User ID testuser3');
+          should.not.exist(result?.items?.[0]?.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common.,If you use this password elsewhere, you should change it. & Your password was exposed by a data breach on the Internet. User ID testuser3');
         });
 
         it('should not create a user with a password missing number', async function createUser(): Promise<void> {
           const result = await userService.create({ items: [testuser4] });
           should.exist(result);
-          should.not.exist(result?.items[0]?.payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password must contain at least one number User ID testuser4');
+          should.not.exist(result?.items?.[0]?.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password must contain at least one number User ID testuser4');
         });
 
         it('should not create a user with a password missing special character', async function createUser(): Promise<void> {
           const result = await userService.create({ items: [testuser5] });
           should.exist(result);
-          should.not.exist(result?.items[0]?.payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password must contain at least one special character (!@#$%^&*) User ID testuser5');
+          should.not.exist(result?.items?.[0]?.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password must contain at least one special character (!@#$%^&*) User ID testuser5');
         });
 
         it('should not create a user with a password missing uppercase letter', async function createUser(): Promise<void> {
           const result = await userService.create({ items: [testuser6] });
           should.exist(result);
-          should.not.exist(result?.items[0]?.payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password must contain at least one uppercase letter User ID testuser6');
+          should.not.exist(result?.items?.[0]?.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password must contain at least one uppercase letter User ID testuser6');
         });
 
         it('should not create a user with a password missing lowercase letter', async function createUser(): Promise<void> {
           const result = await userService.create({ items: [testuser7] });
           should.exist(result);
-          should.not.exist(result?.items[0]?.payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password must contain at least one lowercase letter User ID testuser7');
+          should.not.exist(result?.items?.[0]?.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password must contain at least one lowercase letter User ID testuser7');
         });
 
         it('should not create a user with a password without of a length of password 12', async function createUser(): Promise<void> {
           const result = await userService.create({ items: [testuser8] });
           should.exist(result);
-          should.not.exist(result?.items[0]?.payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password is not long enough User ID testuser8');
+          should.not.exist(result?.items?.[0]?.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('Password is too weak The password score is 0/4, minimum score is 3. Suggestions: Add more words that are less common. & Your password is not long enough User ID testuser8');
         });
 
         it('should not create a user with empty email', async function createUser(): Promise<void> {
           // append password, but no email
           Object.assign(testuser2, { password: 'CNQJrH%KAayeDpf3h' });
           const result = await userService.create({ items: [testuser2] });
-          should.not.exist(result.items[0].payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('argument email is empty');
+          should.not.exist(result!.items![0]!.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('argument email is empty');
         });
 
         it('should not create a user with empty name', async function createUser(): Promise<void> {
           // append email, but no name
           Object.assign(testuser2, { email: 'test2@ms.restorecommerce.io' });
           const result = await userService.create({ items: [testuser2] });
-          should.not.exist(result.items[0].payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('argument name is empty');
+          should.not.exist(result!.items![0]!.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('argument name is empty');
         });
 
         it('should not create a user with invalid username - username contains "@" but is not valid email', async function createUser(): Promise<void> {
           // append name
           Object.assign(testuser2, { name: 'something@ex..ample.com' });
           const result = await userService.create({ items: [testuser2] });
-          should.not.exist(result.items[0].payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('Error while validating username: something@ex..ample.com, error: InvalidArgument, message:Username something@ex..ample.com is not a valid email!');
+          should.not.exist(result!.items![0]!.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('Error while validating username: something@ex..ample.com, error: InvalidArgument, message:Username something@ex..ample.com is not a valid email!');
         });
 
         it('should not create a user with invalid username - minimum characters condition not met', async function createUser(): Promise<void> {
           // append name
           Object.assign(testuser2, { name: 'test123' });
           const result = await userService.create({ items: [testuser2] });
-          should.not.exist(result.items[0].payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('Error while validating username: test123, error: InvalidArgument, message:Username test123 is invalid! The username length must be between 8 and 20 characters!');
+          should.not.exist(result!.items![0]!.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('Error while validating username: test123, error: InvalidArgument, message:Username test123 is invalid! The username length must be between 8 and 20 characters!');
         });
 
         it('should not create a user with invalid username - maximum characters condition not met', async function createUser(): Promise<void> {
           // append name
           Object.assign(testuser2, { name: 'TestQQwpnociqzkUyFOaTWPX' });
           const result = await userService.create({ items: [testuser2] });
-          should.not.exist(result.items[0].payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('Error while validating username: TestQQwpnociqzkUyFOaTWPX, error: InvalidArgument, message:Username TestQQwpnociqzkUyFOaTWPX is invalid! The username length must be between 8 and 20 characters!');
+          should.not.exist(result!.items![0]!.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('Error while validating username: TestQQwpnociqzkUyFOaTWPX, error: InvalidArgument, message:Username TestQQwpnociqzkUyFOaTWPX is invalid! The username length must be between 8 and 20 characters!');
         });
 
         it('should not create a user with invalid username - first character condition not met', async function createUser(): Promise<void> {
           // append name
           Object.assign(testuser2, { name: '_TestTest' });
           const result = await userService.create({ items: [testuser2] });
-          should.not.exist(result.items[0].payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('Error while validating username: _TestTest, error: InvalidArgument, message:Username _TestTest is invalid! The first letter should be one of the allowed characters: a-z A-Z or äöüÄÖÜß');
+          should.not.exist(result!.items![0]!.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('Error while validating username: _TestTest, error: InvalidArgument, message:Username _TestTest is invalid! The first letter should be one of the allowed characters: a-z A-Z or äöüÄÖÜß');
         });
 
         it('should not create a user with invalid username - allowed characters condition not met', async function createUser(): Promise<void> {
           // append name
           Object.assign(testuser2, { name: 'Test?Test' });
           const result = await userService.create({ items: [testuser2] });
-          should.not.exist(result.items[0].payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('Error while validating username: Test?Test, error: InvalidArgument, message:Username Test?Test is invalid! Please use only the allowed characters: a-z, A-Z, 0-9, äöüÄÖÜß and @_.- ');
+          should.not.exist(result!.items![0]!.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('Error while validating username: Test?Test, error: InvalidArgument, message:Username Test?Test is invalid! Please use only the allowed characters: a-z, A-Z, 0-9, äöüÄÖÜß and @_.- ');
         });
 
         it('should not create a user with invalid username - character repetition condition not met', async function createUser(): Promise<void> {
           // append name
           Object.assign(testuser2, { name: 'Test--Test' });
           const result = await userService.create({ items: [testuser2] });
-          should.not.exist(result.items[0].payload);
-          result.items[0].status.code.should.equal(400);
-          result.items[0].status.message.should.equal('Error while validating username: Test--Test, error: InvalidArgument, message:Username Test--Test is invalid! Character repetitions like __, .., -- are not allowed.');
+          should.not.exist(result!.items![0]!.payload);
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal('Error while validating username: Test--Test, error: InvalidArgument, message:Username Test--Test is invalid! Character repetitions like __, .., -- are not allowed.');
         });
 
         it('should create a user and unregister it', async function createUser(): Promise<void> {
           // append name
           Object.assign(testuser2, { name: 'test_user@n-fuse.co' });
           const result = await userService.create({ items: [testuser2] });
-          should.exist(result.items[0].payload);
-          result.items[0].payload.id.should.equal('testuser2');
-          result.items[0].status.code.should.equal(200);
-          result.items[0].status.message.should.equal('success');
-          await userService.unregister({ identifier: result.items[0].payload.name });
+          should.exist(result!.items![0]!.payload);
+          result!.items![0]!.payload!.id!.should.equal('testuser2');
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
+          await userService.unregister({ identifier: result!.items![0]!.payload!.name });
         });
 
         it('should create a user with additional json data and unregister it', async function createUser(): Promise<void> {
@@ -869,30 +869,30 @@ describe('testing identity-srv', () => {
           const result = await userService.create({ items: [testuser2] });
           // read user with json data
           const userData = await userService.find({ id: 'testuser2' });
-          const decodedData = JSON.parse(userData.items[0].payload.data.value.toString());
-          decodedData.testKey.should.equal('testValue');
-          should.exist(result.items[0].payload);
-          result.items[0].payload.id.should.equal('testuser2');
-          result.items[0].status.code.should.equal(200);
-          result.items[0].status.message.should.equal('success');
-          await userService.unregister({ identifier: result.items[0].payload.name });
+          const decodedData = JSON.parse(userData.items![0]!.payload!.data!.value!.toString());
+          decodedData.testKey!.should.equal('testValue');
+          should.exist(result!.items![0]!.payload);
+          result!.items![0]!.payload!.id!.should.equal('testuser2');
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
+          await userService.unregister({ identifier: result!.items![0]!.payload!.name });
         });
 
         it('should invite a user and confirm User Invitation', async function inviteUser(): Promise<void> {
           Object.assign(testuser2, { invite: true });
           const result = await userService.create({ items: [testuser2] });
-          const userStatus = result.items[0].payload.active;
-          userStatus.should.equal(false);
+          const userStatus = result!.items![0]!.payload!.active;
+          userStatus!.should.equal(false);
           // confirm Invitation
           const confirmUserInvtStatus = await userService.confirmUserInvitation({
             identifier: testuser2.name,
-            password: testuser2.password, activation_code: result.items[0].payload.activation_code
+            password: testuser2.password, activation_code: result!.items![0]!.payload!.activation_code
           });
           // read the user and now the status should be true
           const userData = await userService.find({ id: 'testuser2' });
-          userData.items[0].payload.active.should.equal(true);
+          userData.items![0]!.payload!.active!.should.equal(true);
           // unregister
-          await userService.unregister({ identifier: result.items[0].payload.name });
+          await userService.unregister({ identifier: result!.items![0]!.payload!.name });
         });
       });
 
@@ -902,11 +902,11 @@ describe('testing identity-srv', () => {
             id: testUserID,
           }));
           should.exist(result);
-          should.exist(result.items[0].payload);
-          should.exist(result.operation_status);
-          should.exist(result.items[0].status);
-          result.items[0].status.code.should.equal(200);
-          result.items[0].status.message.should.equal('success');
+          should.exist(result!.items![0]!.payload);
+          should.exist(result!.operation_status);
+          should.exist(result!.items![0]!.status);
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
         });
       });
 
@@ -916,20 +916,20 @@ describe('testing identity-srv', () => {
             role: 'normal_user',
           }));
           should.exist(result);
-          should.exist(result.items[0].payload);
-          should.exist(result.operation_status);
-          should.exist(result.items[0].status);
-          result.items[0].status.code.should.equal(200);
-          result.items[0].status.message.should.equal('success');
+          should.exist(result!.items![0]!.payload);
+          should.exist(result!.operation_status);
+          should.exist(result!.items![0]!.status);
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
         });
         it('should not return a user for invalid role', async function findUser(): Promise<void> {
           const result = await (userService.findByRole({
             role: 'invalid_role',
           }));
-          should.not.exist(result.items);
-          should.exist(result.operation_status);
-          result.operation_status.code.should.equal(404);
-          result.operation_status.message.should.equal('Role invalid_role does not exist');
+          should.not.exist(result!.items);
+          should.exist(result!.operation_status);
+          result!.operation_status!.code!.should.equal(404);
+          result!.operation_status!.message!.should.equal('Role invalid_role does not exist');
         });
       });
 
@@ -939,9 +939,9 @@ describe('testing identity-srv', () => {
             identifier: 'invalid_id',
             password: 'CNQJrH%KAayeDpf3h',
           }));
-          should.not.exist(result.payload);
-          result.status.code.should.equal(404);
-          result.status.message.should.equal('user not found');
+          should.not.exist(result!.payload);
+          result!.status!.code!.should.equal(404);
+          result!.status!.message!.should.equal('user not found');
         });
 
         it('should return an obfuscated error for invalid user identifier', async function login(): Promise<void> {
@@ -950,9 +950,9 @@ describe('testing identity-srv', () => {
             identifier: 'invalid_id',
             password: 'CNQJrH%KAayeDpf3h',
           }));
-          should.not.exist(result.payload);
-          result.status.code.should.equal(412);
-          result.status.message.should.equal('Invalid credentials provided, user inactive or account does not exist');
+          should.not.exist(result!.payload);
+          result!.status!.code!.should.equal(412);
+          result!.status!.message!.should.equal('Invalid credentials provided, user inactive or account does not exist');
           cfg.set('obfuscateAuthNErrorReason', false);
         });
 
@@ -962,9 +962,9 @@ describe('testing identity-srv', () => {
               identifier: user.name,
               password: user.password,
             }));
-            should.not.exist(result.payload);
-            result.status.code.should.equal(412);
-            result.status.message.should.equal('user is inactive');
+            should.not.exist(result!.payload);
+            result!.status!.code!.should.equal(412);
+            result!.status!.message!.should.equal('user is inactive');
           });
 
         it('without activation should throw an error that user not authenticated' +
@@ -974,26 +974,26 @@ describe('testing identity-srv', () => {
               identifier: user.name,
               password: user.password,
             }));
-            should.not.exist(result.payload);
-            result.status.code.should.equal(412);
-            result.status.message.should.equal('Invalid credentials provided, user inactive or account does not exist');
+            should.not.exist(result!.payload);
+            result!.status!.code!.should.equal(412);
+            result!.status!.message!.should.equal('Invalid credentials provided, user inactive or account does not exist');
             cfg.set('obfuscateAuthNErrorReason', false);
           });
 
         it('should activate the user', async function activateUser(): Promise<void> {
           const offset = await topic.$offset(-1);
           const listener = function listener(message: any, context: any): void {
-            result.items[0].payload.id.should.equal(message.id);
+            result!.items![0]!.payload!.id!.should.equal(message!.id);
           };
           await topic.on('activated', listener);
           let result = await (userService.find({
             id: testUserID,
           }));
           should.exist(result);
-          should.exist(result.items[0].payload);
-          result.items.should.be.length(1);
+          should.exist(result!.items![0]!.payload);
+          result!.items!.should.be.length(1);
 
-          const u = result.items[0].payload;
+          const u = result!.items![0]!.payload!;
           await (userService.activate({
             identifier: u.name,
             activation_code: u.activation_code,
@@ -1005,11 +1005,11 @@ describe('testing identity-srv', () => {
           }));
           should.exist(result);
           should.exist(result);
-          should.exist(result.items[0].payload);
-          result.items.should.be.length(1);
-          should.exist(result.items[0].payload.active);
-          result.items[0].payload.active.should.be.true();
-          result.items[0].payload.activation_code.should.be.empty();
+          should.exist(result!.items![0]!.payload);
+          result!.items!.should.be.length(1);
+          should.exist(result!.items![0]!.payload!.active);
+          result!.items![0]!.payload!.active!.should.be.true();
+          result!.items![0]!.payload!.activation_code!.should.be.empty();
           await topic.removeListener('activated', listener);
         });
 
@@ -1019,13 +1019,13 @@ describe('testing identity-srv', () => {
             password: user.password,
           }));
           should.exist(result);
-          should.exist(result.payload);
+          should.exist(result!.payload);
 
           const compareResult = await (userService.find({
             id: testUserID,
           }));
-          const userDBDoc = compareResult.items[0].payload;
-          result.payload.should.deepEqual(userDBDoc);
+          const userDBDoc = compareResult.items![0]!.payload!;
+          result!.payload!.should.deepEqual(userDBDoc);
         });
 
         it('should return an error when trying to login with email field, since loginIdentifierProperty is set to name', async function login(): Promise<void> {
@@ -1033,11 +1033,11 @@ describe('testing identity-srv', () => {
             identifier: user.email,
             password: user.password,
           }));
-          should.not.exist(result.payload);
-          should.exist(result.status.code);
-          should.exist(result.status.message);
-          result.status.code.should.equal(404);
-          result.status.message.should.equal('user not found');
+          should.not.exist(result!.payload);
+          should.exist(result!.status!.code);
+          should.exist(result!.status!.message);
+          result!.status!.code!.should.equal(404);
+          result!.status!.message!.should.equal('user not found');
         });
 
         it('should return an obfuscated error in case the passwords don`t match', async function login(): Promise<void> {
@@ -1046,9 +1046,9 @@ describe('testing identity-srv', () => {
             identifier: user.name,
             password: 'CNQJrH%KAayeDpf3htest',
           }));
-          should.not.exist(result.payload);
-          result.status.code.should.equal(412);
-          result.status.message.should.equal('Invalid credentials provided, user inactive or account does not exist');
+          should.not.exist(result!.payload);
+          result!.status!.code!.should.equal(412);
+          result!.status!.message!.should.equal('Invalid credentials provided, user inactive or account does not exist');
           cfg.set('obfuscateAuthNErrorReason', false);
         });
 
@@ -1057,9 +1057,9 @@ describe('testing identity-srv', () => {
             identifier: user.name,
             password: 'CNQJrH%KAayeDpf3htes4',
           }));
-          should.not.exist(result.payload);
-          result.status.code.should.equal(401);
-          result.status.message.should.equal('password does not match');
+          should.not.exist(result!.payload);
+          result!.status!.code!.should.equal(401);
+          result!.status!.message!.should.equal('password does not match');
         });
       });
 
@@ -1092,15 +1092,15 @@ describe('testing identity-srv', () => {
           this.timeout(30000);
           const offset = await topic.$offset(-1);
           const listener = function listener(message: any, context: any): void {
-            pwHashA.should.not.equal(message.password_hash);
+            pwHashA!.should.not.equal(message!.password_hash);
           };
           await topic.on('passwordChanged', listener);
           let result = await userService.find({
             id: testUserID,
             subject: { token: 'user-token' }
           });
-          should.exist(result.items);
-          const pwHashA = result.items[0].payload.password_hash;
+          should.exist(result!.items);
+          const pwHashA = result!.items![0]!.payload!.password_hash;
           const changeResult = await (userService.changePassword({
             password: 'CNQJrH%KAayeDpf3h',
             new_password: 'CNQJrH%43KAayeDpf3h',
@@ -1108,16 +1108,16 @@ describe('testing identity-srv', () => {
           }));
           should.exist(changeResult);
           should.exist(changeResult.operation_status);
-          changeResult.operation_status.code.should.equal(200);
-          changeResult.operation_status.message.should.equal('success');
+          changeResult.operation_status!.code!.should.equal(200);
+          changeResult.operation_status!.message!.should.equal('success');
           await topic.$wait(offset);
 
           const findResult = await (userService.find({
             id: testUserID, subject: { token: 'user-token' }
           }));
-          const pwHashB = findResult.items[0].payload.password_hash;
-          pwHashB.should.not.be.null();
-          pwHashA.should.not.equal(pwHashB);
+          const pwHashB = findResult.items![0]!.payload!.password_hash;
+          pwHashB!.should.not.be.null();
+          pwHashA!.should.not.equal(pwHashB);
           await topic.removeListener('passwordChanged', listener);
         });
 
@@ -1127,22 +1127,22 @@ describe('testing identity-srv', () => {
           });
           should.exist(findResult);
           should.exist(findResult.items);
-          const activationCode = findResult.items[0].payload.activation_code;
-          activationCode.should.be.length(0);
+          const activationCode = findResult.items![0]!.payload!.activation_code;
+          activationCode!.should.be.length(0);
 
           const changeResult = await userService.requestPasswordChange({
             identifier: user.name
           });
           should.exist(changeResult);
           should.exist(changeResult.operation_status);
-          changeResult.operation_status.code.should.equal(200);
-          changeResult.operation_status.message.should.equal('success');
+          changeResult.operation_status!.code!.should.equal(200);
+          changeResult.operation_status!.message!.should.equal('success');
 
           const find2Result = await (userService.find({
             id: testUserID,
           }));
-          const upUser = find2Result.items[0].payload;
-          upUser.activation_code.should.not.be.empty();
+          const upUser = find2Result.items![0]!.payload!;
+          upUser.activation_code!.should.not.be.empty();
         });
 
         it('should confirm a password change by providing the UUID', async function requestPasswordChange(): Promise<void> {
@@ -1150,10 +1150,10 @@ describe('testing identity-srv', () => {
             id: testUserID,
           });
           should.exist(result);
-          should.exist(result.items);
-          const activationCode = result.items[0].payload.activation_code;
-          activationCode.should.not.be.null();
-          const pwHashA = (result.items[0] as any).password_hash;
+          should.exist(result!.items);
+          const activationCode = result!.items![0]!.payload!.activation_code;
+          activationCode!.should.not.be.null();
+          const pwHashA = (result!.items![0] as any).password_hash;
 
           const changeResult = await userService.confirmPasswordChange({
             identifier: user.name,
@@ -1163,15 +1163,15 @@ describe('testing identity-srv', () => {
 
           should.exist(changeResult);
           should.exist(changeResult.operation_status);
-          changeResult.operation_status.code.should.equal(200);
-          changeResult.operation_status.message.should.equal('success');
+          changeResult.operation_status!.code!.should.equal(200);
+          changeResult.operation_status!.message!.should.equal('success');
 
           const findResult = await (userService.find({
             id: testUserID,
           }));
-          const upUser = findResult.items[0].payload;
-          upUser.activation_code.should.be.empty();
-          upUser.password_hash.should.not.equal(pwHashA);
+          const upUser = findResult.items![0]!.payload!;
+          upUser.activation_code!.should.be.empty();
+          upUser.password_hash!.should.not.equal(pwHashA);
         });
       });
 
@@ -1183,10 +1183,10 @@ describe('testing identity-srv', () => {
             const email = user.email;
             const activationCode = user.activation_code;
 
-            new_email.should.not.be.null();
-            email_old.should.not.equal(new_email);
-            new_email.should.equal('newmail@newmail.com');
-            activationCode.should.not.be.null();
+            new_email!.should.not.be.null();
+            email_old!.should.not.equal(new_email);
+            new_email!.should.equal('newmail@newmail.com');
+            activationCode!.should.not.be.null();
           };
 
           const listener = function listener(message: any, context: any): void {
@@ -1199,16 +1199,16 @@ describe('testing identity-srv', () => {
             id: testUserID,
           });
           should.exist(result);
-          should.exist(result.items);
-          const email_old = result.items[0].payload.email;
+          should.exist(result!.items);
+          const email_old = result!.items![0]!.payload!.email;
           const changeResult = await (userService.requestEmailChange({
             identifier: testUserName,
             new_email: 'newmail@newmail.com',
           }));
           should.exist(changeResult);
           should.exist(changeResult.operation_status);
-          changeResult.operation_status.code.should.equal(200);
-          changeResult.operation_status.message.should.equal('success');
+          changeResult.operation_status!.code!.should.equal(200);
+          changeResult.operation_status!.message!.should.equal('success');
 
           await topic.$wait(offset);
           const filters = [{
@@ -1220,7 +1220,7 @@ describe('testing identity-srv', () => {
           }];
           const readResult = await (userService.read({ filters }));
 
-          const dbUser = readResult.items[0].payload;
+          const dbUser = readResult!.items![0]!.payload!;
           validate(dbUser);
           await topic.removeListener('emailChangeRequested', listener);
         });
@@ -1229,7 +1229,7 @@ describe('testing identity-srv', () => {
           this.timeout(30000);
           const validate = (user: User) => {
             const email = user.email;
-            email.should.equal('newmail@newmail.com');
+            email!.should.equal('newmail@newmail.com');
           };
 
           const listener = function listener(message: any, context: any): void {
@@ -1241,16 +1241,16 @@ describe('testing identity-srv', () => {
             id: testUserID,
           });
           should.exist(result);
-          should.exist(result.items);
-          const activationCode = result.items[0].payload.activation_code;
+          should.exist(result!.items);
+          const activationCode = result!.items![0]!.payload!.activation_code;
           const changeResult = await (userService.confirmEmailChange({
             activation_code: activationCode,
             identifier: user.name
           }));
           should.exist(changeResult);
           should.exist(changeResult.operation_status);
-          changeResult.operation_status.code.should.equal(200);
-          changeResult.operation_status.message.should.equal('success');
+          changeResult.operation_status!.code!.should.equal(200);
+          changeResult.operation_status!.message!.should.equal('success');
 
           await topic.$wait(offset);
           const filters = [{
@@ -1261,10 +1261,10 @@ describe('testing identity-srv', () => {
             }]
           }];
           const readResult = await (userService.read({ filters }));
-          const dbUser = readResult.items[0].payload;
+          const dbUser = readResult!.items![0]!.payload!;
           validate(dbUser);
-          dbUser.new_email.should.be.empty();
-          dbUser.activation_code.should.be.empty();
+          dbUser.new_email!.should.be.empty();
+          dbUser.activation_code!.should.be.empty();
           await topic.removeListener('emailChangeConfirmed', listener);
         });
       });
@@ -1275,8 +1275,8 @@ describe('testing identity-srv', () => {
             should.exist(message);
 
             const newUser = message;
-            newUser.first_name.should.equal('John');
-            newUser.first_name.should.not.equal(user.first_name);
+            newUser.first_name!.should.equal('John');
+            newUser.first_name!.should.not.equal(user.first_name);
           };
           await topic.on('userModified', listener);
 
@@ -1291,13 +1291,13 @@ describe('testing identity-srv', () => {
           });
           await topic.$wait(offset);
           should.exist(result);
-          should.exist(result.items[0].payload);
-          result.items[0].payload.name.should.equal('test.user1');
+          should.exist(result!.items![0]!.payload);
+          result!.items![0]!.payload!.name!.should.equal('test.user1');
           // validate item status and overall status
-          result.items[0].status.code.should.equal(200);
-          result.items[0].status.message.should.equal('success');
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
           await topic.removeListener('userModified', listener);
         });
 
@@ -1333,20 +1333,20 @@ describe('testing identity-srv', () => {
             }]
           });
           should.exist(result);
-          should.exist(result.items[0].payload);
+          should.exist(result!.items![0]!.payload);
           // validate first user update
-          result.items[0].payload.name.should.equal('test.user1');
-          result.items[0].payload.first_name.should.equal('JohnNew');
+          result!.items![0]!.payload!.name!.should.equal('test.user1');
+          result!.items![0]!.payload!.first_name!.should.equal('JohnNew');
           // validate second user update
-          result.items[1].payload.name.should.equal('test.newUserName');
-          result.items[1].payload.first_name.should.equal('testNew');
+          result!.items![1]!.payload!.name!.should.equal('test.newUserName');
+          result!.items![1]!.payload!.first_name!.should.equal('testNew');
           // validate item status and overall status
-          result.items[0].status.code.should.equal(200);
-          result.items[0].status.message.should.equal('success');
-          result.items[1].status.code.should.equal(200);
-          result.items[1].status.message.should.equal('success');
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
+          result!.items![1]!.status!.code!.should.equal(200);
+          result!.items![1]!.status!.message!.should.equal('success');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
           // unregister second user
           await userService.unregister({ identifier: 'testuser2' });
         });
@@ -1364,14 +1364,14 @@ describe('testing identity-srv', () => {
             }]
           });
           should.exist(result);
-          should.exist(result.items);
-          result.items[0].payload.email.should.equal('update@restorecommerce.io');
-          result.items[0].payload.name.should.equal('test.user1');
+          should.exist(result!.items);
+          result!.items![0]!.payload!.email!.should.equal('update@restorecommerce.io');
+          result!.items![0]!.payload!.name!.should.equal('test.user1');
           // validate item status and overall status
-          result.items[0].status.code.should.equal(200);
-          result.items[0].status.message.should.equal('success');
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
         });
 
         it(`should allow to update 'name' field`,
@@ -1385,13 +1385,13 @@ describe('testing identity-srv', () => {
               }]
             });
             should.exist(result);
-            should.exist(result.items[0].payload);
+            should.exist(result!.items![0]!.payload);
             // validate item status and overall status
-            result.items[0].payload.name.should.equal('new_name');
-            result.items[0].status.code.should.equal(200);
-            result.items[0].status.message.should.equal('success');
-            result.operation_status.code.should.equal(200);
-            result.operation_status.message.should.equal('success');
+            result!.items![0]!.payload!.name!.should.equal('new_name');
+            result!.items![0]!.status!.code!.should.equal(200);
+            result!.items![0]!.status!.message!.should.equal('success');
+            result!.operation_status!.code!.should.equal(200);
+            result!.operation_status!.message!.should.equal('success');
           });
       });
 
@@ -1401,20 +1401,20 @@ describe('testing identity-srv', () => {
           const deleteResp = await userService.delete({
             ids: [testUserID, 'invalidID']
           });
-          deleteResp.status[0].code.should.equal(200);
-          deleteResp.status[0].message.should.equal('success');
-          deleteResp.status[1].code.should.equal(404);
-          deleteResp.status[1].message.should.equal('document not found');
-          deleteResp.status[1].id.should.equal('invalidID');
+          deleteResp.status![0]!.code!.should.equal(200);
+          deleteResp.status![0]!.message!.should.equal('success');
+          deleteResp.status![1]!.code!.should.equal(404);
+          deleteResp.status![1]!.message!.should.equal('document not found');
+          deleteResp.status![1]!.id!.should.equal('invalidID');
           should.exist(deleteResp.operation_status);
-          deleteResp.operation_status.code.should.equal(200);
-          deleteResp.operation_status.message.should.equal('success');
+          deleteResp.operation_status!.code!.should.equal(200);
+          deleteResp.operation_status!.message!.should.equal('success');
           const result = await userService.find({
             id: testUserID,
           });
-          should.not.exist(result.items);
-          result.operation_status.code.should.equal(404);
-          result.operation_status.message.should.equal('user not found');
+          should.not.exist(result!.items);
+          result!.operation_status!.code!.should.equal(404);
+          result!.operation_status!.message!.should.equal('user not found');
         });
       });
 
@@ -1454,13 +1454,13 @@ describe('testing identity-srv', () => {
         it('should emit a renderRequest for sending the email', async function sendInvitationEmail(): Promise<void> {
 
           const listener = function listener(message: any, context: any): void {
-            message.id.should.equal(`identity#${sampleUser.email}`);
+            message!.id!.should.equal(`identity#${sampleUser.email}`);
           };
           await topic.on('renderRequest', listener);
           const result = await (userService.sendInvitationEmail({ identifier: sampleUser.name, invited_by_user_identifier: invitingUser.name }));
           should.exist(result);
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
           await topic.removeListener('renderRequest', listener);
         });
       });
@@ -1476,15 +1476,15 @@ describe('testing identity-srv', () => {
               last_name: 'upsert'
             }]
           });
-          upserUserID = result.items[0].payload.id;
+          upserUserID = result!.items![0]!.payload!.id;
           should.exist(result);
-          should.exist(result.items);
-          result.items[0].payload.email.should.equal('upsert@restorecommerce.io');
+          should.exist(result!.items);
+          result!.items![0]!.payload!.email!.should.equal('upsert@restorecommerce.io');
           // validate item status and overall status
-          result.items[0].status.code.should.equal(200);
-          result.items[0].status.message.should.equal('success');
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
         });
 
         it('should fail trying to update the user name to already existing one', async function update(): Promise<void> {
@@ -1500,11 +1500,11 @@ describe('testing identity-srv', () => {
             }]
           });
           // validate fail result
-          should.exist(result.items);
-          result.items[0].status.code.should.equal(409);
-          result.items[0].status.message.should.equal('User name sampleuser1 already exists');
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          should.exist(result!.items);
+          result!.items![0]!.status!.code!.should.equal(409);
+          result!.items![0]!.status!.message!.should.equal('User name sampleuser1 already exists');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
         });
 
         it('should fail trying to update invalid / not existing user', async function update(): Promise<void> {
@@ -1520,11 +1520,11 @@ describe('testing identity-srv', () => {
             }]
           });
           // validate fail result
-          should.exist(result.items);
-          result.items[0].status.code.should.equal(404);
-          result.items[0].status.message.should.equal('user not found for update');
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          should.exist(result!.items);
+          result!.items![0]!.status!.code!.should.equal(404);
+          result!.items![0]!.status!.message!.should.equal('user not found for update');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
         });
 
         it('should upsert (update) user and delete user collection', async function upsert(): Promise<void> {
@@ -1539,21 +1539,21 @@ describe('testing identity-srv', () => {
             }]
           });
           should.exist(result);
-          should.exist(result.items);
-          result.items[0].payload.email.should.equal('upsert2@restorecommerce.io');
+          should.exist(result!.items);
+          result!.items![0]!.payload!.email!.should.equal('upsert2@restorecommerce.io');
           // validate item status and overall status
-          result.items[0].status.code.should.equal(200);
-          result.items[0].status.message.should.equal('success');
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
           // delete user collection
           const deleteResult = await userService.delete({
             collection: true
           });
           should.exist(deleteResult.status);
           _.forEach(deleteResult.status, (eachResult) => {
-            eachResult.code.should.equal(200);
-            eachResult.message.should.equal('success');
+            eachResult.code!.should.equal(200);
+            eachResult.message!.should.equal('success');
           });
         });
       });
@@ -1668,13 +1668,13 @@ describe('testing identity-srv', () => {
           updateConfig(cfg);
           const result = await userService.create({ items: [testUser], subject });
           should.exist(result);
-          should.exist(result.items);
-          result.items[0].payload.id.should.equal('testuser');
+          should.exist(result!.items);
+          result!.items![0]!.payload!.id!.should.equal('testuser');
           // validate item status and overall status
-          result.items[0].status.code.should.equal(200);
-          result.items[0].status.message.should.equal('success');
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
         });
         it('should allow to update a User role_associations, first and last name with valid role and valid HR scope', async () => {
           testUser.first_name = 'testFirstName';
@@ -1693,28 +1693,28 @@ describe('testing identity-srv', () => {
           });
           const result = await userService.update({ items: [testUser], subject });
           should.exist(result);
-          should.exist(result.items);
-          result.items[0].payload.id.should.equal('testuser');
-          result.items[0].payload.first_name.should.equal('testFirstName');
-          result.items[0].payload.last_name.should.equal('testLastName');
-          result.items[0].payload.role_associations[0].attributes[0].attributes[0].value.should.equal('orgC');
-          result.items[0].payload.role_associations[1].attributes[0].attributes[0].value.should.equal('orgB');
+          should.exist(result!.items);
+          result!.items![0]!.payload!.id!.should.equal('testuser');
+          result!.items![0]!.payload!.first_name!.should.equal('testFirstName');
+          result!.items![0]!.payload!.last_name!.should.equal('testLastName');
+          result!.items![0]!.payload!.role_associations![0]!.attributes![0]!.attributes![0]!.value!.should.equal('orgC');
+          result!.items![0]!.payload!.role_associations![1]!.attributes![0]!.attributes![0]!.value!.should.equal('orgB');
           // validate item status and overall status
-          result.items[0].status.code.should.equal(200);
-          result.items[0].status.message.should.equal('success');
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
-          await userService.unregister({ identifier: result.items[0].payload.name });
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
+          await userService.unregister({ identifier: result!.items![0]!.payload!.name });
         });
 
         it('should not allow to create a User with invalid role existing in system', async () => {
-          testUser.role_associations[0].role = 'invalid_role';
+          testUser.role_associations![0]!.role = 'invalid_role';
           const result = await userService.create({ items: [testUser], subject });
-          result.items[0].status.code.should.equal(403);
-          result.items[0].status.message.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
-          result.items[0].status.id.should.equal('testuser');
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          result!.items![0]!.status!.code!.should.equal(403);
+          result!.items![0]!.status!.message!.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
+          result!.items![0]!.status!.id!.should.equal('testuser');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
         });
 
         it('should create first user and give an error status for second user containing invalid role', async () => {
@@ -1731,37 +1731,37 @@ describe('testing identity-srv', () => {
               attributes: []
             }]
           };
-          testUser.role_associations[0].role = 'invalid_role';
+          testUser.role_associations![0]!.role = 'invalid_role';
           const result = await userService.create({ items: [testuser1, testUser], subject });
 
-          result.items[0].status.code.should.equal(403);
-          result.items[0].status.message.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
-          result.items[0].status.id.should.equal('testuser');
+          result!.items![0]!.status!.code!.should.equal(403);
+          result!.items![0]!.status!.message!.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
+          result!.items![0]!.status!.id!.should.equal('testuser');
           // first user created, validate result
-          result.items[1].status.code.should.equal(200);
-          result.items[1].status.message.should.equal('success');
-          result.items[1].status.id.should.equal('testuser2');
-          result.items[1].payload.name.should.equal('test.user2');
-          result.items[1].payload.email.should.equal('test2@ms.restorecommerce.io');
+          result!.items!![1]!.status!.code!.should.equal(200);
+          result!.items!![1]!.status!.message!.should.equal('success');
+          result!.items!![1]!.status!.id!.should.equal('testuser2');
+          result!.items!![1]!.payload!.name!.should.equal('test.user2');
+          result!.items!![1]!.payload!.email!.should.equal('test2@ms.restorecommerce.io');
           // overall status
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
           // unregister testuser2
           await userService.unregister({ identifier: 'testuser2' });
         });
 
         it('should not allow to create a User with role assocation which is not assignable', async () => {
-          testUser.role_associations[0].role = 'super-admin-r-id';
+          testUser.role_associations![0]!.role = 'super-admin-r-id';
           const result = await userService.create({ items: [testUser], subject });
-          result.items[0].status.code.should.equal(403);
-          result.items[0].status.message.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id,admin-r-id,user-r-id does not have permissions');
-          result.items[0].status.id.should.equal('testuser');
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          result!.items![0]!.status!.code!.should.equal(403);
+          result!.items![0]!.status!.message!.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id,admin-r-id,user-r-id does not have permissions');
+          result!.items![0]!.status!.id!.should.equal('testuser');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
         });
 
         it('should throw an error when hierarchical scope do not match creator role', async () => {
-          testUser.role_associations[0].role = 'user-r-id';
+          testUser.role_associations![0]!.role = 'user-r-id';
           // auth_context not containing valid creator role (admin-r-id)
           subjectResolved.hierarchical_scopes = [
             {
@@ -1781,15 +1781,15 @@ describe('testing identity-srv', () => {
           let hrScopeskey = `cache:${subject.id}:${subject.token}:hrScopes`;
           await redisClient.set(hrScopeskey, JSON.stringify(subjectResolved.hierarchical_scopes));
           const result = await userService.create({ items: [testUser], subject });
-          result.items[0].status.code.should.equal(403);
-          result.items[0].status.message.should.equal('The target role user-r-id cannot be assigned to user test.user as user role  does not have permissions');
-          result.items[0].status.id.should.equal('testuser');
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          result!.items![0]!.status!.code!.should.equal(403);
+          result!.items![0]!.status!.message!.should.equal('The target role user-r-id cannot be assigned to user test.user as user role  does not have permissions');
+          result!.items![0]!.status!.id!.should.equal('testuser');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
         });
 
         it('should not allow to create a User with role assocation with invalid hierarchical_scope', async () => {
-          testUser.role_associations[0].role = 'user-r-id';
+          testUser.role_associations![0]!.role = 'user-r-id';
           // auth_context missing orgC in HR scope
           subjectResolved.hierarchical_scopes = [
             {
@@ -1807,11 +1807,11 @@ describe('testing identity-srv', () => {
           let hrScopeskey = `cache:${subject.id}:${subject.token}:hrScopes`;
           await redisClient.set(hrScopeskey, JSON.stringify(subjectResolved.hierarchical_scopes));
           const result = await userService.create({ items: [testUser], subject });
-          result.items[0].status.code.should.equal(403);
-          result.items[0].status.message.should.equal('the role user-r-id cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
-          result.items[0].status.id.should.equal('testuser');
-          result.operation_status.code.should.equal(200);
-          result.operation_status.message.should.equal('success');
+          result!.items![0]!.status!.code!.should.equal(403);
+          result!.items![0]!.status!.message!.should.equal('the role user-r-id cannot be assigned to user test.user;do not have permissions to assign target scope orgC for test.user');
+          result!.items![0]!.status!.id!.should.equal('testuser');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
 
           // disable authorization
           cfg.set('authorization:enabled', false);
@@ -1833,17 +1833,17 @@ describe('testing identity-srv', () => {
           should.exist(registerResult.status);
           const result = registerResult.payload;
           should.exist(result);
-          should.exist(result.id);
-          testUserID = result.id;
-          testUserName = result.name;
-          should.exist(result.name);
-          result.name.should.equal(user.name);
-          should.exist(result.password_hash);
-          should.exist(result.email);
-          result.email.should.equal(user.email);
-          result.active.should.be.false();
-          result.activation_code.should.not.be.empty();
-          JSON.parse(result.data.value.toString()).testKey.should.equal('testValue');
+          should.exist(result!.id);
+          testUserID = result!.id;
+          testUserName = result!.name;
+          should.exist(result!.name);
+          result!.name!.should.equal(user.name);
+          should.exist(result!.password_hash);
+          should.exist(result!.email);
+          result!.email!.should.equal(user.email);
+          result!.active!.should.be.false();
+          result!.activation_code!.should.not.be.empty();
+          JSON.parse(result!.data!.value!.toString()).testKey!.should.equal('testValue');
           await userService.unregister({ identifier: 'test.user1' });
         });
       });
@@ -1899,19 +1899,19 @@ describe('testing identity-srv', () => {
             domain: 'example.com'
           });
 
-          exampleToken.token.should.equal('aaaa');
+          exampleToken.token!.should.equal('aaaa');
 
           const fooToken = await userService.getUnauthenticatedSubjectTokenForTenant({
             domain: 'foo.com'
           });
 
-          fooToken.token.should.equal('bbbb');
+          fooToken.token!.should.equal('bbbb');
 
           const missingToken = await userService.getUnauthenticatedSubjectTokenForTenant({
             domain: 'hello.com'
           });
 
-          missingToken.should.deepEqual({});
+          missingToken!.should.deepEqual({});
 
           await userService.delete({ ids: ['example-unauthenticated-user', 'foo-unauthenticated-user'] });
         });
