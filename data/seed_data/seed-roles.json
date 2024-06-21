@@ -1,0 +1,24 @@
+[
+  {
+    "id": "superadministrator-r-id",
+    "name": "Superadmininistrator",
+    "description": "Has read and write access across all orgnizational scopes",
+    "assignable_by_roles": [
+      "superadministrator-r-id"
+    ],
+    "meta": {
+      "owners": [
+        {
+          "id": "urn:restorecommerce:acs:names:ownerIndicatoryEntity",
+          "value": "urn:restorecommerce:acs:model:organization.Organization",
+          "attributes": [
+            {
+              "id": "urn:restorecommerce:acs:names:ownerInstance",
+              "value": "system"
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

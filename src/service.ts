@@ -3092,6 +3092,10 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     await this.redisClient.quit();
   }
 
+  superUpsert(request: RoleList, context: any): Promise<DeepPartial<RoleListResponse>> {
+    return super.upsert(request, context);
+  }
+
   async create(request: RoleList, context: any): Promise<DeepPartial<RoleListResponse>> {
     if (!request || !request.items || request?.items?.length == 0) {
       return returnOperationStatus(400, 'No role was provided for creation');

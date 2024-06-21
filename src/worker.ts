@@ -203,15 +203,15 @@ export class Worker {
       }
     }
     if (externalJobFiles && externalJobFiles.length > 0) {
-      externalJobFiles.forEach( async (externalFile) => {
-        if (externalFile.endsWith('.js') || externalFile.endsWith('.cjs') ) {
+      externalJobFiles.forEach(async (externalFile) => {
+        if (externalFile.endsWith('.js') || externalFile.endsWith('.cjs')) {
           let require_dir = './jobs/';
           if (process.env.EXTERNAL_JOBS_REQUIRE_DIR) {
             require_dir = process.env.EXTERNAL_JOBS_REQUIRE_DIR;
           }
           // check for double default
           let fileImport = await import(require_dir + externalFile);
-          if(fileImport?.default?.default) {
+          if (fileImport?.default?.default) {
             (async () => (await import(require_dir + externalFile)).default.default(cfg, logger, events, runWorker))().catch(err => {
               this.logger.error(`Error scheduling external job ${externalFile}`, { err: err.message });
             });
@@ -349,10 +349,50 @@ export class Worker {
       })
     } as BindConfig<HealthDefinition>);
 
+    // Import static seed roles
+    const seedDataConfig = this.cfg.get('seed_data');
+    if (seedDataConfig) {
+      const entities = Object.keys(seedDataConfig);
+      for (let entity of entities) {
+        const filePath = seedDataConfig[entity];
+        await new Promise<void>((resolve, reject) => {
+          fs.readFile(filePath, (err, data) => {
+            if (err) {
+              this.logger.error(`Failed loading seed ${entity} file`, err);
+              reject(err);
+              return;
+            }
+            let seedData;
+            try {
+              seedData = JSON.parse(data.toString());
+            } catch(err) {
+              this.logger.error(`Error parsing seed ${entity} file`, err);
+              reject(err);
+              return;
+            }
+            this.logger.info(`Loaded ${seedData?.length} seed ${entity}`);
+            const service = entity === 'user' ? this.userService : this.roleService;
+
+            service.superUpsert({ items: seedData }, undefined)
+              .then(() => {
+                this.logger.info(`Seed ${entity} upserted successfully`);
+                resolve();
+              })
+              .catch( (err: any) => {
+                this.logger.error(`Failed upserting seed ${entity} file`, err);
+                reject(err);
+              });
+          });
+        }).catch((err) => {
+          this.logger.error(`Failed upserting seed ${entity} file`, err);
+        });
+      }
+    }
+
     // Import static seed accounts
     const seedAccountFile = this.cfg.get('seed_account_file');
     if (seedAccountFile) {
-      this.logger.info('Loading seed account file:', seedAccountFile);
+      this.logger.info('Loading seed account file', { seedAccountFile });
       await new Promise<void>((resolve, reject) => {
         fs.readFile(seedAccountFile, (err, data) => {
           if (err) {
@@ -374,13 +414,8 @@ export class Worker {
             items: seedAccounts,
           }), undefined)
             .then(() => {
-              this.logger.info('Loading default seed account token into redis');
-
-              const token = defaultSeedAccount.tokens.find((t: any) => t.default_technical_token).token;
-
-              cis.redisClient.set('default_account_api_token', token)
-                .then(() => resolve())
-                .catch(reject);
+              this.logger.info('Seed accounts upserted successfully');
+              resolve();
             })
             .catch(err => {
               this.logger.error('Failed upserting seed account file:', err);

@@ -373,5 +373,8 @@
       }
     }
   },
-  "seed_account_file": "./test/seed-accounts.json"
+  "seed_data": {
+    "users": "./data/seed_data/seed-accounts.json",
+    "roles": "./data/seed_data/seed-roles.json"
+  }
 }
