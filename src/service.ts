@@ -566,6 +566,16 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   }
 
   superUpsert(request: UserList, context: any): Promise<DeepPartial<UserListResponse>> {
+    const usersList = request.items;
+    for (let user of usersList || []) {
+      user.activation_code = this.idGen();
+      user.id = user.id ? user.id : this.idGen();
+      user.active = user.active ? user.active : true;
+      if (user.password) {
+        user.password_hash = password.hash(user.password);
+        delete user.password;
+      }
+    }
     return super.upsert(request, context);
   }
 

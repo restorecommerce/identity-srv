@@ -24,7 +24,8 @@ import {
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/job.js';
 import {
   RoleServiceDefinition,
-  protoMetadata as roleMeta
+  protoMetadata as roleMeta,
+  RoleList
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role.js';
 import {
   AuthenticationLogServiceDefinition,
@@ -371,9 +372,10 @@ export class Worker {
               return;
             }
             this.logger.info(`Loaded ${seedData?.length} seed ${entity}`);
-            const service = entity === 'user' ? this.userService : this.roleService;
+            const service = entity === 'users' ? this.userService : this.roleService;
+            const serviceList = entity === 'users' ? UserList: RoleList;
 
-            service.superUpsert({ items: seedData }, undefined)
+            service.superUpsert(serviceList.fromPartial({ items: seedData }), undefined)
               .then(() => {
                 this.logger.info(`Seed ${entity} upserted successfully`);
                 resolve();

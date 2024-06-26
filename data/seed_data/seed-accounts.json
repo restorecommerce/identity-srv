@@ -2,19 +2,19 @@
   {
     "id": "tech-user",
     "name": "tech-user",
-    "firstName": "Tech",
-    "lastName": "User",
+    "first_name": "Tech",
+    "last_name": "User",
     "email": "tech-user@restorecommerce.io",
-    "defaultScope": "",
-    "roleAssociations": [
+    "default_scope": "",
+    "role_associations": [
       {
         "id": "superadministrator-r-role-assoc-id",
         "role": "superadministrator-r-id",
         "attributes": []
       }
     ],
-    "localeId": "de-de",
-    "timezoneId": "europe-berlin",
+    "locale_id": "de-de",
+    "timezone_id": "europe-berlin",
     "meta": {
       "owners": [
         {
@@ -40,14 +40,14 @@
       ]
     },
     "active": true,
-    "password": "10cdd55a-3371-4ae3-919d-2506e78c0c33",
+    "password": "65018a43-7184-4012-b08f-5a2563fd5458",
     "guest": false,
-    "userType": "TECHNICAL_USER",
+    "user_type": "TECHNICAL_USER",
     "invite": false,
     "tokens": [
       {
         "name": "access-token",
-        "token": "609edc0a-75d1-403e-9f9f-ad61bf42937c",
+        "token": "1a4c6789-6435-487a-9308-64d06384acf9",
         "scopes": [
           "superadministrator-r-role-assoc-id"
         ],
