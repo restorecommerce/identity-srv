@@ -714,12 +714,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         this.logger.error('Error making wahtIsAllowedACS request for verifying role associations', { code: err.code, message: err.message, stack: err.stack });
         return returnStatus(err.code, err.message, usersList[0].id);
       }
-      // for apiKey no need to verify role assocs
-      const configuredApiKey = this.cfg.get('authentication:apiKey');
-      if ((acsResponse.decision === Response_Decision.PERMIT) &&
-        (configuredApiKey && subject.token && configuredApiKey === subject.token)) {
-        return;
-      }
       if ((acsResponse as PolicySetRQResponse)?.policy_sets?.length > 0) {
         const policiesList = (acsResponse as PolicySetRQResponse).policy_sets[0].policies;
         if (policiesList?.length > 0) {

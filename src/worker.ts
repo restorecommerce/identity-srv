@@ -119,12 +119,6 @@ class UserCommandInterface extends chassis.CommandInterface {
     };
   }
 
-  async setApiKey(payload: any): Promise<any> {
-    const commandResponse = await super.setApiKey(payload);
-    updateConfig(this.config);
-    return commandResponse;
-  }
-
   async configUpdate(payload: any): Promise<any> {
     const commandResponse = await super.configUpdate(payload);
     updateConfig(this.config);
