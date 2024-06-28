@@ -279,12 +279,6 @@
       "sendEmail": {
         "messageObject": "io.restorecommerce.notification_req.NotificationReq"
       },
-      "setApiKeyCommand": {
-        "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
-      },
-      "setApiKeyResponse": {
-        "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
-      },
       "flushCacheCommand": {
         "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
       },
@@ -315,7 +309,6 @@
             "resetCommand",
             "versionCommand",
             "configUpdateCommand",
-            "setApiKeyCommand",
             "flushCacheCommand"
           ]
         },
