@@ -1,10 +1,10 @@
 [
   {
-    "id": "tech-user",
-    "name": "tech-user",
-    "first_name": "Tech",
+    "id": "root-tech-user",
+    "name": "root-tech-user",
+    "first_name": "Root Tech",
     "last_name": "User",
-    "email": "tech-user@restorecommerce.io",
+    "email": "root-tech-user@restorecommerce.io",
     "default_scope": "",
     "role_associations": [
       {
@@ -33,7 +33,7 @@
           "attributes": [
             {
               "id": "urn:restorecommerce:acs:names:ownerInstance",
-              "value": "tech-user"
+              "value": "root-tech-user"
             }
           ]
         }
