@@ -19,16 +19,6 @@
       "owners": [
         {
           "id": "urn:restorecommerce:acs:names:ownerIndicatoryEntity",
-          "value": "urn:restorecommerce:acs:model:organization.Organization",
-          "attributes": [
-            {
-              "id": "urn:restorecommerce:acs:names:ownerInstance",
-              "value": "system"
-            }
-          ]
-        },
-        {
-          "id": "urn:restorecommerce:acs:names:ownerIndicatoryEntity",
           "value": "urn:restorecommerce:acs:model:user.User",
           "attributes": [
             {

@@ -20,9 +20,6 @@ import {
   Filter_Operation,
   ReadRequest
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
-import {
-  Response_Decision
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 import fetch from 'node-fetch';
 
 export const accountResolvers: { [key: string]: (access_token: string) => Promise<string> } = {
