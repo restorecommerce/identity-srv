@@ -61,11 +61,15 @@ export class TokenService implements TokenServiceImplementation {
           field: 'id',
           operation: Filter_Operation.eq,
           value: payload?.accountId
-        }]
+        }],
+        limit: 1
       }];
-      const userData = await this.userService.superRead(ReadRequest.fromPartial({ filters }), {});
-      if (userData?.items?.length > 0) {
-        let user = userData.items[0].payload;
+      const user = await this.userService.superRead(
+        ReadRequest.fromPartial({ filters }), {}
+      ).then(
+        response => response.items?.[0]?.payload
+      );
+      if (user) {
         const expiredTokenList = user?.tokens?.length > 0 && user.tokens.filter(
           obj => obj?.expires_in && (obj.expires_in.getTime() < new Date().getTime())
         );
@@ -77,7 +81,7 @@ export class TokenService implements TokenServiceImplementation {
         }
         const token = {
           name: token_name,
-          expires_in: tokenData?.expires_in, // since AQL is used to store to DB
+          expires_in: tokenData?.expires_in,
           token: payload.jti,
           type,
           interactive: true,
