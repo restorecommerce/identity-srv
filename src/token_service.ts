@@ -74,7 +74,7 @@ export class TokenService implements TokenServiceImplementation {
           obj => obj?.expires_in && (obj.expires_in.getTime() < new Date().getTime())
         );
         let token_name;
-        if (payload.claims && payload.claims.token_name) {
+        if (payload.claims?.token_name) {
           token_name = payload.claims.token_name;
         } else {
           token_name = uuid.v4().replace(/-/g, '');

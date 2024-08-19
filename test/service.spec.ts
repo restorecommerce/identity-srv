@@ -22,6 +22,10 @@ import { createClient as RedisCreateClient, RedisClientType } from 'redis';
 import { Rule, Effect } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rule';
 import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta';
 import { PolicySetRQ } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/policy_set';
+import {
+  TokenServiceClient,
+  TokenServiceDefinition
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token';
 
 /*
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
@@ -46,36 +50,44 @@ async function start(): Promise<void> {
   await worker.start();
 }
 
-async function connect(clientCfg: string, resourceName: string): Promise<any> { // returns a gRPC service
+async function connect<T extends any = any>(clientCfg: string, resourceName: string): Promise<T> { // returns a gRPC service
   logger = worker.logger;
 
   if (events) {
     await events.stop();
   }
 
-  events = new Events({
-    ...cfg.get('events:kafka'),
-    groupId: 'restore-identity-srv-test-runner',
-    kafka: {
-      ...cfg.get('events:kafka:kafka'),
-    }
-  }, logger);
-  await (events.start());
-  let topicLable = `${resourceName}.resource`;
-  topic = await events.topic(cfg.get(`events:kafka:topics:${topicLable}:topic`));
+  const topicLable = cfg.get(`events:kafka:topics:${resourceName}.resource:topic`);
+  if (topicLable) {
+    events = new Events({
+      ...cfg.get('events:kafka'),
+      groupId: 'restore-identity-srv-test-runner',
+      kafka: {
+        ...cfg.get('events:kafka:kafka'),
+      }
+    }, logger);
+    await (events.start());
+    topic = await events.topic(topicLable);
+  }
 
   const channel = createChannel(cfg.get(clientCfg).address);
   if (resourceName.startsWith('user')) {
     return createClient({
       ...cfg.get(clientCfg),
       logger
-    }, UserServiceDefinition, channel) as any;
+    }, UserServiceDefinition, channel) as T;
   } else if (resourceName.startsWith('role')) {
     return createClient({
       ...cfg.get(clientCfg),
       logger
-    }, RoleServiceDefinition, channel) as any;
+    }, RoleServiceDefinition, channel) as T;
+  } else if (resourceName.startsWith('token')) {
+    return createClient({
+      ...cfg.get(clientCfg),
+      logger
+    }, TokenServiceDefinition, channel) as T;
   }
+  throw new Error('Given client config not supported!');
 }
 
 let meta: Meta = {
@@ -341,7 +353,7 @@ describe('testing identity-srv', () => {
   describe('testing User service with email constraint (default)', () => {
     describe('with test client with email constraint (default)', () => {
       let userService: UserServiceClient;
-      let testUserID, upserUserID, user, testUserName;
+      let testUserID, upsertUserID, user, testUserName;
       before(async function connectUserService(): Promise<void> {
         userService = await connect('client:user', 'user');
         user = {
@@ -1476,7 +1488,7 @@ describe('testing identity-srv', () => {
               last_name: 'upsert'
             }]
           });
-          upserUserID = result!.items![0]!.payload!.id;
+          upsertUserID = result!.items![0]!.payload!.id;
           should.exist(result);
           should.exist(result!.items);
           result!.items![0]!.payload!.email!.should.equal('upsert@restorecommerce.io');
@@ -1491,7 +1503,7 @@ describe('testing identity-srv', () => {
           // sampleuser1 already exists in DB, so changing the `upseruser` name to `sampleuser1` should fail
           let result = await userService.update({
             items: [{
-              id: upserUserID,
+              id: upsertUserID,
               name: 'sampleuser1',
               email: 'upsert@restorecommerce.io',
               password: 'RNZzHwG&jpv5RS4Ev',
@@ -1530,7 +1542,7 @@ describe('testing identity-srv', () => {
         it('should upsert (update) user and delete user collection', async function upsert(): Promise<void> {
           let result = await userService.upsert({
             items: [{
-              id: upserUserID,
+              id: upsertUserID,
               name: 'upsertuser',
               email: 'upsert2@restorecommerce.io',
               password: 'RNZzHwG&jpv5RS4Ev2',
@@ -1914,6 +1926,29 @@ describe('testing identity-srv', () => {
           missingToken!.should.deepEqual({});
 
           await userService.delete({ ids: ['example-unauthenticated-user', 'foo-unauthenticated-user'] });
+        });
+      });
+
+      describe('testing user Token service', async function testTokenService() {
+        let tokenService: TokenServiceClient;
+        
+        before(async () => {
+          tokenService = await connect<TokenServiceClient>('client:token', 'token');
+        });
+    
+        it('should upsert token to User', async () => {
+          await tokenService.upsert({
+            id: upsertUserID,
+            expires_in: new Date(new Date().getTime() + 100000),
+            payload: {
+              value: Buffer.from(
+                JSON.stringify({
+                  jti: 'TESTTOKEN',
+                  accountId: upsertUserID,
+                })
+              )
+            }
+          });
         });
       });
     });

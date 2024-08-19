@@ -150,6 +150,9 @@
     "role": {
       "address": "localhost:50051"
     },
+    "token": {
+      "address": "localhost:50051"
+    },
     "reflection": {
       "address": "localhost:50051"
     },

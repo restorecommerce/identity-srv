@@ -30,7 +30,7 @@ import {
 import { createClient, RedisClientType } from 'redis';
 import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common.js';
 import { validateAllChar, validateEmail, validateFirstChar, validateStrLen, validateSymbolRepeat } from './validation.js';
-import { TokenService } from './token_service.js';
+// import { TokenService } from './token_service.js';
 import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base.js';
 import {
   ActivateRequest,
@@ -120,7 +120,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   authZ: ACSAuthZ;
   redisClient: RedisClientType<any, any>;
   authZCheck: boolean;
-  tokenService: TokenService;
+  // tokenService: TokenService;
   tokenRedisClient: RedisClientType<any, any>;
   uniqueEmailConstraint: boolean;
 
@@ -170,7 +170,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     this.tokenRedisClient.on('error', (err) => logger.error('Redis client error in token cache store', err));
     this.tokenRedisClient.connect().then((val) =>
       logger.info('Redis client connection successful for token cache store')).catch(err => logger.error('Redis connection error', err));
-    this.tokenService = new TokenService(cfg, logger, this);
+    // this.tokenService = new TokenService(cfg, logger, this);
     this.emailEnabled = this.cfg.get('service:enableEmail');
     const isConfigSet = this.cfg.get('service:uniqueEmailConstraint');
     if (isConfigSet === undefined || isConfigSet) {
