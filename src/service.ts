@@ -329,8 +329,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     // tokens get overwritten with update operation on simultaneours req
     if (token && token.interactive) {
       // insert token to tokens array
-      const aql_token = `FOR doc in users FILTER doc.id == @docID UPDATE doc WITH
-      { tokens: PUSH(doc.tokens, @token)} IN users return doc`;
+      const aql_token = `
+        FOR doc IN users
+        FILTER doc._key == @docID OR doc.id == @docID
+        LIMIT 1
+        UPDATE doc WITH { tokens: PUSH(doc.tokens, @token)} IN users
+        RETURN doc
+      `;
       const bindVars = Object.assign({
         docID: id,
         token
@@ -338,8 +343,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const res = await query(this.db.db, 'users', aql_token, bindVars);
       await res.all();
       // update last_access
-      const aql_last_accesss = `FOR doc in users FILTER doc.id == @docID UPDATE doc WITH
-      { last_access: @last_access} IN users return doc`;
+      const aql_last_accesss = `
+        FOR doc IN users
+        FILTER doc._key == @docID OR doc.id == @docID
+        LIMIT 1
+        UPDATE doc WITH { last_access: @last_access} IN users
+        RETURN doc
+      `;
       const bindVars_last_access = Object.assign({
         docID: id,
         last_access: new Date().getTime()
@@ -349,8 +359,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       this.logger.debug('Tokens updated successuflly for subject', { id });
       // check for expired tokens if they exist and remove them
       if (expiredTokens?.length > 0) {
-        const token_remove = `FOR doc in users FILTER doc.id == @docID UPDATE doc WITH
-          { tokens: REMOVE_VALUES(doc.tokens, @expiredTokens)} IN users return doc`;
+        const token_remove = `
+          FOR doc IN users
+          FILTER doc._key == @docID OR doc.id == @docID
+          LIMIT 1
+          UPDATE doc WITH { tokens: REMOVE_VALUES(doc.tokens, @expiredTokens)} IN users
+          RETURN doc
+        `;
         const bindTokenVars = Object.assign({
           docID: id,
           expiredTokens
