@@ -66,18 +66,9 @@ export class TokenService implements TokenServiceImplementation {
       const userData = await this.userService.superRead(ReadRequest.fromPartial({ filters }), {});
       if (userData?.items?.length > 0) {
         let user = userData.items[0].payload;
-        let expiredTokenList = new Array<Tokens>();
-        if (user?.tokens?.length > 0) {
-          // remove expired tokens
-          expiredTokenList = (user.tokens).filter(obj => {
-            if (obj?.expires_in && (obj.expires_in.getTime() < new Date().getTime())) {
-              // since AQL is used to remove object - convert DateObject to time in ms
-              (obj as any).expires_in = obj.expires_in ? obj.expires_in.getTime() : undefined;
-              (obj as any).last_login = obj.last_login ? obj.last_login.getTime() : undefined;
-              return obj;
-            }
-          });
-        }
+        const expiredTokenList = user?.tokens?.length > 0 && user.tokens.filter(
+          obj => obj?.expires_in && (obj.expires_in.getTime() < new Date().getTime())
+        );
         let token_name;
         if (payload.claims && payload.claims.token_name) {
           token_name = payload.claims.token_name;
@@ -86,11 +77,11 @@ export class TokenService implements TokenServiceImplementation {
         }
         const token = {
           name: token_name,
-          expires_in: tokenData?.expires_in?.getTime(), // since AQL is used to store to DB
+          expires_in: tokenData?.expires_in, // since AQL is used to store to DB
           token: payload.jti,
           type,
           interactive: true,
-          last_login: new Date().getTime(),
+          last_login: new Date(),
           client_id: payload?.clientId
         };
         try {

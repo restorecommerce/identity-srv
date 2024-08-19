@@ -313,6 +313,18 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   }
 
   async updateUserTokens(id: string, token: Tokens, expiredTokens?: Tokens[]) {
+    // since AQL is used to remove object - convert DateObject to time in ms
+    token = {
+      ...token,
+      expires_in: token?.expires_in?.getTime(),
+      last_login: token?.last_login?.getTime(),
+    } as any;
+    expiredTokens = expiredTokens?.map((token): any => ({
+      ...token,
+      expires_in: token.expires_in?.getTime(),
+      last_login: token.last_login?.getTime()
+    }));
+
     // temporary hack to update tokens on user(to fix issue when same user login multiple times simultaneously)
     // tokens get overwritten with update operation on simultaneours req
     if (token && token.interactive) {
