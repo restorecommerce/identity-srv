@@ -457,7 +457,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               }
             }
           );
-          
+
           if (user) {
             logger.debug('found user from token', user);
             // validate token expiry and delete if expired
@@ -484,7 +484,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                   }
                 }
               );
-              
+
               if (updatedUser) {
                 logger.debug('update of user token last login successfully', { updatedUser });
                 await this.tokenRedisClient.set(token, JSON.stringify(updatedUser));
