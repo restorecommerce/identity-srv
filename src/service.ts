@@ -30,7 +30,6 @@ import {
 import { createClient, RedisClientType } from 'redis';
 import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common.js';
 import { validateAllChar, validateEmail, validateFirstChar, validateStrLen, validateSymbolRepeat } from './validation.js';
-// import { TokenService } from './token_service.js';
 import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base.js';
 import {
   ActivateRequest,
@@ -120,7 +119,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   authZ: ACSAuthZ;
   redisClient: RedisClientType<any, any>;
   authZCheck: boolean;
-  // tokenService: TokenService;
   tokenRedisClient: RedisClientType<any, any>;
   uniqueEmailConstraint: boolean;
 
@@ -170,7 +168,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     this.tokenRedisClient.on('error', (err) => logger.error('Redis client error in token cache store', err));
     this.tokenRedisClient.connect().then((val) =>
       logger.info('Redis client connection successful for token cache store')).catch(err => logger.error('Redis connection error', err));
-    // this.tokenService = new TokenService(cfg, logger, this);
     this.emailEnabled = this.cfg.get('service:enableEmail');
     const isConfigSet = this.cfg.get('service:uniqueEmailConstraint');
     if (isConfigSet === undefined || isConfigSet) {
@@ -293,16 +290,20 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   */
   async updateTokenLastLogin(id: string, token: string) {
     // update last_login
-    const aql_last_login = `FOR u IN users
-    FILTER u.id == @docID
-     UPDATE u WITH {
-      tokens: (
-          FOR tokenObj in u.tokens
-            RETURN tokenObj.token == @token
-              ? MERGE( tokenObj, {last_login: @last_login })
-              : tokenObj
-      )
-    } IN users`;
+    const aql_last_login = `
+      FOR u IN users
+        FILTER u._key == @docID OR u.id == @docID
+        LIMIT 1
+        UPDATE u WITH {
+          tokens: (
+            FOR tokenObj in u.tokens
+              RETURN tokenObj.token == @token
+                ? MERGE( tokenObj, {last_login: @last_login })
+                : tokenObj
+          )
+        } IN users
+        RETURN NEW
+    `;
     const bindVars_last_login = Object.assign({
       docID: id,
       token,
@@ -348,7 +349,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         FILTER doc._key == @docID OR doc.id == @docID
         LIMIT 1
         UPDATE doc WITH { last_access: @last_access} IN users
-        RETURN doc
+        RETURN NEW
       `;
       const bindVars_last_access = Object.assign({
         docID: id,
@@ -364,7 +365,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           FILTER doc._key == @docID OR doc.id == @docID
           LIMIT 1
           UPDATE doc WITH { tokens: REMOVE_VALUES(doc.tokens, @expiredTokens)} IN users
-          RETURN doc
+          RETURN NEW
         `;
         const bindTokenVars = Object.assign({
           docID: id,
@@ -380,8 +381,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   async removeToken(id: string, tokenObj: Tokens[]) {
     // Remove token using AQL query
     if (tokenObj?.length > 0) {
-      const token_remove = `FOR doc in users FILTER doc.id == @docID UPDATE doc WITH
-          { tokens: REMOVE_VALUES(doc.tokens, @tokenObj)} IN users return doc`;
+      const token_remove = `
+        FOR doc in users
+        FILTER doc._key == @docID OR doc.id == @docID
+        LIMIT 1
+        UPDATE doc WITH { tokens: REMOVE_VALUES(doc.tokens, @tokenObj)} IN users
+        RETURN NEW
+      `;
       const bindTokenVars = Object.assign({
         docID: id,
         tokenObj
@@ -416,8 +422,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             logger.error('Token missing in User Data!', { userData });
             return { status: { code: 500, message: 'Token missing in User Data!' } };
           }
-          else if (!redisToken.expires_in
-            || redisToken?.expires_in?.getTime() === 0
+          else if (
+            new Date(redisToken?.expires_in ?? 0).getTime() === 0
             || new Date(redisToken?.expires_in) >= new Date()
           ) {
             return { payload: userData, status: returnCodeMessage(200, 'success') };
@@ -430,22 +436,30 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         } else {
           // when not set in redis
           // regex filter search field for token array
-          const filters = [{
+          const query = ReadRequest.fromPartial({
             filters: [{
-              field: 'tokens[*].token',
-              operation: Filter_Operation.in,
-              value: token
-            }]
-          }];
-          const users = await super.read(ReadRequest.fromPartial({ filters }), context);
-          const user = users.items?.[0]?.payload;
-
-          if (users?.items?.length > 1) {
-            logger.error('multiple user found for request', { request });
-            return { status: { code: 400, message: 'Multiple users found for token' } };
-          }
-          else if (user) {
-            logger.debug('found user from token', users);
+              filters: [{
+                field: 'tokens[*].token',
+                operation: Filter_Operation.in,
+                value: token
+              }],
+            }],
+            limit: 2 // limit 2 for checking invalids!
+          });
+          const user = await super.read(query, context).then(
+            response => {
+              if (response?.items?.length > 1) {
+                logger.error('multiple user found for request', { request });
+                throw { code: 400, message: 'Multiple users found for token' };
+              }
+              else {
+                return response.items?.[0]?.payload;
+              }
+            }
+          );
+          
+          if (user) {
+            logger.debug('found user from token', user);
             // validate token expiry and delete if expired
             const dbToken = user?.tokens?.find(t => t.token === token);
             // if expires_in does not exist or if its set to value 0 - token valid without time frame
@@ -453,18 +467,25 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               logger.error('Token missing in User Data!', { user });
               return { status: { code: 500, message: 'Token missing in User Data!' } };
             }
-            else if (!dbToken.expires_in
-              || dbToken.expires_in.getTime() === 0
-              || dbToken?.expires_in >= new Date()
+            else if (
+              new Date(dbToken.expires_in ?? 0).getTime() === 0
+              || new Date(dbToken.expires_in) >= new Date()
             ) {
               // update token last_login
               await this.updateTokenLastLogin(user.id, token);
-              const response = await super.read(ReadRequest.fromPartial({ filters }), context);
-              const updatedUser = response.items?.[0]?.payload;
-              if (response?.items?.length > 1) {
-                return { status: { code: 400, message: 'Multiple users found for token' } };
-              }
-              else if (updatedUser) {
+              const updatedUser = await super.read(query, context).then(
+                response => {
+                  if (response?.items?.length > 1) {
+                    logger.error('multiple user found for request', { request });
+                    throw { code: 400, message: 'Multiple users found for token' };
+                  }
+                  else {
+                    return response.items?.[0]?.payload;
+                  }
+                }
+              );
+              
+              if (updatedUser) {
                 logger.debug('update of user token last login successfully', { updatedUser });
                 await this.tokenRedisClient.set(token, JSON.stringify(updatedUser));
                 logger.debug('Stored user data to redis cache successfully');
@@ -494,7 +515,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       this.logger.error('Fatal error', { error: e.stack, code: e.code, message: e.message });
       return {
         status: {
-          code: 500,
+          code: e.code ?? 500,
           message: e.message ?? e.details ?? e.toString() ?? e,
         }
       };
