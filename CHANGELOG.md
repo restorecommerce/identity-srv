@@ -1,3 +1,9 @@
+### 1.8.3 (August 27th, 2024)
+
+- bump versions
+- fix oauth
+- remove tech users and api keys
+
 ### 1.5.1 (Februrary 6th, 2024)
 
 - bump minor dep versions

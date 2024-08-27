@@ -90,8 +90,8 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
             prompt: 'consent',
             access_type: 'offline'
           })
-        })
-      ))
+        }))
+      )
     };
   }
 
