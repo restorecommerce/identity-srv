@@ -1,17 +1,18 @@
 import { Logger } from 'winston';
 import { OAuth2 } from 'oauth';
-import { checkAccessRequest, createMetadata } from './utils.js';
 import { UserService } from './service.js';
-import { AuthZAction, Operation } from '@restorecommerce/acs-client';
 import * as _ from 'lodash-es';
 import * as uuid from 'uuid';
 import * as jose from 'jose';
 import {
   DeepPartial,
+  ExchangeCodeRequest,
   ExchangeCodeResponse,
   GenerateLinksResponse,
   OAuthServiceImplementation,
-  ServicesResponse
+  ServicesResponse,
+  GetTokenResponse,
+  GetTokenRequest,
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/oauth.js';
 import { Empty } from '@restorecommerce/rc-grpc-clients/dist/generated/google/protobuf/empty.js';
 import { WithRequestID } from '@restorecommerce/chassis-srv/lib/microservice/transport/provider/grpc/middlewares.js';
@@ -24,33 +25,19 @@ import fetch from 'node-fetch';
 
 export const accountResolvers: { [key: string]: (access_token: string) => Promise<string> } = {
   google: async access_token => {
-    const response = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
-      headers: {
-        Authorization: 'Bearer ' + access_token
+    const response: any = await fetch(
+      'https://www.googleapis.com/oauth2/v1/userinfo',
+      {
+        headers: {
+          Authorization: 'Bearer ' + access_token
+        }
       }
-    }).then(response => response.json());
-    return response['email'];
+    ).then(
+      response => response.json()
+    );
+    return response.email;
   }
 };
-
-interface ExchangeCodeRequest {
-  service: string;
-  code: string;
-  state: string;
-}
-
-interface GetTokenRequest {
-  subject: any;
-  service: string;
-}
-
-interface GetTokenResponse {
-  status?: {
-    code: number;
-    message: string;
-  };
-  token?: string;
-}
 
 export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
@@ -93,110 +80,118 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
   async generateLinks(request: Empty, context: any): Promise<DeepPartial<GenerateLinksResponse>> {
     const nonce = 'nonce'; // TODO Generate, store and compare unique nonce
     return {
-      links: Object.entries(this.clients).reduce((result, entry) => {
-        result[entry[0]] = entry[1].getAuthorizeUrl({
-          redirect_uri: this.cfg.get('oauth:redirect_uri_base') + entry[0],
-          scope: this.cfg.get('oauth:services:' + entry[0] + ':scope'),
-          response_type: 'code',
-          state: nonce,
-          prompt: 'consent',
-          access_type: 'offline'
-        });
-        return result;
-      }, {})
+      links: Object.assign({},
+        ...Object.entries(this.clients).map(([key, value]) => ({
+          key: value.getAuthorizeUrl({
+            redirect_uri: this.cfg.get('oauth:redirect_uri_base') + key,
+            scope: this.cfg.get('oauth:services:' + key + ':scope'),
+            response_type: 'code',
+            state: nonce,
+            prompt: 'consent',
+            access_type: 'offline'
+          })
+        })
+      ))
     };
   }
 
   async exchangeCode(request: ExchangeCodeRequest, context: any): Promise<DeepPartial<ExchangeCodeResponse>> {
-    const oauthService = request.service;
-    if (!(oauthService in this.clients)) {
-      throw new Error('Unknown service: ' + oauthService);
-    }
-
-    const data: any = await new Promise((resolve, reject) => this.clients[oauthService].getOAuthAccessToken(request.code, {
-      grant_type: 'authorization_code',
-      redirect_uri: this.cfg.get('oauth:redirect_uri_base') + oauthService,
-    }, (err, access_token, refresh_token, result) => {
-      if (err) {
-        this.logger.error('Oauth failed:', { err });
-        reject(err);
-        return;
+    try {
+      const oauthService = request.service;
+      if (!(oauthService in this.clients)) {
+        throw new Error('Unknown service: ' + oauthService);
       }
 
-      resolve({
-        access_token,
-        refresh_token,
-        result
-      });
-    }));
-
-    const email = await accountResolvers[oauthService](data['access_token']);
-
-    const users = await this.userService.superRead(ReadRequest.fromPartial({
-      filters: [
-        {
-          filters: [
-            {
-              field: 'email',
-              operation: Filter_Operation.eq,
-              value: email
+      const data: any = await new Promise(
+        (resolve, reject) => this.clients[oauthService].getOAuthAccessToken(
+          request.code,
+          {
+            grant_type: 'authorization_code',
+            redirect_uri: this.cfg.get('oauth:redirect_uri_base') + oauthService,
+          },
+          (err, access_token, refresh_token, result) => {
+            if (err) {
+              this.logger.error('Oauth failed:', { err });
+              reject(err);
+              return;
             }
-          ]
-        }
-      ]
-    }), context);
 
-    if (users.total_count === 0) {
-      return { email };
-    }
+            resolve({
+              access_token,
+              refresh_token,
+              result
+            });
+          }
+        )
+      );
 
-    const user = users.items[0].payload;
-    const resultTokens = (user.tokens || []).filter(t => {
-      return t.name === oauthService + '-access_token' || t.name === oauthService + '-refresh_token';
-    });
+      const email = await accountResolvers[oauthService](data.access_token);
+      const user = await this.userService.superRead(ReadRequest.fromPartial({
+        filters: [
+          {
+            filters: [
+              {
+                field: 'email',
+                operation: Filter_Operation.eq,
+                value: email
+              }
+            ]
+          }
+        ],
+        limit: 1
+      }), context).then(
+        response => response?.items?.[0]?.payload
+      );
 
-    const userCopy = {
-      ...user
-    };
+      if (!user) {
+        throw {
+          code: 404,
+          message: `No user found for ${email}`,
+        };
+      }
 
-    delete userCopy['tokens'];
-    delete userCopy['password_hash'];
-    delete userCopy['data'];
+      const resultTokens = (user.tokens || []).filter(
+        t => t.name === oauthService + '-access_token'
+          || t.name === oauthService + '-refresh_token'
+      );
 
-    const token = new jose.UnsecuredJWT({
-      user: userCopy
-    }).setIssuedAt()
-      .setExpirationTime((Date.now() / 1000) + (60 * 60 * 24 * 30 * 6))
-      .encode();
+      delete user.tokens;
+      delete user.password_hash;
+      delete user.data;
 
-    const authToken: any = {
-      name: uuid.v4().replace(/-/g, ''),
-      expires_in: Date.now() + (1000 * 60 * 60 * 24 * 30 * 6), // 6 months
-      token,
-      type: 'access_token',
-      interactive: true,
-      last_login: Date.now()
-    };
+      const token = new jose.UnsecuredJWT({
+        user
+      }).setIssuedAt()
+        .setExpirationTime((Date.now() / 1000) + (60 * 60 * 24 * 30 * 6))
+        .encode();
 
-    const accessToken = {
-      name: oauthService + '-access_token',
-      expires_in: Date.now() + (data['result']['expires_in'] * 1000),
-      token: data['access_token'],
-      type: 'access_token',
-      interactive: true,
-      last_login: Date.now()
-    };
+      const authToken: any = {
+        name: uuid.v4().replace(/-/g, ''),
+        expires_in: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30 * 6), // 6 months
+        token,
+        type: 'access_token',
+        interactive: true,
+        last_login: new Date()
+      };
 
-    const refreshToken = {
-      name: oauthService + '-refresh_token',
-      expires_in: Date.now() + (1000 * 60 * 60 * 24 * 30 * 6), // 6 months
-      token: data['refresh_token'],
-      type: 'refresh_token',
-      interactive: true,
-      last_login: Date.now()
-    };
+      const accessToken = {
+        name: oauthService + '-access_token',
+        expires_in: new Date(Date.now() + data.result.expires_in * 1000),
+        token: data.access_token,
+        type: 'access_token',
+        interactive: true,
+        last_login: new Date()
+      };
 
-    try {
+      const refreshToken = {
+        name: oauthService + '-refresh_token',
+        expires_in: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30 * 6), // 6 months
+        token: data.refresh_token,
+        type: 'refresh_token',
+        interactive: true,
+        last_login: new Date()
+      };
+
       // append access token on user entity
       // remove expired tokens
       await this.userService.updateUserTokens(user.id, accessToken, resultTokens.filter(t => {
@@ -210,102 +205,150 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       // append auth token on user entity
       await this.userService.updateUserTokens(user.id, authToken);
       this.logger.info('Token updated successfully on user entity', { id: user.id });
-    } catch (err: any) {
-      this.logger.error('Error Updating Token', err);
-      return { user: { status: { code: err.code, message: err.message } } };
-    }
 
-    // convert expires_in to date, as updateUserTokens is done using custom AQL query and not via resource base interface
-    authToken.expires_in = new Date(authToken.expires_in);
-    return { email, user: { payload: user, status: { code: 200, message: 'success' } }, token: authToken };
+      authToken.expires_in = new Date(authToken.expires_in);
+      return {
+        email,
+        user: {
+          payload: user,
+          status: {
+            code: 200,
+            message: 'success'
+          }
+        },
+        token: authToken
+      };
+    } catch (err: any) {
+      this.logger.error('Error on token exchange', err);
+      return {
+        user: {
+          status: {
+            code: err.code,
+            message: err.message
+          }
+        }
+      };
+    }
   }
 
   async getToken(request: GetTokenRequest, context: any): Promise<DeepPartial<GetTokenResponse>> {
-    const oauthService = request.service;
-    if (!(oauthService in this.clients)) {
-      throw new Error('Unknown service: ' + oauthService);
-    }
-
-    const user = await this.userService.findByToken(FindByTokenRequest.fromPartial({token: request.subject.token}), context);
-    if (!user || !user.payload || !user.payload.tokens) {
-      return {status: {code: 404, message: 'user not found'}};
-    }
-
-    const tokens = user?.payload?.tokens?.filter((t: any) => t?.name?.startsWith(oauthService + '-'));
-    if (tokens.length < 2) {
-      if (tokens.length > 0) {
-        return {token: tokens[0].token};
-      } else {
-        return {status: {code: 404, message: 'user has no token for this service'}};
-      }
-    }
-
-    const toRemove = [];
-
-    const accessTokens: any[] = tokens.filter(t => t.name.endsWith('access_token'));
-    for (let accessToken of accessTokens) {
-      if (accessToken.expires_in.getTime() > Date.now()) {
-        return {token: accessToken.token};
-      }
-
-      toRemove.push(accessToken);
-    }
-
-    const refreshTokens: any[] = tokens.filter(t => t.name.endsWith('refresh_token'));
-
-    let data;
-    for (const refreshToken of refreshTokens) {
-      if (refreshToken.expires_in.getTime() < Date.now()) {
-        toRemove.push(refreshToken);
-        continue;
-      }
-
-      data = await new Promise((resolve) => this.clients[oauthService].getOAuthAccessToken(refreshToken.token, {
-        grant_type: 'refresh_token'
-      }, (err, access_token, refresh_token, result) => {
-        if (err) {
-          this.logger.error('Error Refreshing Token', err);
-          resolve(undefined);
-          return;
-        }
-
-        resolve({
-          access_token,
-          refresh_token,
-          result
-        });
-      }));
-
-      if (data) {
-        break;
-      } else {
-        toRemove.push(refreshToken);
-      }
-    }
-
-    if (!data) {
-      return {status: {code: 400, message: 'refresh token has expired'}};
-    }
-
-    const newAccessToken = {
-      name: oauthService + '-access_token',
-      expires_in: Date.now() + (data['result']['expires_in'] * 1000),
-      token: data['access_token'],
-      type: 'access_token',
-      interactive: true,
-      last_login: Date.now()
-    };
-
     try {
+      const oauthService = request.service;
+      if (!(oauthService in this.clients)) {
+        throw new Error('Unknown service: ' + oauthService);
+      }
+
+      const user = await this.userService.findByToken(
+        FindByTokenRequest.fromPartial(
+          {
+            token: request.subject.token
+          }
+        ),
+        context
+      );
+
+      if (!user?.payload?.tokens) {
+        return {
+          status: {
+            code: 404,
+            message: 'user not found'
+          }
+        };
+      }
+
+      const tokens = user?.payload?.tokens?.filter((t: any) => t?.name?.startsWith(oauthService + '-'));
+      if (tokens.length < 2) {
+        if (tokens.length > 0) {
+          return {
+            token: tokens[0].token
+          };
+        } else {
+          return {
+            status: {
+              code: 404,
+              message: 'user has no token for this service'
+            }
+          };
+        }
+      }
+
+      const toRemove = tokens.filter(
+        t => t.expires_in.getTime() < Date.now()
+      );
+
+      await this.userService.removeToken(
+        user.payload.id,
+        toRemove
+      ).catch(
+        err => this.logger.warn(
+          'Failed to remove expired tokens',
+          { err, toRemove }
+        )
+      );
+
+      const validAccessToken = tokens.find(
+        t => t.name.endsWith('access_token')
+          && t.expires_in.getTime() >= Date.now()
+      );
+
+      if (validAccessToken) {
+        return {
+          token: validAccessToken.token
+        };
+      }
+
+      const validRefreshToken = tokens.find(
+        t => t.name.endsWith('refresh_token')
+          && t.expires_in.getTime() >= Date.now()
+      );
+
+      const data: any = validRefreshToken && await new Promise(
+        (resolve, reject) => this.clients[oauthService].getOAuthAccessToken(
+          validRefreshToken.token,
+          {
+            grant_type: 'refresh_token'
+          },
+          (err, access_token, refresh_token, result) => {
+            if (err) {
+              this.logger.error('Error Refreshing Token', err);
+              reject(err);
+              return;
+            }
+
+            resolve({
+              access_token,
+              refresh_token,
+              result
+            });
+          }
+        )
+      );
+
+      if (!data) {
+        return {status: {code: 400, message: 'refresh token has expired'}};
+      }
+
+      const newAccessToken = {
+        name: oauthService + '-access_token',
+        expires_in: new Date(Date.now() + data.result.expires_in * 1000),
+        token: data.access_token,
+        type: 'access_token',
+        interactive: true,
+        last_login: new Date()
+      };
+
       // append access token on user entity
-      await this.userService.updateUserTokens(user.payload.id, newAccessToken, toRemove);
+      await this.userService.updateUserTokens(user.payload.id, newAccessToken);
       this.logger.info('Token updated successfully on user entity', {id: user.payload.id});
+      return { token: newAccessToken.token };
     } catch (err: any) {
       this.logger.error('Error Updating Token', err);
-      return {status: {code: err.code, message: err.message}};
+      return {
+        status: {
+          code: err.code,
+          message: err.message
+        }
+      };
     }
-
-    return { token: newAccessToken.token };
   }
-
 }

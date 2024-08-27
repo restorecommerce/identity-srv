@@ -407,7 +407,7 @@
     }
   ],
   "oauth": {
-    "redirect_uri_base": "http://localhost:5000/oauth2/",
+    "redirect_uri_base": "http://127.0.0.1:5000/oauth2/",
     "services": {
       "google": {
         "client_id": "",
