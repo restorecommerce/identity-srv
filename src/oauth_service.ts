@@ -82,7 +82,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
     return {
       links: Object.assign({},
         ...Object.entries(this.clients).map(([key, value]) => ({
-          key: value.getAuthorizeUrl({
+          [key]: value.getAuthorizeUrl({
             redirect_uri: this.cfg.get('oauth:redirect_uri_base') + key,
             scope: this.cfg.get('oauth:services:' + key + ':scope'),
             response_type: 'code',
