@@ -818,17 +818,17 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         limit: targetUserRoleIds.length,
         subject,
       }, {});
+
       if (rolesData?.items?.length < targetUserRoleIds.length)  {
         const message = `One or more of the target role IDs are invalid ${targetUserRoleIds},` +
           ` no such role exist in system`;
         this.logger.error(message, rolesData);
         return returnStatus(400, message, user.id);
       }
-      let dbTargetRoles = [];
+
       if (rolesData?.items?.length > 0) {
         for (let targetRole of rolesData.items) {
           if (targetRole?.payload?.id) {
-            dbTargetRoles.push(targetRole.payload.id);
             if (!targetRole?.payload?.assignable_by_roles ||
               !createAccessRole.some((role) => targetRole?.payload?.assignable_by_roles?.includes(role))) {
               const userNameId = user?.name ? user.name : user?.id;
@@ -838,17 +838,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               return returnStatus(403, message, user.id);
             }
           }
-        }
-      }
-
-      // validate target roles is a valid role in DB
-      for (let targetUserRoleId of targetUserRoleIds || []) {
-        if (!dbTargetRoles?.includes(targetUserRoleId)) {
-          const userNameId = user?.name ? user.name : user?.id;
-          let message = `The target role ${targetUserRoleId} is invalid and cannot be assigned to` +
-            ` user ${userNameId}`;
-          this.logger.verbose(message);
-          return returnStatus(403, message, user.id);
         }
       }
     }

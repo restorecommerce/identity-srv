@@ -1722,8 +1722,10 @@ describe('testing identity-srv', () => {
         it('should not allow to create a User with invalid role existing in system', async () => {
           testUser.role_associations![0]!.role = 'invalid_role';
           const result = await userService.create({ items: [testUser], subject });
-          result!.items![0]!.status!.code!.should.equal(403);
-          result!.items![0]!.status!.message!.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal(
+            `One or more of the target role IDs are invalid ${ testUser.role_associations!.map(ra => ra.role) }, no such role exist in system`
+          );
           result!.items![0]!.status!.id!.should.equal('testuser');
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');
@@ -1746,15 +1748,17 @@ describe('testing identity-srv', () => {
           testUser.role_associations![0]!.role = 'invalid_role';
           const result = await userService.create({ items: [testuser1, testUser], subject });
 
-          result!.items![0]!.status!.code!.should.equal(403);
-          result!.items![0]!.status!.message!.should.equal('The target role invalid_role is invalid and cannot be assigned to user test.user');
+          result!.items![0]!.status!.code!.should.equal(400);
+          result!.items![0]!.status!.message!.should.equal(
+            `One or more of the target role IDs are invalid ${ testUser.role_associations!.map(ra => ra.role) }, no such role exist in system`
+          );
           result!.items![0]!.status!.id!.should.equal('testuser');
           // first user created, validate result
-          result!.items!![1]!.status!.code!.should.equal(200);
-          result!.items!![1]!.status!.message!.should.equal('success');
-          result!.items!![1]!.status!.id!.should.equal('testuser2');
-          result!.items!![1]!.payload!.name!.should.equal('test.user2');
-          result!.items!![1]!.payload!.email!.should.equal('test2@ms.restorecommerce.io');
+          result!.items![1]!.status!.code!.should.equal(200);
+          result!.items![1]!.status!.message!.should.equal('success');
+          result!.items![1]!.status!.id!.should.equal('testuser2');
+          result!.items![1]!.payload!.name!.should.equal('test.user2');
+          result!.items![1]!.payload!.email!.should.equal('test2@ms.restorecommerce.io');
           // overall status
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');
