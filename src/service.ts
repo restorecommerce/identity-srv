@@ -821,7 +821,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       if (rolesData?.items?.length < targetUserRoleIds.length)  {
         const message = `One or more of the target role IDs are invalid ${targetUserRoleIds},` +
           ` no such role exist in system`;
-        this.logger.verbose(message);
+        this.logger.error(message, rolesData);
         return returnStatus(400, message, user.id);
       }
       let dbTargetRoles = [];
