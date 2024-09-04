@@ -1,7 +1,7 @@
 [
   {
     "id": "superadministrator-r-id",
-    "name": "Superadmininistrator",
+    "name": "Super Administrator",
     "description": "Has read and write access across all orgnizational scopes",
     "assignable_by_roles": [
       "superadministrator-r-id"

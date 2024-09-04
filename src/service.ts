@@ -722,11 +722,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
   private async verifyUserRoleAssociations(usersList: User[], subject: any): Promise<any> {
     let validateRoleScope = false;
-    let token, redisHRScopesKey, user;
+    let redisHRScopesKey, user;
     let hierarchical_scopes: any = [];
-    if (subject) {
-      token = subject.token;
-    }
+    const token = subject?.token;
+
     if (token) {
       user = await this.findByToken(FindByTokenRequest.fromPartial({ token }), {});
       if (user?.payload) {
@@ -759,7 +758,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         let ctx = { subject, resources: new Array() };
         acsResponse = await checkAccessRequest(ctx, [{ resource: 'user' }], AuthZAction.MODIFY, Operation.whatIsAllowed);
       } catch (err: any) {
-        this.logger.error('Error making wahtIsAllowedACS request for verifying role associations', { code: err.code, message: err.message, stack: err.stack });
+        this.logger.error('Error making whatIsAllowedACS request for verifying role associations', { code: err.code, message: err.message, stack: err.stack });
         return returnStatus(err.code, err.message, usersList[0].id);
       }
       if ((acsResponse as PolicySetRQResponse)?.policy_sets?.length > 0) {
@@ -794,31 +793,33 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return returnStatus(err.code, err.message);
     }
     // check if the assignable_by_roles contain createAccessRole
-    for (let user of usersList || []) {
-      let userRoleAssocs = user.role_associations ? user.role_associations : [];
-      let targetUserRoleIds = [];
-      if (_.isEmpty(userRoleAssocs)) {
+    for (let user of usersList ?? []) {
+      const targetUserRoleIds = Array.from(
+        new Set(user.role_associations?.map(
+          ra => ra.role
+        ))
+      );
+
+      if (!targetUserRoleIds?.length) {
         continue;
       }
-      for (let roleAssoc of userRoleAssocs) {
-        targetUserRoleIds.push(roleAssoc.role);
-      }
+
       // read all target roles at once and check for each role's assign_by_role
       // contains createAccessRole
-      const filters = [{
-        filters: [{
-          field: 'id',
-          operation: Filter_Operation.in,
-          value: JSON.stringify(targetUserRoleIds),
-          type: FilterValueType.ARRAY
-        }]
-      }];
       let rolesData = await this.roleService.read({
-        filters,
-        subject
-      } as any, {});
-      if (rolesData?.total_count === 0) {
-        let message = `One or more of the target role IDs are invalid ${targetUserRoleIds},` +
+        filters: [{
+          filters: [{
+            field: 'id',
+            operation: Filter_Operation.in,
+            value: JSON.stringify(targetUserRoleIds),
+            type: Filter_ValueType.ARRAY,
+          }],
+        }],
+        limit: targetUserRoleIds.length,
+        subject,
+      }, {});
+      if (rolesData?.items?.length < targetUserRoleIds.length)  {
+        const message = `One or more of the target role IDs are invalid ${targetUserRoleIds},` +
           ` no such role exist in system`;
         this.logger.verbose(message);
         return returnStatus(400, message, user.id);
@@ -1829,9 +1830,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
     let items = request.items;
     // update meta data for owners information
+    let acsResponse: DecisionResponse;
     const subject = await resolveSubject(request.subject);
     const acsResources = await this.createMetadata(request.items, AuthZAction.MODIFY, subject);
-    let acsResponse: DecisionResponse;
     try {
       if (!context) { context = {}; };
       context.subject = subject;
@@ -3184,28 +3185,27 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
    * Extends ServiceBase.read()
    */
   async read(request: ReadRequest, context: any): Promise<DeepPartial<RoleListResponse>> {
-    let subject = request.subject;
-    let acsResponse: PolicySetRQResponse;
+    const subject = request.subject;
     try {
-      acsResponse = await checkAccessRequest({
+      const acsResponse = await checkAccessRequest({
         ...context,
         subject,
         resources: []
       }, [{ resource: 'role' }], AuthZAction.READ, Operation.whatIsAllowed) as PolicySetRQResponse;
+      if (acsResponse.decision != Response_Decision.PERMIT) {
+        return { operation_status: acsResponse.operation_status };
+      }
+      const readRequest = request;
+      if (acsResponse?.custom_query_args?.length > 0) {
+        readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
+        readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
+      }
+      if (acsResponse.decision === Response_Decision.PERMIT) {
+        return await super.read(readRequest, context);
+      }
     } catch (err: any) {
-      this.logger.error('Error occurred requesting access-control-srv for read', { code: err.code, message: err.message, stack: err.stack });
+      this.logger.error('Error occurred requesting roles', { code: err.code, message: err.message, stack: err.stack });
       return returnOperationStatus(err.code, err.message);
-    }
-    if (acsResponse.decision != Response_Decision.PERMIT) {
-      return { operation_status: acsResponse.operation_status };
-    }
-    const readRequest = request;
-    if (acsResponse?.custom_query_args?.length > 0) {
-      readRequest.custom_queries = acsResponse.custom_query_args[0].custom_queries;
-      readRequest.custom_arguments = acsResponse.custom_query_args[0].custom_arguments;
-    }
-    if (acsResponse.decision === Response_Decision.PERMIT) {
-      return await super.read(readRequest, context);
     }
   }
 
