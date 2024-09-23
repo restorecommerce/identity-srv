@@ -238,7 +238,7 @@
         "messageObject": "io.restorecommerce.user.EmailChangeRequested"
       },
       "unregistered": {
-        "messageObject": "io.restorecommerce.user.Deleted"
+        "messageObject": "io.restorecommerce.resourcebase.Deleted"
       },
       "restoreCommand": {
         "messageObject": "io.restorecommerce.commandinterface.CommandRequest"
