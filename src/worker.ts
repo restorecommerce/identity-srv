@@ -197,7 +197,7 @@ export class Worker {
         logger.error('Error reading jobs files');
       }
     }
-    if (externalJobFiles && externalJobFiles.length > 0) {
+    if (externalJobFiles?.length > 0) {
       externalJobFiles.forEach(async (externalFile) => {
         if (externalFile.endsWith('.js') || externalFile.endsWith('.cjs')) {
           const require_dir = process.env.EXTERNAL_JOBS_REQUIRE_DIR ?? './jobs/';

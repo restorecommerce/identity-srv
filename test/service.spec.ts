@@ -1724,7 +1724,7 @@ describe('testing identity-srv', () => {
           const result = await userService.create({ items: [testUser], subject });
           result!.items![0]!.status!.code!.should.equal(400);
           result!.items![0]!.status!.message!.should.equal(
-            `One or more of the target role IDs are invalid ${ testUser.role_associations!.map(ra => ra.role) }, no such role exist in the system`
+            `The following role IDs [invalid_role] are either invalid or the assigning user does not have the required permission.`
           );
           result!.items![0]!.status!.id!.should.equal('testuser');
           result!.operation_status!.code!.should.equal(200);
@@ -1750,7 +1750,7 @@ describe('testing identity-srv', () => {
 
           result!.items![0]!.status!.code!.should.equal(400);
           result!.items![0]!.status!.message!.should.equal(
-            `One or more of the target role IDs are invalid ${ testUser.role_associations!.map(ra => ra.role) }, no such role exist in the system`
+            `The following role IDs [invalid_role] are either invalid or the assigning user does not have the required permission.`
           );
           result!.items![0]!.status!.id!.should.equal('testuser');
           // first user created, validate result
@@ -1770,7 +1770,7 @@ describe('testing identity-srv', () => {
           testUser.role_associations![0]!.role = 'super-admin-r-id';
           const result = await userService.create({ items: [testUser], subject });
           result!.items![0]!.status!.code!.should.equal(403);
-          result!.items![0]!.status!.message!.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as the user role admin-r-id,admin-r-id,user-r-id does not have the required permission');
+          result!.items![0]!.status!.message!.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as the user roles [admin-r-id, admin-r-id, user-r-id] does not have the required permission');
           result!.items![0]!.status!.id!.should.equal('testuser');
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');
@@ -1798,7 +1798,7 @@ describe('testing identity-srv', () => {
           await redisClient.set(hrScopeskey, JSON.stringify(subjectResolved.hierarchical_scopes));
           const result = await userService.create({ items: [testUser], subject });
           result!.items![0]!.status!.code!.should.equal(403);
-          result!.items![0]!.status!.message!.should.equal('The target role user-r-id cannot be assigned to user test.user as user role  does not have permissions');
+          result!.items![0]!.status!.message!.should.equal('The target role user-r-id cannot be assigned to user test.user as the user roles [] does not have the required permission');
           result!.items![0]!.status!.id!.should.equal('testuser');
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');
