@@ -201,7 +201,7 @@ export class Worker {
       externalJobFiles.forEach(async (externalFile) => {
         if (externalFile.endsWith('.js') || externalFile.endsWith('.cjs')) {
           const require_dir = process.env.EXTERNAL_JOBS_REQUIRE_DIR ?? './jobs/';
-          
+
           try {
             const fileImport = await import(require_dir + externalFile);
             // check for double default
@@ -370,7 +370,7 @@ export class Worker {
 
             service.superUpsert(serviceList.fromPartial({ items: seedData }), undefined)
               .then(() => {
-                this.logger.info(`Seed ${entity} upserted successfully`);
+                this.logger.info(`Seed ${entity} upserted`);
                 resolve();
               })
               .catch( (err: any) => {
@@ -409,7 +409,7 @@ export class Worker {
             items: seedAccounts,
           }), undefined)
             .then(() => {
-              this.logger.info('Seed accounts upserted successfully');
+              this.logger.info('Seed accounts upserted');
               resolve();
             })
             .catch(err => {
@@ -425,7 +425,7 @@ export class Worker {
 
     this.events = events;
     this.server = server;
-    this.logger.info('Server started successfully');
+    this.logger.info('Server started');
   }
 
   async stop(): Promise<any> {

@@ -91,14 +91,14 @@ export class TokenService implements TokenServiceImplementation {
           // append tokens on user entity
           this.logger.debug('Removing expired token list', expiredTokenList);
           await this.userService.updateUserTokens(user.id, token, expiredTokenList);
-          this.logger.info('Token updated successfully on user entity', { token, id: user.id });
+          this.logger.info('Token updated on user entity', { token, id: user.id });
         } catch (err: any) {
           this.logger.error('Error Updating Token', err);
         }
         response = {
           status: {
             code: 200,
-            message: `Token updated successfully for Subject ${user.name}`
+            message: `Token updated for Subject ${user.name}`
           }
         };
       } else {
@@ -237,14 +237,14 @@ export class TokenService implements TokenServiceImplementation {
                   return obj;
                 }
               }));
-              this.logger.info('Removed token successfully from destroy api', { token: request.id, user });
+              this.logger.info('Removed token from destroy api', { token: request.id, user });
               // flush token subject cache
               const numberOfDeletedKeys = await this.userService.tokenRedisClient.del(request.id);
               this.logger.info('Subject deleted from Redis', { noOfKeys: numberOfDeletedKeys });
               response = {
                 status: {
                   code: 200,
-                  message: `Key for subject ${user.id} deleted successfully`
+                  message: `Key for subject ${user.id} deleted`
                 }
               };
             } else {

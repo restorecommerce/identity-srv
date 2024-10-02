@@ -262,7 +262,7 @@ const startGrpcMockServer = async (methodWithOutput: MethodWithOutput[]) => {
 
 const stopGrpcMockServer = async () => {
   await mockServer.stop();
-  logger.info('Mock ACS Server closed successfully');
+  logger.info('Mock ACS Server closed');
 };
 
 describe('testing identity-srv', () => {
@@ -1724,7 +1724,7 @@ describe('testing identity-srv', () => {
           const result = await userService.create({ items: [testUser], subject });
           result!.items![0]!.status!.code!.should.equal(400);
           result!.items![0]!.status!.message!.should.equal(
-            `One or more of the target role IDs are invalid ${ testUser.role_associations!.map(ra => ra.role) }, no such role exist in system`
+            `One or more of the target role IDs are invalid ${ testUser.role_associations!.map(ra => ra.role) }, no such role exist in the system`
           );
           result!.items![0]!.status!.id!.should.equal('testuser');
           result!.operation_status!.code!.should.equal(200);
@@ -1750,7 +1750,7 @@ describe('testing identity-srv', () => {
 
           result!.items![0]!.status!.code!.should.equal(400);
           result!.items![0]!.status!.message!.should.equal(
-            `One or more of the target role IDs are invalid ${ testUser.role_associations!.map(ra => ra.role) }, no such role exist in system`
+            `One or more of the target role IDs are invalid ${ testUser.role_associations!.map(ra => ra.role) }, no such role exist in the system`
           );
           result!.items![0]!.status!.id!.should.equal('testuser');
           // first user created, validate result
@@ -1770,7 +1770,7 @@ describe('testing identity-srv', () => {
           testUser.role_associations![0]!.role = 'super-admin-r-id';
           const result = await userService.create({ items: [testUser], subject });
           result!.items![0]!.status!.code!.should.equal(403);
-          result!.items![0]!.status!.message!.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as user role admin-r-id,admin-r-id,user-r-id does not have permissions');
+          result!.items![0]!.status!.message!.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as the user role admin-r-id,admin-r-id,user-r-id does not have the required permission');
           result!.items![0]!.status!.id!.should.equal('testuser');
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');
@@ -1935,11 +1935,11 @@ describe('testing identity-srv', () => {
 
       describe('testing user Token service', async function testTokenService() {
         let tokenService: TokenServiceClient;
-        
+
         before(async () => {
           tokenService = await connect<TokenServiceClient>('client:token', 'token');
         });
-    
+
         it('should upsert token to User', async () => {
           await tokenService.upsert({
             id: upsertUserID,
