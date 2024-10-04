@@ -204,7 +204,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       }));
       // append auth token on user entity
       await this.userService.updateUserTokens(user.id, authToken);
-      this.logger.info('Token updated successfully on user entity', { id: user.id });
+      this.logger.info('Token updated on user entity', { id: user.id });
 
       authToken.expires_in = new Date(authToken.expires_in);
       return {
@@ -339,7 +339,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
       // append access token on user entity
       await this.userService.updateUserTokens(user.payload.id, newAccessToken);
-      this.logger.info('Token updated successfully on user entity', {id: user.payload.id});
+      this.logger.info('Token updated on user entity', {id: user.payload.id});
       return { token: newAccessToken.token };
     } catch (err: any) {
       this.logger.error('Error Updating Token', err);

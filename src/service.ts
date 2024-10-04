@@ -373,7 +373,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         });
         const res = await query(this.db.db, 'users', token_remove, bindTokenVars);
         await res.all();
-        this.logger.debug('Expired tokens removed successfully');
+        this.logger.debug('Expired tokens removed');
       }
     }
   }
@@ -394,7 +394,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       });
       const res = await query(this.db.db, 'users', token_remove, bindTokenVars);
       await res.all();
-      this.logger.debug(`Removed token ${tokenObj[0].token} successfully`);
+      this.logger.debug(`Removed token ${tokenObj[0].token}`);
     }
   }
 
@@ -430,8 +430,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           } else {
             // delete token from redis and update user entity
             const numberOfDeletedKeys = await this.tokenRedisClient.del(token);
-            logger.info('Redis cached data for findByToken deleted successfully', { noOfKeys: numberOfDeletedKeys });
-            return { status: returnCodeMessage(401, 'Redis cached data for findByToken deleted successfully') };
+            logger.info('Redis cached data for findByToken deleted', { noOfKeys: numberOfDeletedKeys });
+            return { status: returnCodeMessage(401, 'Redis cached data for findByToken deleted') };
           }
         } else {
           // when not set in redis
@@ -486,9 +486,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               );
 
               if (updatedUser) {
-                logger.debug('update of user token last login successfully', { updatedUser });
+                logger.debug('update of user token last login', { updatedUser });
                 await this.tokenRedisClient.set(token, JSON.stringify(updatedUser));
-                logger.debug('Stored user data to redis cache successfully');
+                logger.debug('Stored user data to redis cache');
                 return {
                   payload: updatedUser,
                   status: { code: 200, message: 'success' }
@@ -794,11 +794,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
     // check if the assignable_by_roles contain createAccessRole
     for (let user of usersList ?? []) {
-      const targetUserRoleIds = Array.from(
-        new Set(user.role_associations?.map(
+      const targetUserRoleIds = [...new Set(
+        user.role_associations?.map(
           ra => ra.role
-        ))
-      );
+        )
+      )];
 
       if (!targetUserRoleIds?.length) {
         continue;
@@ -820,9 +820,12 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }, {});
 
       if (rolesData?.items?.length < targetUserRoleIds.length)  {
-        const message = `One or more of the target role IDs are invalid ${targetUserRoleIds},` +
-          ` no such role exist in system`;
-        this.logger.error(message, rolesData);
+        const found = rolesData?.items?.map(item => item.payload?.id);
+        const missing = targetUserRoleIds.filter(id => !found?.includes(id));
+        const message = `The following role IDs [${
+          missing?.join(', ')
+        }] are either invalid or the assigning user does not have the required permission.`;
+        this.logger.error(message);
         return returnStatus(400, message, user.id);
       }
 
@@ -830,10 +833,18 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         for (let targetRole of rolesData.items) {
           if (targetRole?.payload?.id) {
             if (!targetRole?.payload?.assignable_by_roles ||
-              !createAccessRole.some((role) => targetRole?.payload?.assignable_by_roles?.includes(role))) {
+              !createAccessRole.some(
+                (role) => targetRole?.payload?.assignable_by_roles?.includes(role)
+              )
+            ) {
               const userNameId = user?.name ? user.name : user?.id;
-              let message = `The target role ${targetRole.payload.id} cannot be assigned to` +
-                ` user ${userNameId} as user role ${createAccessRole} does not have permissions`;
+              let message = `The target role ${
+                targetRole.payload.id
+              } cannot be assigned to user ${
+                userNameId
+              } as the user roles [${
+                createAccessRole.join(', ')
+              }] does not have the required permission`;
               this.logger.verbose(message);
               return returnStatus(403, message, user.id);
             }
@@ -2006,7 +2017,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               if (!roleAssocEqual || !tokensEqual || (updatedRoleAssocs?.length != redisRoleAssocs?.length)) {
                 // flush token subject cache
                 await this.tokenRedisClient.del(tokenValue);
-                this.logger.info('Redis cached data for findByToken deleted successfully', { token: tokenValue });
+                this.logger.info('Redis cached data for findByToken deleted', { token: tokenValue });
               }
             }
           }
@@ -2030,7 +2041,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           for (let token of user.tokens) {
             const tokenValue = token.token;
             await this.tokenRedisClient.del(tokenValue);
-            this.logger.info('Redis token deleted successfully', { token: tokenValue });
+            this.logger.info('Redis token deleted', { token: tokenValue });
           }
           user.tokens = [];
         }
