@@ -1,9 +1,10 @@
 import {} from 'mocha';
 import should from 'should';
+// @ts-ignore
 import _ from 'lodash-es';
 import { createChannel, createClient } from '@restorecommerce/grpc-client';
 import { Events, Topic } from '@restorecommerce/kafka-client';
-import { Worker } from '../src/worker';
+import { Worker } from '../src/worker.js';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { GrpcMockServer, ProtoUtils } from '@alenon/grpc-mock-server';
 import * as proto_loader from '@grpc/proto-loader';
@@ -12,20 +13,21 @@ import { updateConfig } from '@restorecommerce/acs-client';
 import {
   UserServiceDefinition,
   UserServiceClient, User, DeepPartial, UserType
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   RoleServiceDefinition,
   RoleServiceClient
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
-import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role.js';
+import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 import { createClient as RedisCreateClient, RedisClientType } from 'redis';
-import { Rule, Effect } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rule';
-import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta';
-import { PolicySetRQ } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/policy_set';
+import { Rule, Effect } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rule.js';
+import { Meta } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/meta.js';
+import { PolicySetRQ } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/policy_set.js';
 import {
   TokenServiceClient,
   TokenServiceDefinition
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token.js';
+import { totp } from 'otplib';
 
 /*
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
@@ -33,8 +35,8 @@ import {
 
 let cfg: any;
 let worker: Worker;
-let client;
-let logger;
+let client: any;
+let logger: any;
 let redisClient: RedisClientType;
 let tokenRedisClient: RedisClientType;
 
@@ -292,9 +294,9 @@ describe('testing identity-srv', () => {
   after(async function stopServer(): Promise<void> {
     // delete user and roles collection
     const userService: UserServiceClient = await connect('client:user', 'user');
-    await userService.delete({
-      collection: true
-    });
+    // await userService.delete({
+    //   collection: true
+    // });
     roleService = await connect('client:role', 'role');
     await roleService.delete({
       collection: true
@@ -342,7 +344,7 @@ describe('testing identity-srv', () => {
         result!.operation_status!.code!.should.equal(200);
         result!.operation_status!.message!.should.equal('success');
         // validate individual status
-        _.forEach(result!.items, (item) => {
+        _.forEach(result!.items, (item: any) => {
           item!.status!.code!.should.equal(200);
           item!.status!.message!.should.equal('success');
         });
@@ -353,7 +355,7 @@ describe('testing identity-srv', () => {
   describe('testing User service with email constraint (default)', () => {
     describe('with test client with email constraint (default)', () => {
       let userService: UserServiceClient;
-      let testUserID, upsertUserID, user, testUserName;
+      let testUserID: any, upsertUserID: any, user: any, testUserName: any;
       before(async function connectUserService(): Promise<void> {
         userService = await connect('client:user', 'user');
         user = {
@@ -1563,7 +1565,7 @@ describe('testing identity-srv', () => {
             collection: true
           });
           should.exist(deleteResult.status);
-          _.forEach(deleteResult.status, (eachResult) => {
+          _.forEach(deleteResult.status, (eachResult: any) => {
             eachResult.code!.should.equal(200);
             eachResult.message!.should.equal('success');
           });
@@ -1955,6 +1957,80 @@ describe('testing identity-srv', () => {
           });
         });
       });
+
+      describe('totp', () => {
+        let totpSecret: string;
+
+        before(async () => {
+          // Ensure user is active
+          let result = await (userService.find({
+            id: 'testuser2',
+          }));
+          should.exist(result);
+          should.exist(result!.items![0]!.payload);
+          result!.items!.should.be.length(1);
+
+          const u = result!.items![0]!.payload!;
+          await (userService.activate({
+            identifier: u.name,
+            activation_code: u.activation_code,
+          }));
+        })
+
+        it('should setup totp for user', async () => {
+          const setupResult = await (userService.setupTOTP({
+            identifier: 'test.user2',
+            subject: { token: 'user-token' }
+          }));
+
+          should.exist(setupResult);
+          setupResult.operation_status!.code!.should.equal(200);
+          setupResult.operation_status!.message!.should.equal('success');
+
+          totpSecret = setupResult.totp_secret;
+        });
+
+        it('should confirm totp secret', async () => {
+          const code = totp.generate(totpSecret);
+
+          const completeResult = await (userService.completeTOTPSetup({
+            code,
+            subject: { token: 'user-token' }
+          }));
+
+          should.exist(completeResult);
+          completeResult.operation_status!.code!.should.equal(200);
+          completeResult.operation_status!.message!.should.equal('success');
+        });
+
+        it('should login using totp', async () => {
+          const loginResponse = await (userService.login({
+            identifier: 'test.user2',
+            password: user.password
+          }));
+
+          should.exist(loginResponse);
+          should.exist(loginResponse.totp_session_token);
+
+          const code = totp.generate(totpSecret);
+          const exchangeResponse = await (userService.exchangeTOTP({
+            code,
+            totp_session_token: loginResponse.totp_session_token,
+            subject: {
+              id: 'test.user2'
+            }
+          }));
+
+          should.exist(exchangeResponse);
+          should.exist(exchangeResponse!.payload);
+
+          const compareResult = await (userService.find({
+            id: 'testuser2',
+          }));
+          const userDBDoc = compareResult.items![0]!.payload!;
+          exchangeResponse!.payload!.should.deepEqual(userDBDoc);
+        });
+      })
     });
   });
 });

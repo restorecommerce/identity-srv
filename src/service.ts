@@ -44,6 +44,7 @@ import {
   FindByTokenRequest,
   FindRequest,
   LoginRequest,
+  LoginResponse,
   OrgIDRequest,
   RegisterRequest,
   RequestPasswordChangeRequest,
@@ -58,7 +59,10 @@ import {
   UserResponse,
   UserType,
   TenantRequest,
-  TenantResponse
+  TenantResponse,
+  ExchangeTOTPRequest,
+  SetupTOTPRequest,
+  SetupTOTPResponse,
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   Role,
@@ -99,6 +103,9 @@ import {
   Match,
 } from '@zxcvbn-ts/core/dist/types.js';
 import fetch from 'node-fetch';
+
+import { authenticator, totp } from 'otplib';
+import * as jose from 'jose';
 
 export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
@@ -2241,7 +2248,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * Endpoint verifyPassword, checks if the provided password and user matches
    * the one found in the database.
    */
-  async login(request: LoginRequest, context: any): Promise<DeepPartial<UserResponse>> {
+  async login(request: LoginRequest, context: any): Promise<DeepPartial<LoginResponse>> {
     if (_.isEmpty(request) ||
       (_.isEmpty(request.identifier) || (_.isEmpty(request.password) &&
         _.isEmpty(request.token)))
@@ -2297,6 +2304,24 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           return returnStatus(401, 'password does not match', user.id);
         }
       }
+
+      if (user.totp_secret) {
+        const totp_session_token = new jose.UnsecuredJWT({})
+          .setIssuedAt()
+          .setExpirationTime((Date.now() / 1000) + (60 * 10)) // 10 Minute expiry
+          .encode();
+
+        user.totp_session_tokens = [
+          ...(user.totp_session_tokens || []).filter(t => jose.decodeJwt(t).exp > (Date.now() / 1000)),
+          totp_session_token
+        ];
+        await super.update(UserList.fromPartial({
+          items: [user]
+        }), context);
+
+        return { totp_session_token, status: { code: 200, message: 'success' } };
+      }
+
       return { payload: user, status: { code: 200, message: 'success' } };
     } else {
       return returnStatus(404, 'user not found');
@@ -3059,6 +3084,143 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
       return returnOperationStatus(200, 'success');
     }
+  }
+
+  async setupTOTP(request: SetupTOTPRequest, context: any): Promise<DeepPartial<SetupTOTPResponse>> {
+    let subject = request.subject;
+    const users = await super.read(ReadRequest.fromPartial({
+      filters: [{
+        filters: [{
+          field: 'id',
+          operation: Filter_Operation.eq,
+          value: subject?.id
+        }]
+      }]
+    }), context);
+
+    if (!users || users.total_count === 0) {
+      this.logger.debug('user does not exist', { identifier: subject.id });
+      return returnOperationStatus(404, 'user does not exist');
+    } else if (users.total_count > 1) {
+      return returnOperationStatus(400, `Invalid identifier provided for totp setup, multiple users found for identifier ${subject.id}`);
+    }
+
+    const totpSecret = authenticator.generateSecret();
+
+    const user = users.items[0].payload;
+    let acsResponse: DecisionResponse;
+    try {
+      acsResponse = await checkAccessRequest({
+        ...context,
+        subject,
+        resources: { id: user.id, totp_secret_processing: totpSecret, meta: user.meta }
+      }, [{ resource: 'user', id: user.id, property: ['totp_secret_processing'] }], AuthZAction.MODIFY, Operation.isAllowed);
+    } catch (err: any) {
+      this.logger.error('Error occurred requesting access-control-srv for setupTOTP', { code: err.code, message: err.message, stack: err.stack });
+      return returnOperationStatus(err.code, err.message);
+    }
+
+    if (acsResponse.decision != Response_Decision.PERMIT) {
+      return { operation_status: acsResponse.operation_status };
+    }
+
+    user.totp_secret_processing = totpSecret;
+    const updateStatus = await super.update(UserList.fromPartial({
+      items: [user]
+    }), context);
+    return {
+      totp_secret: totpSecret,
+      operation_status: updateStatus?.items[0]?.status
+    };
+  }
+
+  async completeTOTPSetup(request: ExchangeTOTPRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
+    let subject = request.subject;
+    const users = await super.read(ReadRequest.fromPartial({
+      filters: [{
+        filters: [{
+          field: 'id',
+          operation: Filter_Operation.eq,
+          value: subject?.id
+        }]
+      }]
+    }), context);
+
+    if (!users || users.total_count === 0) {
+      this.logger.debug('user does not exist', { identifier: subject.id });
+      return returnOperationStatus(404, 'user does not exist');
+    } else if (users.total_count > 1) {
+      return returnOperationStatus(400, `Invalid identifier provided for totp setup, multiple users found for identifier ${subject.id}`);
+    }
+
+    const user = users.items[0].payload;
+    let acsResponse: DecisionResponse;
+    try {
+      acsResponse = await checkAccessRequest({
+        ...context,
+        subject,
+        resources: { id: user.id, totp_secret_processing: undefined, totp_secret: user.totp_secret_processing, meta: user.meta }
+      }, [{ resource: 'user', id: user.id, property: ['totp_secret', 'totp_secret_processing'] }], AuthZAction.MODIFY, Operation.isAllowed);
+    } catch (err: any) {
+      this.logger.error('Error occurred requesting access-control-srv for setupTOTP', { code: err.code, message: err.message, stack: err.stack });
+      return returnOperationStatus(err.code, err.message);
+    }
+
+    if (acsResponse.decision != Response_Decision.PERMIT) {
+      return { operation_status: acsResponse.operation_status };
+    }
+
+    if (!totp.check(request.code, user.totp_secret_processing)) {
+      return returnOperationStatus(400, `Invalid TOTP code`);
+    }
+
+    user.totp_secret = user.totp_secret_processing;
+    user.totp_secret_processing = undefined;
+    const updateStatus = await super.update(UserList.fromPartial({
+      items: [user]
+    }), context);
+    if (updateStatus?.items[0]?.status?.message === 'success') {
+      this.logger.info('totp secret changed for user', { identifier: subject.id });
+    }
+    return {operation_status: updateStatus?.items[0]?.status};
+  }
+
+  async exchangeTOTP(request: ExchangeTOTPRequest, context: any): Promise<DeepPartial<UserResponse>> {
+    let subject = request.subject;
+
+    let loginIdentifierProperty = this.cfg.get('service:loginIdentifierProperty');
+    // if loginIdentifierProperty is not set defaults to name / email
+    if (!loginIdentifierProperty) {
+      loginIdentifierProperty = ['name', 'email'];
+    }
+    const filters = getLoginIdentifierFilter(loginIdentifierProperty, subject.id);
+    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+
+    if (!users || users.total_count === 0) {
+      this.logger.debug('user does not exist', { identifier: subject.id });
+      return returnStatus(404, 'user does not exist');
+    } else if (users.total_count > 1) {
+      return returnStatus(400, `Invalid identifier provided for totp setup, multiple users found for identifier ${subject.id}`);
+    }
+
+    const user = users.items[0].payload;
+    let found = false;
+    for (const totpSessionToken of user.totp_session_tokens) {
+      if (request.totp_session_token === totpSessionToken) {
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      return returnStatus(400, 'Invalid TOTP session token');
+    }
+
+    if (!totp.check(request.code, user.totp_secret_processing)) {
+      return returnStatus(400, 'Invalid TOTP code');
+    }
+
+    return { payload: user, status: { code: 200, message: 'success' } };
   }
 
   async getUnauthenticatedSubjectTokenForTenant(request: TenantRequest, context: any): Promise<DeepPartial<TenantResponse>> {
