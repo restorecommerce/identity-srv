@@ -73,14 +73,14 @@ class UserCommandInterface extends chassis.CommandInterface {
   }
 
   makeResourcesRestoreSetup(db: any, resource: string): any {
-    const that = this;
+    const logger = this.logger;
     return {
       unregistered: async function restoreUnregistered(message: any, context: any,
         config: any, eventName: string): Promise<any> {
         try {
           await db.delete(`${resource}s`, { id: message.id });
         } catch (err: any) {
-          that.logger.error('Exception caught while restoring unregistered User',
+          logger.error('Exception caught while restoring unregistered User',
             message);
         }
         return {};
@@ -91,7 +91,7 @@ class UserCommandInterface extends chassis.CommandInterface {
           await db.update(`${resource}s`, { id: message.id },
             message);
         } catch (err: any) {
-          that.logger.error('Exception caught while restoring modified User',
+          logger.error('Exception caught while restoring modified User',
             message);
         }
         return {};
@@ -261,14 +261,14 @@ export class Worker {
     };
 
     const topicTypes = _.keys(kafkaCfg.topics);
-    for (let topicType of topicTypes) {
+    for (const topicType of topicTypes) {
       const topicName = kafkaCfg.topics[topicType].topic;
       this.topics[topicType] = await events.topic(topicName);
       const offSetValue = await this.offsetStore.getOffset(topicName);
       logger.info('subscribing to topic with offset value', topicName, offSetValue);
       if (kafkaCfg.topics[topicType].events) {
         const eventNames = kafkaCfg.topics[topicType].events;
-        for (let eventName of eventNames) {
+        for (const eventName of eventNames) {
           await this.topics[topicType].on(eventName,
             identityServiceEventListener, { startingOffset: offSetValue });
         }
@@ -347,7 +347,7 @@ export class Worker {
     const seedDataConfig = this.cfg.get('seed_data');
     if (seedDataConfig) {
       const entities = Object.keys(seedDataConfig);
-      for (let entity of entities) {
+      for (const entity of entities) {
         const filePath = seedDataConfig[entity];
         await new Promise<void>((resolve, reject) => {
           fs.readFile(filePath, (err, data) => {

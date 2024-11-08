@@ -38,7 +38,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
       resourceFieldConfig['bufferFields'] = resourceFieldConfig?.bufferFields?.authentication_logs;
       if (cfg.get('fieldHandlers:timeStampFields')) {
         resourceFieldConfig['timeStampFields'] = [];
-        for (let timeStampFiledConfig of cfg.get('fieldHandlers:timeStampFields')) {
+        for (const timeStampFiledConfig of cfg.get('fieldHandlers:timeStampFields')) {
           if (timeStampFiledConfig.entities.includes('authentication_logs')) {
             resourceFieldConfig['timeStampFields'].push(...timeStampFiledConfig.fields);
           }
@@ -101,7 +101,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
 
     // update owners information
     const subject = await resolveSubject(request.subject);
-    let items = await this.createMetadata(request.items, AuthZAction.MODIFY, subject);
+    const items = await this.createMetadata(request.items, AuthZAction.MODIFY, subject);
     let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest({
@@ -202,8 +202,8 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
    */
   async delete(request: DeleteRequest, context: any): Promise<DeepPartial<DeleteResponse>> {
     const logger = this.logger;
-    let authLogIDs = request.ids;
-    let resources = {};
+    const authLogIDs = request.ids;
+    const resources = {};
     let acsResources;
     const subject = await resolveSubject(request.subject);
     if (authLogIDs) {
@@ -238,7 +238,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
       }
       logger.silly('deleting Role IDs:', { authLogIDs });
       // Check each user exist if one of the user does not exist throw an error
-      for (let authLogID of authLogIDs || []) {
+      for (const authLogID of authLogIDs || []) {
         const filters = [{
           filters: [{
             field: 'id',
@@ -342,7 +342,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         )
       );
 
-      for (let resource of resources) {
+      for (const resource of resources) {
         if (!resource.meta && result_map.has(resource?.id)) {
           resource.meta = result_map.get(resource?.id).meta;
         }
@@ -352,7 +352,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
       }
     }
     else if (action === AuthZAction.CREATE) {
-      for (let resource of resources) {
+      for (const resource of resources) {
         setDefaultMeta(resource);
       }
     }

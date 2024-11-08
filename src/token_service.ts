@@ -48,7 +48,7 @@ export class TokenService implements TokenServiceImplementation {
       return marshallProtobufAny(response);
     }
 
-    let tokenData = request;
+    const tokenData = request;
     // unmarshall payload
     const payload = unmarshallProtobufAny(tokenData.payload);
     const type = tokenData.type;
@@ -153,8 +153,8 @@ export class TokenService implements TokenServiceImplementation {
       let tokenData;
       const user = await this.userService.findByToken(FindByTokenRequest.fromPartial({ token: request.id }), context);
       if (user?.payload?.tokens?.length > 0) {
-        let userTokens = user.payload.tokens;
-        for (let token of userTokens) {
+        const userTokens = user.payload.tokens;
+        for (const token of userTokens) {
           if (token.token === request.id) {
             tokenData = token;
             break;
@@ -212,7 +212,7 @@ export class TokenService implements TokenServiceImplementation {
       let response;
       let user: User = {};
       try {
-        let payload = await this.find(request, context);
+        const payload = await this.find(request, context);
         // delete user token here
         if (payload?.value) {
           const userData = await this.userService.findByToken(FindByTokenRequest.fromPartial({ token: request.id }), {});
@@ -304,16 +304,16 @@ export class TokenService implements TokenServiceImplementation {
         // update last access
         const userData = await this.userService.find(FindRequest.fromPartial({ id: tokenData.accountId, subject }), context);
         if (userData?.items?.length > 0) {
-          let user = userData.items[0].payload;
+          const user = userData.items[0].payload;
           user.last_access = new Date();
           await this.userService.update(UserList.fromPartial({ items: [user], subject }), context);
         }
       };
-      let response = { status: { code: 200, message: `AccessToken with ID ${request.id} consumed` } };
+      const response = { status: { code: 200, message: `AccessToken with ID ${request.id} consumed` } };
       return marshallProtobufAny(response);
     } catch (err: any) {
       this.logger.error('Error consuming token', { message: err.message });
-      let response = { status: { code: err.code, message: err.message } };
+      const response = { status: { code: err.code, message: err.message } };
       return marshallProtobufAny(response);
     }
   }
@@ -328,7 +328,7 @@ export class TokenService implements TokenServiceImplementation {
       return marshallProtobufAny(response);
     }
     context.subject = request.subject;
-    let subject = request.subject;
+    const subject = request.subject;
     let tokens = await this.userService.tokenRedisClient.get(request.grant_id) as any;
     if (tokens) {
       this.logger.debug('Found grant_id in redis cache');
@@ -358,10 +358,10 @@ export class TokenService implements TokenServiceImplementation {
       }
 
       if (tokens && _.isArray(tokens)) {
-        for (let token of tokens) {
+        for (const token of tokens) {
           const userData = await this.find(Identifier.fromPartial({ id: token, subject }), context);
           if (!_.isEmpty(userData)) {
-            let tokenData = unmarshallProtobufAny(userData);
+            const tokenData = unmarshallProtobufAny(userData);
             await this.destroy(Identifier.fromPartial({ id: tokens as any, type: tokenData.kind, subject }), context);
           }
         }

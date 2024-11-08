@@ -49,7 +49,6 @@ export interface ACSResource {
   property?: string[];
 }
 
-/* eslint-disable prefer-arrow-functions/prefer-arrow-functions */
 export async function resolveSubject(subject: Subject) {
   if (subject) {
     const idsClient = getUserServiceClient();
@@ -73,8 +72,8 @@ export const createMetadata = async <T extends Resource>(
     resources = [resources];
   }
 
-  let orgOwnerAttributes = [];
-  for (let resource of resources ?? []) {
+  const orgOwnerAttributes = [];
+  for (const resource of resources ?? []) {
     if (!resource.meta) {
       resource.meta = {};
       if (subject?.id) {

@@ -16,7 +16,7 @@ A microservice for identity management.
 * Password recovery as self-service
 * Un-registration as self-service
 * Customizable, optional email notifications to drive processes
-* Token management service
+* Access token management service
 * Authentication log audit log
 
 [#configuration]
