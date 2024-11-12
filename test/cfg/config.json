@@ -26,7 +26,10 @@
     "passwordMinLength": 12,
     "data": {
       "url": "https://www.google.com/"
-    }
+    },
+    "passwordHistoryEnabled": true,
+    "passwordHistorySize": 3,
+    "passwordHistoryEnforcement": true
   },
   "logger": {
     "console": {

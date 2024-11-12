@@ -25,7 +25,10 @@
     "minUsernameLength": 8,
     "maxUsernameLength": 40,
     "passwordComplexityMinScore": 3,
-    "passwordMinLength": 12
+    "passwordMinLength": 12,
+    "passwordHistoryEnabled": true,
+    "passwordHistorySize": 3,
+    "passwordHistoryEnforcement": false
   },
   "logger": {
     "console": {

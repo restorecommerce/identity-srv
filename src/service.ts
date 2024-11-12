@@ -1596,6 +1596,28 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         return returnOperationStatus(400, `Password is too weak The password score is ${resultPasswordChecker.score}/4, minimum score is ${minScore}. Suggestions: ${resultPasswordChecker.feedback.suggestions} & ${resultPasswordChecker.feedback.warning} User ID ${user.id}`);
       }
 
+      if (this.cfg.get('service:passwordHistoryEnabled')) {
+        if (!('password_hash_history' in user)) {
+          user.password_hash_history = [];
+        }
+
+        if (this.cfg.get('service:passwordHistoryEnforcement')) {
+          for (const old_hash of user.password_hash_history) {
+            if (!password.verify(old_hash, newPw)) {
+              logger.error(`This password has recently been used. User ID:`, user.id);
+              return returnOperationStatus(400, `This password has recently been used. User ID ${user.id}`);
+            }
+          }
+        }
+
+        user.password_hash_history.unshift(user.password_hash);
+
+        const limit = this.cfg.get('service:passwordHistorySize');
+        if (limit > 0) {
+          user.password_hash_history = user.password_hash_history.slice(0, limit);
+        }
+      }
+
       user.password_hash = password.hash(newPw);
       const updateStatus = await super.update(UserList.fromPartial({
         items: [user]

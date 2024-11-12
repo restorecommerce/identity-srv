@@ -1187,6 +1187,43 @@ describe('testing identity-srv', () => {
           upUser.activation_code!.should.be.empty();
           upUser.password_hash!.should.not.equal(pwHashA);
         });
+
+        it('should fail to change the password if it was used before', async function changePasswordFail(): Promise<void> {
+          // store token to Redis as passwordChange looks up the user based on token (as this operation is for logged in user)
+          let expires_in = new Date(); // set expires_in to +1 day
+          expires_in.setDate(expires_in.getDate() + 1);
+          let userWithToken = {
+            name: 'test.user1', // user registered initially, storing with token in DB
+            first_name: 'test',
+            last_name: 'user',
+            password: 'CNQJrH%43KAayeDpf3h',
+            email: 'test@ms.restorecommerce.io',
+            token: 'user-token',
+            tokens: [{
+              token: 'user-token',
+              expires_in
+            }]
+          };
+          const redisConfig = cfg.get('redis');
+          // for findByToken
+          redisConfig.database = cfg.get('redis:db-indexes:db-findByToken') || 0;
+          tokenRedisClient = RedisCreateClient(redisConfig);
+          tokenRedisClient.on('error', (err) => logger.error('Redis client error in token cache store', err));
+          await tokenRedisClient.connect();
+          // store user with tokens and role associations to Redis index `db-findByToken`
+          await tokenRedisClient.set('user-token', JSON.stringify(userWithToken));
+
+          this.timeout(30000);
+          const changeResult = await (userService.changePassword({
+            password: 'CNQJrH%44KAayeDpf3h',
+            new_password: 'CNQJrH%43KAayeDpf3h',
+            subject: { token: 'user-token' }
+          }));
+          should.exist(changeResult);
+          should.exist(changeResult.operation_status);
+          changeResult.operation_status!.code!.should.equal(400);
+          changeResult.operation_status!.message!.should.match(/This password has recently been used. User ID .*/);
+        });
       });
 
       describe('calling changeEmail', function changeEmailId(): void {
