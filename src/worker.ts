@@ -101,7 +101,7 @@ class UserCommandInterface extends chassis.CommandInterface {
         try {
           await db.insert(`${resource}s`, message);
         } catch (err: any) {
-          that.logger.error('Exception caught while restoring registered User',
+          logger.error('Exception caught while restoring registered User',
             message);
         }
         return {};
@@ -111,7 +111,7 @@ class UserCommandInterface extends chassis.CommandInterface {
         try {
           await db.insert(`${resource}s`, message);
         } catch (err: any) {
-          that.logger.error('Exception caught while restoring registered User',
+          logger.error('Exception caught while restoring registered User',
             message);
         }
         return {};
