@@ -15,7 +15,9 @@
       "invitationSubjectTpl": "http://localhost:5000/storage/internal/identity-srv/templates/invitation_subject.hbs",
       "invitationBodyTpl": "http://localhost:5000/storage/internal/identity-srv/templates/invitation_body.hbs",
       "layoutTpl": "http://localhost:5000/storage/internal/identity-srv/templates/layout.hbs",
-      "resourcesTpl": "http://localhost:5000/storage/internal/identity-srv/templates/resources.json"
+      "resourcesTpl": "http://localhost:5000/storage/internal/identity-srv/templates/resources.json",
+      "resetTotpSubjectTpl": "http://localhost:5000/storage/internal/identity-srv/templates/reset_totp_email_subject.hbs",
+      "resetTotpBodyTpl": "http://localhost:5000/storage/internal/identity-srv/templates/reset_totp_email_body.hbs"
     },
     "activationURL": "https://console.restorecommerce.io/activate-account",
     "inactivatedAccountExpiry": "undefined",

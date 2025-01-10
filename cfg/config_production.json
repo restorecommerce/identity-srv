@@ -35,7 +35,9 @@
       "invitationSubjectTpl": "http://facade-srv:5000/storage/internal/identity-srv/templates/invitation_subject.hbs",
       "invitationBodyTpl": "http://facade-srv:5000/storage/internal/identity-srv/templates/invitation_body.hbs",
       "layoutTpl": "http://facade-srv:5000/storage/internal/identity-srv/templates/layout.hbs",
-      "resourcesTpl": "http://facade-srv:5000/storage/internal/identity-srv/templates/resources.json"
+      "resourcesTpl": "http://facade-srv:5000/storage/internal/identity-srv/templates/resources.json",
+      "resetTotpSubjectTpl": "http://facade-srv:5000/storage/internal/identity-srv/templates/reset_totp_email_subject.hbs",
+      "resetTotpBodyTpl": "http://facade-srv:5000/storage/internal/identity-srv/templates/reset_totp_email_body.hbs"
     }
   },
   "database": {
