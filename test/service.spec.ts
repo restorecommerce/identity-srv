@@ -1,6 +1,6 @@
 import {} from 'mocha';
 import should from 'should';
-// @ts-ignore
+// @ts-expect-error TS1192
 import _ from 'lodash-es';
 import { createChannel, createClient } from '@restorecommerce/grpc-client';
 import { Events, Topic } from '@restorecommerce/kafka-client';
@@ -28,6 +28,7 @@ import {
   TokenServiceDefinition
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token.js';
 import { totp } from 'otplib';
+import {unmarshallProtobufAny} from "../src/utils.js";
 
 /*
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
@@ -1997,6 +1998,7 @@ describe('testing identity-srv', () => {
 
       describe('totp', () => {
         let totpSecret: string;
+        let totpBackup: string[];
 
         before(async () => {
           // Ensure user is active
@@ -2052,6 +2054,95 @@ describe('testing identity-srv', () => {
           const code = totp.generate(totpSecret);
           const exchangeResponse = await (userService.exchangeTOTP({
             code,
+            totp_session_token: loginResponse.totp_session_token,
+            subject: {
+              id: 'test.user2'
+            }
+          }));
+
+          should.exist(exchangeResponse);
+          should.exist(exchangeResponse!.payload);
+
+          const compareResult = await (userService.find({
+            id: 'testuser2',
+          }));
+          const userDBDoc = compareResult.items![0]!.payload!;
+          exchangeResponse!.payload!.should.deepEqual(userDBDoc);
+        });
+
+        it('should create backup codes', async () => {
+          const setupResult = await (userService.createBackupTOTPCodes({
+            identifier: 'test.user2',
+            subject: { token: 'user-token' }
+          }));
+
+          should.exist(setupResult);
+          setupResult.operation_status!.code!.should.equal(200);
+          setupResult.operation_status!.message!.should.equal('success');
+
+          totpBackup = setupResult.backup_codes;
+        });
+
+        it('should login using totp backup code', async () => {
+          const loginResponse = await (userService.login({
+            identifier: 'test.user2',
+            password: user.password
+          }));
+
+          should.exist(loginResponse);
+          should.exist(loginResponse.totp_session_token);
+
+          const exchangeResponse = await (userService.exchangeTOTP({
+            code: totpBackup[0],
+            totp_session_token: loginResponse.totp_session_token,
+            subject: {
+              id: 'test.user2'
+            }
+          }));
+
+          should.exist(exchangeResponse);
+          should.exist(exchangeResponse!.payload);
+
+          const compareResult = await (userService.find({
+            id: 'testuser2',
+          }));
+          const userDBDoc = compareResult.items![0]!.payload!;
+          exchangeResponse!.payload!.should.deepEqual(userDBDoc);
+        });
+
+        it('should send a totp reset code', async function () {
+          this.timeout(60000);
+
+          let emailBackupCode: string;
+          const listener = function listener(message: any, context: any): void {
+            message!.id!.should.equal(`identity#test2@ms.restorecommerce.io`);
+            const data = unmarshallProtobufAny(message.payloads[0].data, logger);
+            emailBackupCode = data.totpCode;
+          };
+
+          const renderingTopic = await events.topic('io.restorecommerce.rendering');
+          const offset = await renderingTopic.$offset(-1);
+          await renderingTopic.on('renderRequest', listener);
+
+          const result = await userService.resetTOTP({ identifier: user.name });
+          should.exist(result);
+          should.exist(result!.operation_status);
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
+
+          await renderingTopic.$wait(offset);
+          await renderingTopic.removeListener('renderRequest', listener);
+
+          const loginResponse = await (userService.login({
+            identifier: 'test.user2',
+            password: user.password
+          }));
+
+          should.exist(loginResponse);
+          should.exist(loginResponse.totp_session_token);
+
+          const exchangeResponse = await (userService.exchangeTOTP({
+            code: emailBackupCode,
             totp_session_token: loginResponse.totp_session_token,
             subject: {
               id: 'test.user2'

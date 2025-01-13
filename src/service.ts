@@ -18,8 +18,8 @@ import {
 import { ResourcesAPIBase, ServiceBase, FilterValueType } from '@restorecommerce/resource-base-interface';
 import { Logger } from 'winston';
 import {
-  ACSAuthZ,
-  AuthZAction,
+  ACSAuthZ, authZ,
+  AuthZAction, cfg,
   DecisionResponse,
   HierarchicalScope,
   Operation,
@@ -63,6 +63,9 @@ import {
   ExchangeTOTPRequest,
   SetupTOTPRequest,
   SetupTOTPResponse,
+  CreateBackupTOTPCodesRequest,
+  CreateBackupTOTPCodesResponse,
+  ResetTOTPRequest,
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   Role,
@@ -91,21 +94,16 @@ import {
   Subject,
   Tokens
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
-import { zxcvbnOptions, zxcvbnAsync, ZxcvbnResult } from '@zxcvbn-ts/core';
+import {zxcvbnOptions, zxcvbnAsync, ZxcvbnResult, Matcher, Match, MatchEstimated, MatchExtended} from '@zxcvbn-ts/core';
 import * as zxcvbnCommonPackage from '@zxcvbn-ts/language-common';
 import * as zxcvbnEnPackage from '@zxcvbn-ts/language-en';
 import * as zxcvbnDePackage from '@zxcvbn-ts/language-de';
 import { matcherPwnedFactory } from '@zxcvbn-ts/matcher-pwned';
-import {
-  MatchEstimated,
-  MatchExtended,
-  Matcher,
-  Match,
-} from '@zxcvbn-ts/core/dist/types.js';
 import fetch from 'node-fetch';
 
 import { authenticator, totp } from 'otplib';
 import * as jose from 'jose';
+import crypto from 'node:crypto';
 
 export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
@@ -113,13 +111,20 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   db: Arango;
   topics: any;
   cfg: any;
-  registrationSubjectTpl: string;
-  changePWEmailSubjectTpl: string;
+
   layoutTpl: string;
+  registrationSubjectTpl: string;
   registrationBodyTpl: string;
+
+  changePWEmailSubjectTpl: string;
   changePWEmailBodyTpl: string;
+
   invitationSubjectTpl: string;
   invitationBodyTpl: string;
+
+  resetTotpSubjectTpl: string;
+  resetTotpBodyTpl: string;
+
   emailEnabled: boolean;
   emailStyle: string;
   roleService: RoleService;
@@ -762,7 +767,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // the user role associations if not skip validation
       let acsResponse: DecisionResponse | PolicySetRQResponse;
       try {
-        const ctx = { subject, resources: [] };
+        const ctx = { subject, resources: [] as any[] };
         acsResponse = await checkAccessRequest(ctx, [{ resource: 'user' }], AuthZAction.MODIFY, Operation.whatIsAllowed);
       } catch (err: any) {
         this.logger.error('Error making whatIsAllowedACS request for verifying role associations', { code: err.code, message: err.message, stack: err.stack });
@@ -2659,6 +2664,12 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         response = await fetch(hbsTemplates.layoutTpl, { headers });
         this.layoutTpl = await response.text();
 
+        response = await fetch(hbsTemplates.resetTotpSubjectTpl, { headers });
+        this.resetTotpSubjectTpl = await response.text();
+
+        response = await fetch(hbsTemplates.resetTotpBodyTpl, { headers });
+        this.resetTotpBodyTpl = await response.text();
+
         response = await fetch(hbsTemplates.resourcesTpl, { headers });
         if (response.status == 200) {
           const externalRrc = JSON.parse(await response.text());
@@ -3225,7 +3236,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       this.logger.debug('user does not exist', { identifier: subject.id });
       return returnStatus(404, 'user does not exist');
     } else if (users.total_count > 1) {
-      return returnStatus(400, `Invalid identifier provided for totp setup, multiple users found for identifier ${subject.id}`);
+      return returnStatus(400, `Invalid identifier provided for totp exchange, multiple users found for identifier ${subject.id}`);
     }
 
     const user = users.items[0].payload;
@@ -3241,11 +3252,22 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return returnStatus(400, 'Invalid TOTP session token');
     }
 
-    if (!totp.check(request.code, user.totp_secret_processing)) {
-      return returnStatus(400, 'Invalid TOTP code');
+    if (totp.check(request.code, user.totp_secret_processing)) {
+      return { payload: user, status: { code: 200, message: 'success' } };
     }
 
-    return { payload: user, status: { code: 200, message: 'success' } };
+    const backupCode = user.totp_recovery_codes.indexOf(request.code);
+    if (backupCode >= 0) {
+      user.totp_recovery_codes.splice(backupCode, 1);
+
+      const updateStatus = await super.update(UserList.fromPartial({
+        items: [user]
+      }), context);
+
+      return { payload: updateStatus.items[0].payload, status: { code: 200, message: 'success' } };
+    }
+
+    return returnStatus(400, 'Invalid TOTP code');
   }
 
   async getUnauthenticatedSubjectTokenForTenant(request: TenantRequest, context: any): Promise<DeepPartial<TenantResponse>> {
@@ -3293,6 +3315,111 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       token: token?.token
     }));
   }
+
+  async createBackupTOTPCodes(request: CreateBackupTOTPCodesRequest, context: any): Promise<DeepPartial<CreateBackupTOTPCodesResponse>> {
+    const subject = request.subject;
+    const users = await super.read(ReadRequest.fromPartial({
+      filters: [{
+        filters: [{
+          field: 'id',
+          operation: Filter_Operation.eq,
+          value: subject?.id
+        }]
+      }]
+    }), context);
+
+    if (!users || users.total_count === 0) {
+      this.logger.debug('user does not exist', { identifier: subject.id });
+      return returnOperationStatus(404, 'user does not exist');
+    } else if (users.total_count > 1) {
+      return returnOperationStatus(400, `Invalid identifier provided for backup totp code setup, multiple users found for identifier ${subject.id}`);
+    }
+
+    const recovery_code_count = 12;
+    const totp_recovery_codes: string[] = [];
+    for (let i = 0; i < recovery_code_count; i++) {
+      totp_recovery_codes[i] = crypto.randomBytes(16).toString('base64url')
+    }
+
+    const user = users.items[0].payload;
+    let acsResponse: DecisionResponse;
+    try {
+      acsResponse = await checkAccessRequest({
+        ...context,
+        subject,
+        resources: { id: user.id, totp_recovery_codes, meta: user.meta }
+      }, [{ resource: 'user', id: user.id, property: ['totp_recovery_codes'] }], AuthZAction.MODIFY, Operation.isAllowed);
+    } catch (err: any) {
+      this.logger.error('Error occurred requesting access-control-srv for createBackupTOTPCodes', { code: err.code, message: err.message, stack: err.stack });
+      return returnOperationStatus(err.code, err.message);
+    }
+
+    if (acsResponse.decision != Response_Decision.PERMIT) {
+      return { operation_status: acsResponse.operation_status };
+    }
+
+    user.totp_recovery_codes = totp_recovery_codes;
+
+    const updateStatus = await super.update(UserList.fromPartial({
+      items: [user]
+    }), context);
+    return {
+      backup_codes: totp_recovery_codes,
+      operation_status: updateStatus?.items[0]?.status
+    };
+  }
+
+  async resetTOTP(request: ResetTOTPRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
+    const subject = request.subject;
+    const users = await super.read(ReadRequest.fromPartial({
+      filters: [{
+        filters: [{
+          field: 'id',
+          operation: Filter_Operation.eq,
+          value: subject?.id
+        }]
+      }]
+    }), context);
+
+    if (!users || users.total_count === 0) {
+      this.logger.debug('user does not exist', { identifier: subject.id });
+      return returnOperationStatus(404, 'user does not exist');
+    } else if (users.total_count > 1) {
+      return returnOperationStatus(400, `Invalid identifier provided for backup totp code setup, multiple users found for identifier ${subject.id}`);
+    }
+
+    const totpCode = crypto.randomBytes(16).toString('base64url');
+
+    const user = users.items[0].payload;
+    user.totp_recovery_codes.push(totpCode)
+
+    const updateStatus = await super.update(UserList.fromPartial({
+      items: [user]
+    }), context);
+
+    if (this.emailEnabled) {
+      await this.fetchHbsTemplates();
+      const renderRequest = this.makeTOTPResetData(user, totpCode);
+      await this.topics.rendering.emit('renderRequest', renderRequest);
+    }
+
+    return {
+      operation_status: updateStatus?.items[0]?.status
+    };
+  }
+
+  private makeTOTPResetData(user: DeepPartial<User>, totpCode: string): any {
+    const emailBody = this.resetTotpBodyTpl;
+    const emailSubject = this.resetTotpSubjectTpl;
+
+    const dataBody = {
+      firstName: user.first_name,
+      lastName: user.last_name,
+      totpCode,
+    };
+    return this.makeRenderRequestMsg(user, emailSubject, emailBody,
+      dataBody, {}, user.email);
+  }
 }
 
 export class RoleService extends ServiceBase<RoleListResponse, RoleList> implements RoleServiceImplementation {
@@ -3316,7 +3443,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         }
       }
     }
-    super('role', roleTopic, logger, new ResourcesAPIBase(db, 'roles', resourceFieldConfig), isEventsEnabled);
+    super('role', roleTopic as any, logger, new ResourcesAPIBase(db, 'roles', resourceFieldConfig), isEventsEnabled);
     const redisConfig = cfg.get('redis');
     redisConfig.database = cfg.get('redis:db-indexes:db-subject');
     this.redisClient = createClient(redisConfig);
