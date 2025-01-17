@@ -101,7 +101,7 @@ import * as zxcvbnDePackage from '@zxcvbn-ts/language-de';
 import { matcherPwnedFactory } from '@zxcvbn-ts/matcher-pwned';
 import fetch from 'node-fetch';
 
-import { authenticator, totp } from 'otplib';
+import { authenticator } from 'otplib';
 import * as jose from 'jose';
 import crypto from 'node:crypto';
 
@@ -3206,7 +3206,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return { operation_status: acsResponse.operation_status };
     }
 
-    if (!totp.check(request.code, user.totp_secret_processing)) {
+    if (!authenticator.check(request.code, user.totp_secret_processing)) {
       return returnOperationStatus(400, `Invalid TOTP code`);
     }
 
@@ -3252,7 +3252,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return returnStatus(400, 'Invalid TOTP session token');
     }
 
-    if (totp.check(request.code, user.totp_secret_processing)) {
+    if (authenticator.check(request.code, user.totp_secret)) {
       return { payload: user, status: { code: 200, message: 'success' } };
     }
 

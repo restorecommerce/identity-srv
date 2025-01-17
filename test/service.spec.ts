@@ -27,7 +27,7 @@ import {
   TokenServiceClient,
   TokenServiceDefinition
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token.js';
-import { totp } from 'otplib';
+import { authenticator } from 'otplib';
 import {unmarshallProtobufAny} from "../src/utils.js";
 
 /*
@@ -2030,7 +2030,7 @@ describe('testing identity-srv', () => {
         });
 
         it('should confirm totp secret', async () => {
-          const code = totp.generate(totpSecret);
+          const code = authenticator.generate(totpSecret);
 
           const completeResult = await (userService.completeTOTPSetup({
             code,
@@ -2051,7 +2051,7 @@ describe('testing identity-srv', () => {
           should.exist(loginResponse);
           should.exist(loginResponse.totp_session_token);
 
-          const code = totp.generate(totpSecret);
+          const code = authenticator.generate(totpSecret);
           const exchangeResponse = await (userService.exchangeTOTP({
             code,
             totp_session_token: loginResponse.totp_session_token,
