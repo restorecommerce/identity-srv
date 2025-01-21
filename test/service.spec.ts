@@ -2158,6 +2158,19 @@ describe('testing identity-srv', () => {
           const userDBDoc = compareResult.items![0]!.payload!;
           exchangeResponse!.payload!.should.deepEqual(userDBDoc);
         });
+
+        it('should have totp and backup codes setup', async () => {
+          const setupResult = await (userService.mfaStatus({
+            identifier: 'test.user2',
+            subject: { token: 'user-token' }
+          }));
+
+          should.exist(setupResult);
+          setupResult.operation_status!.code!.should.equal(200);
+          setupResult.operation_status!.message!.should.equal('success');
+          setupResult.has_totp.should.equal(true);
+          setupResult.has_backup_codes.should.equal(true);
+        });
       })
     });
   });

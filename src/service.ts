@@ -66,6 +66,8 @@ import {
   CreateBackupTOTPCodesRequest,
   CreateBackupTOTPCodesResponse,
   ResetTOTPRequest,
+  MfaStatusRequest,
+  MfaStatusResponse
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   Role,
@@ -3419,6 +3421,49 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     };
     return this.makeRenderRequestMsg(user, emailSubject, emailBody,
       dataBody, {}, user.email);
+  }
+
+  async mfaStatus(request: MfaStatusRequest, context: any): Promise<DeepPartial<MfaStatusResponse>> {
+    const subject = request.subject;
+    const users = await super.read(ReadRequest.fromPartial({
+      filters: [{
+        filters: [{
+          field: 'id',
+          operation: Filter_Operation.eq,
+          value: subject?.id
+        }]
+      }]
+    }), context);
+
+    if (!users || users.total_count === 0) {
+      this.logger.debug('user does not exist', { identifier: subject.id });
+      return returnOperationStatus(404, 'user does not exist');
+    } else if (users.total_count > 1) {
+      return returnOperationStatus(400, `Invalid identifier provided for mfa status, multiple users found for identifier ${subject.id}`);
+    }
+
+    const user = users.items[0].payload;
+    let acsResponse: DecisionResponse;
+    try {
+      acsResponse = await checkAccessRequest({
+        ...context,
+        subject,
+        resources: { id: user.id, meta: user.meta }
+      }, [{ resource: 'user', id: user.id, property: ['totp_recovery_codes', 'totp_secret'] }], AuthZAction.READ, Operation.isAllowed);
+    } catch (err: any) {
+      this.logger.error('Error occurred requesting access-control-srv for mfa status', { code: err.code, message: err.message, stack: err.stack });
+      return returnOperationStatus(err.code, err.message);
+    }
+
+    if (acsResponse.decision != Response_Decision.PERMIT) {
+      return { operation_status: acsResponse.operation_status };
+    }
+
+    return Promise.resolve({
+      has_totp: user.totp_secret !== undefined && user.totp_secret !== '',
+      has_backup_codes: user.totp_recovery_codes !== undefined && user.totp_recovery_codes.length > 0,
+      operation_status: returnCodeMessage(200, 'success')
+    });
   }
 }
 
