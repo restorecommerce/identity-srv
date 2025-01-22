@@ -22,7 +22,7 @@
     "@restorecommerce/grpc-client": "^2.2.5",
     "@restorecommerce/kafka-client": "1.2.22",
     "@restorecommerce/logger": "^1.3.2",
-    "@restorecommerce/rc-grpc-clients": "5.1.45",
+    "@restorecommerce/rc-grpc-clients": "5.1.46",
     "@restorecommerce/resource-base-interface": "1.6.5",
     "@restorecommerce/scs-jobs": "0.1.49",
     "@restorecommerce/service-config": "^1.0.16",
