@@ -3373,15 +3373,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
   async resetTOTP(request: ResetTOTPRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
     const subject = request.subject;
-    const users = await super.read(ReadRequest.fromPartial({
-      filters: [{
-        filters: [{
-          field: 'id',
-          operation: Filter_Operation.eq,
-          value: subject?.id
-        }]
-      }]
-    }), context);
+    let loginIdentifierProperty = this.cfg.get('service:loginIdentifierProperty');
+    // if loginIdentifierProperty is not set defaults to name / email
+    if (!loginIdentifierProperty) {
+      loginIdentifierProperty = ['name', 'email'];
+    }
+    const filters = getLoginIdentifierFilter(loginIdentifierProperty, subject.id);
+    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
 
     if (!users || users.total_count === 0) {
       this.logger.debug('user does not exist', { identifier: subject.id });
