@@ -2337,21 +2337,23 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }
       }
 
-      if (user.totp_secret) {
-        const totp_session_token = new jose.UnsecuredJWT({})
-          .setIssuedAt()
-          .setExpirationTime((Date.now() / 1000) + (60 * 10)) // 10 Minute expiry
-          .encode();
+      if (this.cfg.get('totp:enabled')) {
+        if (user.totp_secret) {
+          const totp_session_token = new jose.UnsecuredJWT({})
+            .setIssuedAt()
+            .setExpirationTime((Date.now() / 1000) + (60 * 10)) // 10 Minute expiry
+            .encode();
 
-        user.totp_session_tokens = [
-          ...(user.totp_session_tokens || []).filter(t => jose.decodeJwt(t).exp > (Date.now() / 1000)),
-          totp_session_token
-        ];
-        await super.update(UserList.fromPartial({
-          items: [user]
-        }), context);
+          user.totp_session_tokens = [
+            ...(user.totp_session_tokens || []).filter(t => jose.decodeJwt(t).exp > (Date.now() / 1000)),
+            totp_session_token
+          ];
+          await super.update(UserList.fromPartial({
+            items: [user]
+          }), context);
 
-        return { totp_session_token, status: { code: 200, message: 'success' } };
+          return { totp_session_token, status: { code: 200, message: 'success' } };
+        }
       }
 
       return { payload: user, status: { code: 200, message: 'success' } };
