@@ -440,6 +440,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             new Date(redisToken?.expires_in ?? 0).getTime() === 0
             || new Date(redisToken?.expires_in) >= new Date()
           ) {
+            if ('data' in userData && userData.data) {
+              userData.data.value = Buffer.from(userData.data.value.data);
+            }
             return { payload: userData, status: returnCodeMessage(200, 'success') };
           } else {
             // delete token from redis and update user entity
