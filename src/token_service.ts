@@ -69,7 +69,7 @@ export class TokenService implements TokenServiceImplementation {
         response => response.items?.[0]?.payload
       );
       if (user) {
-        const expiredTokenList = user?.tokens?.length > 0 && user.tokens.filter(
+        const expiredTokenList = user?.tokens?.filter(
           obj => obj?.expires_in && (obj.expires_in.getTime() < new Date().getTime())
         );
         let token_name;
