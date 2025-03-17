@@ -203,7 +203,7 @@ export class Worker {
           const require_dir = process.env.EXTERNAL_JOBS_REQUIRE_DIR ?? './jobs/';
 
           try {
-            const fileImport = await import(require_dir + externalFile);
+            const fileImport = await import(/* webpackIgnore: true */ require_dir + externalFile);
             // check for double default
             if (fileImport?.default?.default) {
               await fileImport.default.default(cfg, logger, events, runWorker);
