@@ -1485,7 +1485,7 @@ describe('testing identity-srv', () => {
               role: 'user-r-id',
               attributes: []
             }],
-            active: true
+            active: false
           };
           invitingUser = {
             id: '123invitingUserId',
