@@ -96,7 +96,7 @@ import {
   Subject,
   Tokens
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
-import {zxcvbnOptions, zxcvbnAsync, ZxcvbnResult, Matcher, Match, MatchEstimated, MatchExtended} from '@zxcvbn-ts/core';
+import { zxcvbnOptions, zxcvbnAsync, ZxcvbnResult, Matcher, Match, MatchEstimated, MatchExtended } from '@zxcvbn-ts/core';
 import * as zxcvbnCommonPackage from '@zxcvbn-ts/language-common';
 import * as zxcvbnEnPackage from '@zxcvbn-ts/language-en';
 import * as zxcvbnDePackage from '@zxcvbn-ts/language-de';
@@ -837,12 +837,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         subject,
       }, {});
 
-      if (rolesData?.items?.length < targetUserRoleIds.length)  {
+      if (rolesData?.items?.length < targetUserRoleIds.length) {
         const found = rolesData?.items?.map(item => item.payload?.id);
         const missing = targetUserRoleIds.filter(id => !found?.includes(id));
-        const message = `The following role IDs [${
-          missing?.join(', ')
-        }] are either invalid or the assigning user does not have the required permission.`;
+        const message = `The following role IDs [${missing?.join(', ')
+          }] are either invalid or the assigning user does not have the required permission.`;
         this.logger.error(message);
         return returnStatus(400, message, user.id);
       }
@@ -856,13 +855,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               )
             ) {
               const userNameId = user?.name ? user.name : user?.id;
-              const message = `The target role ${
-                targetRole.payload.id
-              } cannot be assigned to user ${
-                userNameId
-              } as the user roles [${
-                createAccessRole.join(', ')
-              }] does not have the required permission`;
+              const message = `The target role ${targetRole.payload.id
+                } cannot be assigned to user ${userNameId
+                } as the user roles [${createAccessRole.join(', ')
+                }] does not have the required permission`;
               this.logger.verbose(message);
               return returnStatus(403, message, user.id);
             }
@@ -1382,10 +1378,28 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return { operation_status: acsResponse.operation_status };
     }
 
+    // inactive account expiry check
+    const inactivatedAccountExpiry = this.cfg.get('service:inactivatedAccountExpiry');
     if (acsResponse.decision === Response_Decision.PERMIT) {
       if ((!request.activation_code) || request.activation_code !== user.activation_code) {
         this.logger.debug('wrong activation code', { user });
         return returnOperationStatus(412, 'wrong activation code');
+      }
+      // Check if inactivatedAccountExpiry is set and positive
+      if (inactivatedAccountExpiry != undefined && inactivatedAccountExpiry > 0) {
+
+        if (user?.meta?.created) {
+          const currentTimestamp = new Date(); // Current Unix timestamp in seconds
+          const activationTimestamp = user.meta.created;
+
+          // Check if the activation code has expired
+          // calculate the difference between currentTimestamp.getTime() and activationTimestamp.getTime(). This gives the time difference in milliseconds.
+          // multiply inactivatedAccountExpiry by 1000 to convert it to milliseconds (assuming it's specified in seconds), and then compare it with the time difference to check if the activation code has expired.
+          if (currentTimestamp.getTime() - activationTimestamp.getTime() > inactivatedAccountExpiry * 1000) {
+            this.logger.debug('activation code has expired', user);
+            return returnOperationStatus(400, 'Activation code has expired');
+          }
+        }
       }
       user.active = true;
       user.activation_code = '';
@@ -2685,7 +2699,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
         this.emailEnabled = true;
       } catch (err: any) {
-        this.emailEnabled = false;
         if (err.code == 'ECONNREFUSED' || err.message == 'ECONNREFUSED') {
           this.logger.error('An error occurred while attempting to load email templates from'
             + ' remote server. Email operations will be disabled.');
@@ -3225,7 +3238,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     if (updateStatus?.items[0]?.status?.message === 'success') {
       this.logger.info('totp secret changed for user', { identifier: subject.id });
     }
-    return {operation_status: updateStatus?.items[0]?.status};
+    return { operation_status: updateStatus?.items[0]?.status };
   }
 
   async exchangeTOTP(request: ExchangeTOTPRequest, context: any): Promise<DeepPartial<UserResponse>> {
