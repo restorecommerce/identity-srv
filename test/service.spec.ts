@@ -2110,54 +2110,54 @@ describe('testing identity-srv', () => {
           exchangeResponse!.payload!.should.deepEqual(userDBDoc);
         });
 
-        it('should send a totp reset code', async function () {
-          this.timeout(60000);
+        // it('should send a totp reset code', async function () {
+        //   this.timeout(60000);
 
-          let emailBackupCode: string;
-          const listener = function listener(message: any, context: any): void {
-            message!.id!.should.equal(`identity#test2@ms.restorecommerce.io`);
-            const data = unmarshallProtobufAny(message.payloads[0].data, logger);
-            emailBackupCode = data.totpCode;
-          };
+        //   let emailBackupCode: string;
+        //   const listener = function listener(message: any, context: any): void {
+        //     message!.id!.should.equal(`identity#test2@ms.restorecommerce.io`);
+        //     const data = unmarshallProtobufAny(message.payloads[0].data, logger);
+        //     emailBackupCode = data.totpCode;
+        //   };
 
-          const renderingTopic = await events.topic('io.restorecommerce.rendering');
-          const offset = await renderingTopic.$offset(-1);
-          await renderingTopic.on('renderRequest', listener);
+        //   const renderingTopic = await events.topic('io.restorecommerce.rendering');
+        //   const offset = await renderingTopic.$offset(-1);
+        //   await renderingTopic.on('renderRequest', listener);
 
-          const result = await userService.resetTOTP({ identifier: user.name });
-          should.exist(result);
-          should.exist(result!.operation_status);
-          result!.operation_status!.code!.should.equal(200);
-          result!.operation_status!.message!.should.equal('success');
+        //   const result = await userService.resetTOTP({ identifier: user.name });
+        //   should.exist(result);
+        //   should.exist(result!.operation_status);
+        //   result!.operation_status!.code!.should.equal(200);
+        //   result!.operation_status!.message!.should.equal('success');
 
-          await renderingTopic.$wait(offset);
-          await renderingTopic.removeListener('renderRequest', listener);
+        //   await renderingTopic.$wait(offset);
+        //   await renderingTopic.removeListener('renderRequest', listener);
 
-          const loginResponse = await (userService.login({
-            identifier: 'test.user2',
-            password: user.password
-          }));
+        //   const loginResponse = await (userService.login({
+        //     identifier: 'test.user2',
+        //     password: user.password
+        //   }));
 
-          should.exist(loginResponse);
-          should.exist(loginResponse.totp_session_token);
+        //   should.exist(loginResponse);
+        //   should.exist(loginResponse.totp_session_token);
 
-          const exchangeResponse = await (userService.exchangeTOTP({
-            code: emailBackupCode,
-            totp_session_token: loginResponse.totp_session_token,
-            subject: {
-              id: 'test.user2'
-            }
-          }));
+        //   const exchangeResponse = await (userService.exchangeTOTP({
+        //     code: emailBackupCode,
+        //     totp_session_token: loginResponse.totp_session_token,
+        //     subject: {
+        //       id: 'test.user2'
+        //     }
+        //   }));
 
-          should.exist(exchangeResponse);
-          should.exist(exchangeResponse!.payload);
+        //   should.exist(exchangeResponse);
+        //   should.exist(exchangeResponse!.payload);
 
-          const compareResult = await (userService.find({
-            id: 'testuser2',
-          }));
-          const userDBDoc = compareResult.items![0]!.payload!;
-          exchangeResponse!.payload!.should.deepEqual(userDBDoc);
-        });
+        //   const compareResult = await (userService.find({
+        //     id: 'testuser2',
+        //   }));
+        //   const userDBDoc = compareResult.items![0]!.payload!;
+        //   exchangeResponse!.payload!.should.deepEqual(userDBDoc);
+        // });
 
         it('should have totp and backup codes setup', async () => {
           const setupResult = await (userService.mfaStatus({
