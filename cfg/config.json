@@ -35,7 +35,7 @@
   "logger": {
     "console": {
       "handleExceptions": false,
-      "level": "crit",
+      "level": "info",
       "colorize": true,
       "prettyPrint": true
     },
