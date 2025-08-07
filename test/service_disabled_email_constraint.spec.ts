@@ -355,7 +355,7 @@ describe('testing identity-srv', () => {
           should.exist(result);
           should.not.exist(result!.payload);
           result!.status!.code!.should.equal(409);
-          result!.status!.message!.should.equal('user does already exist');
+          result!.status!.message!.should.equal('user already exist');
         });
         it('should throw an error when re-send activation email for registered user with email identifier when is not unique', async function sendActivationEmail(): Promise<void> {
           const result = await userService.sendActivationEmail({ identifier: user.email });
@@ -419,7 +419,7 @@ describe('testing identity-srv', () => {
           should.not.exist(result!.items![0]!.payload);
           // item status
           result!.items![0]!.status!.code!.should.equal(409);
-          result!.items![0]!.status!.message!.should.equal('user does already exist');
+          result!.items![0]!.status!.message!.should.equal('user already exist');
           // overall status
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');

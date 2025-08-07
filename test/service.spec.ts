@@ -468,7 +468,7 @@ describe('testing identity-srv', () => {
           should.not.exist(registerResult.payload);
           should.exist(registerResult.status);
           registerResult.status!.code!.should.equal(409);
-          registerResult.status!.message!.should.equal('user does already exist');
+          registerResult.status!.message!.should.equal('user already exist');
         });
 
         it('should not create a user with an invalid username format - should test character repetition', async function registerUser(): Promise<void> {
