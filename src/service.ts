@@ -719,9 +719,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             user.active = false;
             user.activation_code = this.idGen();
           }
-          insertedUsers.items.push(await this.createUser(user, context));
+          const createdUser = await this.createUser(user, context);
+          insertedUsers.items.push(createdUser);
 
-          if (this.emailEnabled && user?.invite) {
+          if (this.emailEnabled && user?.invite && createdUser?.status?.code === 200) {
             await this.fetchHbsTemplates();
             // send render request for user Invitation
             const renderRequest = this.makeInvitationEmailData(user);
@@ -2739,7 +2740,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       invitedByUserName: user.invited_by_user_name,
       invitedByUserFirstName: user.invited_by_user_first_name,
       invitedByUserLastName: user.invited_by_user_last_name,
-      invitationURL
+      invitationURL,
+      identifier: user.name
     };
 
     const dataSubject = {
