@@ -1257,8 +1257,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         if (user?.payload?.guest) {
           logger.debug('Guest user', { name: user.payload.name });
         } else {
-          logger.debug('user does already exist', users);
-          return returnStatus(409, 'user does already exist', user?.payload?.id);
+          logger.debug('user already exist', users);
+          return returnStatus(409, 'user already exist', user?.payload?.id);
         }
       }
     }
