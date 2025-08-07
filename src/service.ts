@@ -1404,6 +1404,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
       user.active = true;
       user.activation_code = '';
+      user.invite = false;
 
       user.password_hash = password.hash(request.password);
       const updateStatus = await super.update(UserList.fromPartial({
@@ -3128,6 +3129,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     if (acsResponse.decision === Response_Decision.PERMIT) {
+      if (user.active && !user.activation_code) {
+        return returnOperationStatus(200, 'user already active');
+      }
       if (this.emailEnabled && user.invite) {
         const userForInvitation = await this.makeUserForInvitationData(user, invited_by_user_identifier);
         // error
