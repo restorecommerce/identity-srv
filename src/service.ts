@@ -2148,7 +2148,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         const dbRoleAssocs = users.items[0].payload.role_associations;
         if (userRoleAssocs?.length != dbRoleAssocs?.length) {
           roleAssocsModified = true;
-          this.logger.debug('Role associations length are not equal', { id: userID });
+          this.logger.debug('Role associations length are not equal', { id: userID, roleAssocsModified });
           break;
         } else {
           // compare each role and its association
@@ -2197,6 +2197,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
       return roleAssocsModified;
     }
+    return roleAssocsModified;
   }
 
   /**
