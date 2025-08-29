@@ -1084,6 +1084,7 @@ describe('testing identity-srv', () => {
           let expires_in = new Date(); // set expires_in to +1 day
           expires_in.setDate(expires_in.getDate() + 1);
           let userWithToken = {
+            id: testUserID,
             name: 'test.user1', // user registered initially, storing with token in DB
             first_name: 'test',
             last_name: 'user',
@@ -1194,6 +1195,7 @@ describe('testing identity-srv', () => {
           let expires_in = new Date(); // set expires_in to +1 day
           expires_in.setDate(expires_in.getDate() + 1);
           let userWithToken = {
+            id: testUserID,
             name: 'test.user1', // user registered initially, storing with token in DB
             first_name: 'test',
             last_name: 'user',
