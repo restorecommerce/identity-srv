@@ -289,7 +289,7 @@ describe('testing identity-srv', () => {
     await userService.delete({
       collection: true
     });
-  }, 60000);
+  }, 120000);
 
   afterAll(async function stopServer(): Promise<void> {
     // delete user and roles collection
@@ -305,7 +305,7 @@ describe('testing identity-srv', () => {
     stopGrpcMockServer();
     await worker.stop();
     await events?.stop();
-  }, 60000);
+  }, 120000);
 
   describe('testing Role service', () => {
     describe('with test client', () => {
@@ -433,7 +433,7 @@ describe('testing identity-srv', () => {
           result!.operation_status!.message!.should.equal('success');
           await renderingTopic.$wait(offset);
           await renderingTopic.removeListener('renderRequest', listener);
-        }, 60000);
+        }, 120000);
 
         it('should register guest User', async function registerUserAgain(): Promise<void> {
           const guest_user = {

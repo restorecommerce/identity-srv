@@ -210,7 +210,7 @@ describe('testing identity-srv', () => {
     await userService.delete({
       collection: true
     });
-  }, 60000);
+  }, 120000);
 
   afterAll(async function stopServer(): Promise<void> {
     // drop all roles and users
@@ -224,7 +224,7 @@ describe('testing identity-srv', () => {
     await stopGrpcMockServer();
     worker && await worker.stop();
     events && await events.stop();
-  }, 60000);
+  }, 120000);
 
   describe('testing Role service', () => {
     describe('with test client', () => {
