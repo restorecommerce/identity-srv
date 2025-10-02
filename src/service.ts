@@ -1498,7 +1498,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       operator: FilterOp_Operator.or
     }];
 
-    const user = await super.read(ReadRequest.fromPartial({ filters }), {});
+    const user = await super.read(ReadRequest.fromPartial({ filters }), {} as any);
     if (_.isEmpty(user?.items)) {
       this.logger.silly(`Received rendering response from unknown email address ${emailAddress}; discarding`);
       return;
@@ -2544,7 +2544,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         }];
         const userData = await super.read({
           filters,
-        } as any, {});
+        } as any, {} as any);
         if (userData?.items?.length > 0) {
           userData?.items?.forEach((user) => {
             user?.payload?.tokens?.forEach(async (tokenObj) => {
@@ -2900,7 +2900,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             }]
           }))
         }
-      }), {});
+      }), {} as any);
       // The above custom query is to avoid to retreive all the users in DB
       // and get only those belong to orgIds and then check below to see if
       // that org is the only one present before actually deleting the user
@@ -2913,11 +2913,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     if (deactivate) {
-      await super.update(UserList.fromPartial({ items: deactivateUsers }), {});
+      await super.update(UserList.fromPartial({ items: deactivateUsers }), {} as any);
     } else {
       const ids = deactivateUsers.map((user) => { return user.id; });
       this.logger.info('Deleting users:', { ids });
-      await super.delete(DeleteRequest.fromPartial({ ids }), {});
+      await super.delete(DeleteRequest.fromPartial({ ids }), {} as any);
     }
 
     return deactivateUsers;
@@ -3056,7 +3056,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         limit: ids.length
       });
 
-      const result_map = await super.read(filters, {}).then(
+      const result_map = await super.read(filters, {} as any).then(
         resp => new Map(
           resp.items?.map(
             item => [item.payload?.id, item?.payload]
@@ -3099,7 +3099,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       ],
       operator: FilterOp_Operator.or
     }];
-    const invitedByUsers = await super.read(ReadRequest.fromPartial({ filters }), {});
+    const invitedByUsers = await super.read(ReadRequest.fromPartial({ filters }), {} as any);
     if (invitedByUsers.total_count === 1) {
       invitedByUser = invitedByUsers.items[0]?.payload;
     } else {
@@ -3201,26 +3201,15 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
   async setupTOTP(request: SetupTOTPRequest, context: any): Promise<DeepPartial<SetupTOTPResponse>> {
     const subject = request.subject;
-    const users = await super.read(ReadRequest.fromPartial({
-      filters: [{
-        filters: [{
-          field: 'id',
-          operation: Filter_Operation.eq,
-          value: subject?.id
-        }]
-      }]
-    }), context);
+    const userByToken = await this.findByToken({ token: request.subject.token }, context);
 
-    if (!users || users.total_count === 0) {
-      this.logger.debug('user does not exist', { identifier: subject.id });
+    if (!userByToken?.payload) {
       return returnOperationStatus(404, 'user does not exist');
-    } else if (users.total_count > 1) {
-      return returnOperationStatus(400, `Invalid identifier provided for totp setup, multiple users found for identifier ${subject.id}`);
     }
 
     const totpSecret = authenticator.generateSecret();
 
-    const user = users.items[0].payload;
+    const user = userByToken.payload;
     let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest({
@@ -3248,30 +3237,36 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   }
 
   async completeTOTPSetup(request: ExchangeTOTPRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
-    const subject = request.subject;
-    const users = await super.read(ReadRequest.fromPartial({
+    const user = await super.read(ReadRequest.fromPartial({
       filters: [{
         filters: [{
-          field: 'id',
-          operation: Filter_Operation.eq,
-          value: subject?.id
-        }]
-      }]
-    }), context);
+          field: 'tokens[*].token',
+          operation: Filter_Operation.in,
+          value: request.subject.token
+        }],
+      }],
+      limit: 2
+    }), context).then(
+      response => {
+        if (response?.items?.length > 1) {
+          this.logger.error('multiple user found for request', { request });
+          throw { code: 400, message: 'Multiple users found for token' };
+        }
+        else {
+          return response.items?.[0]?.payload;
+        }
+      }
+    );
 
-    if (!users || users.total_count === 0) {
-      this.logger.debug('user does not exist', { identifier: subject.id });
+    if (!user) {
       return returnOperationStatus(404, 'user does not exist');
-    } else if (users.total_count > 1) {
-      return returnOperationStatus(400, `Invalid identifier provided for totp setup, multiple users found for identifier ${subject.id}`);
     }
 
-    const user = users.items[0].payload;
     let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest({
         ...context,
-        subject,
+        subject: request.subject,
         resources: { id: user.id, totp_secret_processing: undefined, totp_secret: user.totp_secret_processing, meta: user.meta }
       }, [{ resource: 'user', id: user.id, property: ['totp_secret', 'totp_secret_processing'] }], AuthZAction.MODIFY, Operation.isAllowed);
     } catch (err: any) {
@@ -3293,7 +3288,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       items: [user]
     }), context);
     if (updateStatus?.items[0]?.status?.message === 'success') {
-      this.logger.info('totp secret changed for user', { identifier: subject.id });
+      this.logger.info('totp secret changed for user', { identifier: user.id });
     }
     return { operation_status: updateStatus?.items[0]?.status };
   }
@@ -3395,21 +3390,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
   async createBackupTOTPCodes(request: CreateBackupTOTPCodesRequest, context: any): Promise<DeepPartial<CreateBackupTOTPCodesResponse>> {
     const subject = request.subject;
-    const users = await super.read(ReadRequest.fromPartial({
-      filters: [{
-        filters: [{
-          field: 'id',
-          operation: Filter_Operation.eq,
-          value: subject?.id
-        }]
-      }]
-    }), context);
+    const userByToken = await this.findByToken({ token: request.subject.token }, context);
 
-    if (!users || users.total_count === 0) {
-      this.logger.debug('user does not exist', { identifier: subject.id });
+    if (!userByToken?.payload) {
       return returnOperationStatus(404, 'user does not exist');
-    } else if (users.total_count > 1) {
-      return returnOperationStatus(400, `Invalid identifier provided for backup totp code setup, multiple users found for identifier ${subject.id}`);
     }
 
     const recovery_code_count = 12;
@@ -3418,7 +3402,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       totp_recovery_codes[i] = crypto.randomBytes(16).toString('base64url')
     }
 
-    const user = users.items[0].payload;
+    const user = userByToken.payload;
     let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest({
@@ -3498,24 +3482,32 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
   async mfaStatus(request: MfaStatusRequest, context: any): Promise<DeepPartial<MfaStatusResponse>> {
     const subject = request.subject;
-    const users = await super.read(ReadRequest.fromPartial({
+
+    const user = await super.read(ReadRequest.fromPartial({
       filters: [{
         filters: [{
-          field: 'id',
-          operation: Filter_Operation.eq,
-          value: subject?.id
-        }]
-      }]
-    }), context);
+          field: 'tokens[*].token',
+          operation: Filter_Operation.in,
+          value: request.subject.token
+        }],
+      }],
+      limit: 2
+    }), context).then(
+      response => {
+        if (response?.items?.length > 1) {
+          this.logger.error('multiple user found for request', { request });
+          throw { code: 400, message: 'Multiple users found for token' };
+        }
+        else {
+          return response.items?.[0]?.payload;
+        }
+      }
+    );
 
-    if (!users || users.total_count === 0) {
-      this.logger.debug('user does not exist', { identifier: subject.id });
+    if (!user) {
       return returnOperationStatus(404, 'user does not exist');
-    } else if (users.total_count > 1) {
-      return returnOperationStatus(400, `Invalid identifier provided for mfa status, multiple users found for identifier ${subject.id}`);
     }
 
-    const user = users.items[0].payload;
     let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest({
@@ -3810,7 +3802,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
             value: roleID
           }]
         }];
-        const result = await super.read(ReadRequest.fromPartial({ filters }), {});
+        const result = await super.read(ReadRequest.fromPartial({ filters }), {} as any);
 
         if (!result || !result.items || result.total_count == 0) {
           return false;
@@ -3896,7 +3888,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
         limit: ids.length
       });
 
-      const result_map = await super.read(filters, {}).then(
+      const result_map = await super.read(filters, {} as any).then(
         resp => new Map(
           resp.items?.map(
             item => [item.payload?.id, item?.payload]

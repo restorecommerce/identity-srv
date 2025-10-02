@@ -206,6 +206,9 @@
       "userDeleted": {
         "messageObject": "io.restorecommerce.user.Deleted"
       },
+      "userDeletedAll": {
+        "messageObject": "io.restorecommerce.user.Deleted"
+      },
       "roleCreated": {
         "messageObject": "io.restorecommerce.role.Role"
       },
@@ -213,6 +216,9 @@
         "messageObject": "io.restorecommerce.role.Role"
       },
       "roleDeleted": {
+        "messageObject": "io.restorecommerce.role.Deleted"
+      },
+      "roleDeletedAll": {
         "messageObject": "io.restorecommerce.role.Deleted"
       },
       "authentication_logCreated": {
