@@ -738,6 +738,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
   }
 
+  // Main method called for verifying userRoleAssociations
   private async verifyUserRoleAssociations(usersList: User[], subject: any): Promise<any> {
     let validateRoleScope = false;
     let redisHRScopesKey, user;
@@ -894,10 +895,25 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       if (_.isEmpty(hrScopes)) {
         return returnStatus(401, 'No Hierarchical Scopes could be found', usersList[0].id);
       }
+      // Check for existing role Associations
       for (const user of usersList) {
         if (user?.role_associations?.length > 0) {
           const userNameId = user?.name ? user.name : user?.id;
-          const validationResponse = this.validateUserRoleAssociations(user.role_associations, hrScopes, userNameId, subject, user.id);
+          let dbUserRoleAssocs: any = [];
+          if (user?.id) {
+            const dbUser = await super.read(ReadRequest.fromPartial({
+              filters: [{
+                filters: [{
+                  field: 'id',
+                  operation: Filter_Operation.eq,
+                  value: user.id
+                }]
+              }]
+            }), {});
+            const dbUserPl = dbUser?.items?.[0]?.payload;
+            dbUserRoleAssocs = dbUserPl.role_associations;
+          }
+          const validationResponse = this.validateUserRoleAssociations(user.role_associations, hrScopes, userNameId, subject, user.id, dbUserRoleAssocs);
           if (validationResponse.status.code != 200) {
             return validationResponse;
           }
@@ -925,8 +941,42 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * with the HR scope and roles of the creating user
    */
   private validateUserRoleAssociations(userRoleAssocs: RoleAssociation[],
-    hrScopes: HierarchicalScope[], userNameId: string, subject: ResolvedSubject, userID: string) {
-    for (const userRoleAssoc of userRoleAssocs || []) {
+    hrScopes: HierarchicalScope[], userNameId: string, subject: ResolvedSubject, userID: string, dbRoleAssocs: RoleAssociation[]) {
+    let validateUserRoleAssoc = [];
+    if (dbRoleAssocs?.length && userRoleAssocs?.length) {
+      for (const userRoleAssoc of userRoleAssocs) {
+        let found = false;
+        for (const dbRoleAssoc of dbRoleAssocs) {
+          if (dbRoleAssoc.role === userRoleAssoc.role) {
+            if (dbRoleAssoc?.attributes?.length > 0) {
+              for (const dbAttribute of dbRoleAssoc.attributes) {
+                const dbNestedAttributes = dbAttribute.attributes;
+                if (userRoleAssoc?.attributes?.length > 0) {
+                  for (const userAttribute of userRoleAssoc.attributes) {
+                    const userNestedAttributes = userAttribute.attributes;
+                    if (userAttribute.id === dbAttribute.id &&
+                      userAttribute.value === dbAttribute.value &&
+                      this.nestedAttributesEqual(dbNestedAttributes, userNestedAttributes)) {
+                      found = true;
+                      break;
+                    }
+                  }
+                }
+              }
+            } else {
+              found = true;
+              break;
+            }
+          }
+        }
+        if (!found) {
+          validateUserRoleAssoc.push(userRoleAssoc);
+        }
+      }
+    } else {
+      validateUserRoleAssoc = userRoleAssocs;
+    }
+    for (const userRoleAssoc of validateUserRoleAssoc || []) {
       let validUserRoleAssoc = false;
       const userRole = userRoleAssoc?.role;
       if (userRole) {
