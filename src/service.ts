@@ -911,7 +911,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               }]
             }), {});
             const dbUserPl = dbUser?.items?.[0]?.payload;
-            dbUserRoleAssocs = dbUserPl.role_associations;
+            dbUserRoleAssocs = dbUserPl?.role_associations ?? [];
           }
           const validationResponse = this.validateUserRoleAssociations(user.role_associations, hrScopes, userNameId, subject, user.id, dbUserRoleAssocs);
           if (validationResponse.status.code != 200) {
