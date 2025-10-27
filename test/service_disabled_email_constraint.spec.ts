@@ -1,9 +1,8 @@
-import {} from 'mocha';
 import should from 'should';
 import _ from 'lodash-es';
 import { createClient, createChannel } from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
-import { Worker } from '../src/worker';
+import { Worker } from '../src/worker.js';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { Topic } from '@restorecommerce/kafka-client/lib/events/provider/kafka';
 import { GrpcMockServer, ProtoUtils } from '@alenon/grpc-mock-server';
@@ -14,14 +13,16 @@ import {
   UserServiceDefinition,
   UserServiceClient, UserType,
   User
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   RoleServiceDefinition,
   RoleServiceClient
-} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role';
-import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base';
-import { PolicySetRQ } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/policy_set';
-import { Effect, RuleRQ } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rule';
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/role.js';
+import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
+import { PolicySetRQ } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/policy_set.js';
+import { Effect, RuleRQ } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rule.js';
+import { expect, it, describe, beforeAll, afterAll } from 'vitest';
+import { Logger } from "winston";
 
 const Events = kafkaClient.Events;
 
@@ -31,10 +32,10 @@ const Events = kafkaClient.Events;
 
 let cfg: any;
 let worker: Worker;
-let logger;
+let logger: Logger;
 
 // For event listeners
-let events;
+let events: any;
 let topic: Topic;
 let roleService: RoleServiceClient;
 
@@ -192,8 +193,7 @@ const stopGrpcMockServer = async () => {
 
 describe('testing identity-srv', () => {
 
-  before(async function startServer(): Promise<void> {
-    this.timeout(60000);
+  beforeAll(async function startServer(): Promise<void> {
     await start();
     // disable authorization
     cfg.set('authorization:enabled', false);
@@ -210,9 +210,9 @@ describe('testing identity-srv', () => {
     await userService.delete({
       collection: true
     });
-  });
+  }, 120000);
 
-  after(async function stopServer(): Promise<void> {
+  afterAll(async function stopServer(): Promise<void> {
     // drop all roles and users
     await roleService.delete({
       collection: true
@@ -222,10 +222,9 @@ describe('testing identity-srv', () => {
       collection: true
     }).then();
     await stopGrpcMockServer();
-    this.timeout(60000);
     worker && await worker.stop();
     events && await events.stop();
-  });
+  }, 120000);
 
   describe('testing Role service', () => {
     describe('with test client', () => {
@@ -262,7 +261,7 @@ describe('testing identity-srv', () => {
         // validate item status and overall status
         result!.operation_status!.code!.should.equal(200);
         result!.operation_status!.message!.should.equal('success');
-        _.forEach(result!.items, (item) => {
+        _.forEach(result!.items, (item: any) => {
           item!.status!.code!.should.equal(200);
           item!.status!.message!.should.equal('success');
         });
@@ -272,8 +271,10 @@ describe('testing identity-srv', () => {
 
   describe('testing User service with disabled email constraint', () => {
     let userService: UserServiceClient;
-    let testUserID, user, testUserName;
-    before(async function connectUserService(): Promise<void> {
+    let testUserID;
+    let user: any;
+    let testUserName;
+    beforeAll(async function connectUserService(): Promise<void> {
       userService = await connect('client:user', 'user');
       user = {
         name: 'test.user1', // this user is used in the next tests
@@ -284,7 +285,7 @@ describe('testing identity-srv', () => {
       };
     });
 
-    after(async function stopUserService(): Promise<void> {
+    afterAll(async function stopUserService(): Promise<void> {
       // service stopped using worker thread
     });
 
@@ -344,7 +345,7 @@ describe('testing identity-srv', () => {
           // validate item status and overall status
           getResult.operation_status!.code!.should.equal(200);
           getResult.operation_status!.message!.should.equal('success');
-          _.forEach(getResult.items, (item) => {
+          _.forEach(getResult.items, (item: any) => {
             item!.status!.code!.should.equal(200);
             item!.status!.message!.should.equal('success');
           });
@@ -389,7 +390,7 @@ describe('testing identity-srv', () => {
           email: 'test@ms.restorecommerce.io',
           role_associations: [{
             role: 'user-r-id',
-            attributes: []
+            attributes: [] as any[]
           }],
           active: true
         };
@@ -406,7 +407,7 @@ describe('testing identity-srv', () => {
           // validate item status and overall status
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');
-          _.forEach(result!.items, (item) => {
+          _.forEach(result!.items, (item: any) => {
             item!.status!.code!.should.equal(200);
             item!.status!.message!.should.equal('success');
           });
@@ -493,7 +494,7 @@ describe('testing identity-srv', () => {
           });
           should.exist(result);
           result!.total_count!.should.equal(4);
-          _.forEach(result!.items, (item) => {
+          _.forEach(result!.items, (item: any) => {
             item!.status!.code!.should.equal(200);
             item!.status!.message!.should.equal('success');
           });
@@ -507,7 +508,7 @@ describe('testing identity-srv', () => {
           });
           should.exist(result);
           result!.total_count!.should.equal(1);
-          _.forEach(result!.items, (item) => {
+          _.forEach(result!.items, (item: any) => {
             item!.status!.code!.should.equal(200);
             item!.status!.message!.should.equal('success');
           });
@@ -585,7 +586,7 @@ describe('testing identity-srv', () => {
       });
 
       describe('Activate', () => {
-        let activation_code;
+        let activation_code: string;
         it('should throw an error when activating with email identifier when is not unique', async () => {
           // register 2 users
           user.name = 'test.user1';
@@ -613,7 +614,7 @@ describe('testing identity-srv', () => {
       });
 
       describe('ChangePassword', () => {
-        let activation_code;
+        let activation_code: string;
         const email = 'test@ms.restorecommerce.io';
         const userName = 'test.user1';
         it('should throw an error for RequestPasswordChange with email as identifier when is not unique', async () => {
@@ -679,7 +680,7 @@ describe('testing identity-srv', () => {
       describe('SendAndConfirmInvitation', () => {
         const email = 'test@ms.restorecommerce.io';
         const userName = 'test.user2'; // testuser2 invited by testuser1
-        let activation_code;
+        let activation_code: string;
         it('should throw an error when sending invitation with email as identifier when not unique', async () => {
           const result = await userService.sendInvitationEmail({
             identifier: email,
@@ -725,7 +726,7 @@ describe('testing identity-srv', () => {
       describe('ChangeEmail', () => {
         const email = 'test@ms.restorecommerce.io';
         const userName = 'test.user1';
-        let activation_code;
+        let activation_code: string;
         it('should throw an error when requesting to change email with email as identifier when is not unique', async () => {
           const result = await userService.requestEmailChange({
             identifier: email,

@@ -334,7 +334,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
         limit: ids.length
       });
 
-      const result_map = await super.read(filters, {}).then(
+      const result_map = await super.read(filters, {} as any).then(
         resp => new Map(
           resp.items?.map(
             item => [item.payload?.id, item?.payload]

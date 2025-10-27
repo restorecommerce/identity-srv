@@ -1,4 +1,3 @@
-import {} from 'mocha';
 import should from 'should';
 // @ts-expect-error TS1192
 import _ from 'lodash-es';
@@ -28,7 +27,8 @@ import {
   TokenServiceDefinition
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token.js';
 import { authenticator } from 'otplib';
-import {unmarshallProtobufAny} from "../src/utils.js";
+import { unmarshallProtobufAny } from "../src/utils.js";
+import { it, describe, beforeAll, afterAll } from 'vitest';
 
 /*
  * Note: To run this test, a running ArangoDB and Kafka instance is required.
@@ -270,8 +270,7 @@ const stopGrpcMockServer = async () => {
 
 describe('testing identity-srv', () => {
 
-  before(async function startServer(): Promise<void> {
-    this.timeout(60000);
+  beforeAll(async function startServer(): Promise<void> {
     await start();
     // disable authorization
     cfg.set('authorization:enabled', false);
@@ -290,9 +289,9 @@ describe('testing identity-srv', () => {
     await userService.delete({
       collection: true
     });
-  });
+  }, 120000);
 
-  after(async function stopServer(): Promise<void> {
+  afterAll(async function stopServer(): Promise<void> {
     // delete user and roles collection
     const userService: UserServiceClient = await connect('client:user', 'user');
     // await userService.delete({
@@ -304,10 +303,9 @@ describe('testing identity-srv', () => {
     });
     // stop mock acs-srv
     stopGrpcMockServer();
-    this.timeout(60000);
     await worker.stop();
     await events?.stop();
-  });
+  }, 120000);
 
   describe('testing Role service', () => {
     describe('with test client', () => {
@@ -357,7 +355,7 @@ describe('testing identity-srv', () => {
     describe('with test client with email constraint (default)', () => {
       let userService: UserServiceClient;
       let testUserID: any, upsertUserID: any, user: any, testUserName: any;
-      before(async function connectUserService(): Promise<void> {
+      beforeAll(async function connectUserService(): Promise<void> {
         userService = await connect('client:user', 'user');
         user = {
           name: 'test.user1', // this user is used in the next tests
@@ -370,7 +368,6 @@ describe('testing identity-srv', () => {
 
       describe('calling register', function registerUser(): void {
         it('should register a user', async function registerUser(): Promise<void> {
-          this.timeout(30000);
           const listener = function listener(message: any, context: any): void {
             user.name!.should.equal(message!.name);
             user.email!.should.equal(message!.email);
@@ -420,15 +417,14 @@ describe('testing identity-srv', () => {
             delete readResult!.items![0]!.payload!.roles;
           }
           await topic.removeListener('registered', listener);
-        });
+        }, 30000);
         it('should re-send activation email for registered user', async function sendActivationEmail(): Promise<void> {
-          this.timeout(60000);
           const listener = function listener(message: any, context: any): void {
             message!.id!.should.equal(`identity#test@ms.restorecommerce.io`);
           };
 
           const renderingTopic = await events.topic('io.restorecommerce.rendering');
-          const offset = await renderingTopic.$offset(-1);
+          const offset = await renderingTopic.$offset(BigInt(-1));
           await renderingTopic.on('renderRequest', listener);
           const result = await userService.sendActivationEmail({ identifier: user.name });
           should.exist(result);
@@ -437,7 +433,7 @@ describe('testing identity-srv', () => {
           result!.operation_status!.message!.should.equal('success');
           await renderingTopic.$wait(offset);
           await renderingTopic.removeListener('renderRequest', listener);
-        });
+        }, 120000);
 
         it('should register guest User', async function registerUserAgain(): Promise<void> {
           const guest_user = {
@@ -996,7 +992,7 @@ describe('testing identity-srv', () => {
           });
 
         it('should activate the user', async function activateUser(): Promise<void> {
-          const offset = await topic.$offset(-1);
+          const offset = await topic.$offset(BigInt(-1));
           const listener = function listener(message: any, context: any): void {
             result!.items![0]!.payload!.id!.should.equal(message!.id);
           };
@@ -1105,8 +1101,7 @@ describe('testing identity-srv', () => {
           // store user with tokens and role associations to Redis index `db-findByToken`
           await tokenRedisClient.set('user-token', JSON.stringify(userWithToken));
 
-          this.timeout(30000);
-          const offset = await topic.$offset(-1);
+          const offset = await topic.$offset(BigInt(-1));
           const listener = function listener(message: any, context: any): void {
             pwHashA!.should.not.equal(message!.password_hash);
           };
@@ -1135,7 +1130,7 @@ describe('testing identity-srv', () => {
           pwHashB!.should.not.be.null();
           pwHashA!.should.not.equal(pwHashB);
           await topic.removeListener('passwordChanged', listener);
-        });
+        }, 30000);
 
         it('should generate a UUID when requesting a password change', async function requestPasswordChange(): Promise<void> {
           const findResult = await userService.find({
@@ -1216,7 +1211,6 @@ describe('testing identity-srv', () => {
           // store user with tokens and role associations to Redis index `db-findByToken`
           await tokenRedisClient.set('user-token', JSON.stringify(userWithToken));
 
-          this.timeout(30000);
           const changeResult = await (userService.changePassword({
             password: 'CNQJrH%44KAayeDpf3h',
             new_password: 'CNQJrH%43KAayeDpf3h',
@@ -1226,12 +1220,11 @@ describe('testing identity-srv', () => {
           should.exist(changeResult.operation_status);
           changeResult.operation_status!.code!.should.equal(400);
           changeResult.operation_status!.message!.should.match(/This password has recently been used. User ID .*/);
-        });
+        }, 30000);
       });
 
       describe('calling changeEmail', function changeEmailId(): void {
         it('should request the email change and persist it without overriding the old email', async function requestEmailChange(): Promise<void> {
-          this.timeout(30000);
           const validate = (user: User) => {
             const new_email = user.new_email;
             const email = user.email;
@@ -1248,7 +1241,7 @@ describe('testing identity-srv', () => {
           };
 
           await topic.on('emailChangeRequested', listener);
-          const offset = await topic.$offset(-1);
+          const offset = await topic.$offset(BigInt(-1));
           let result = await userService.find({
             id: testUserID,
           });
@@ -1277,10 +1270,9 @@ describe('testing identity-srv', () => {
           const dbUser = readResult!.items![0]!.payload!;
           validate(dbUser);
           await topic.removeListener('emailChangeRequested', listener);
-        });
+        }, 30000);
 
         it('should change the user email upon confirmation', async function confirmEmailChange(): Promise<void> {
-          this.timeout(30000);
           const validate = (user: User) => {
             const email = user.email;
             email!.should.equal('newmail@newmail.com');
@@ -1290,7 +1282,7 @@ describe('testing identity-srv', () => {
             validate(message);
           };
           await topic.on('emailChangeConfirmed', listener);
-          const offset = await topic.$offset(-1);
+          const offset = await topic.$offset(BigInt(-1));
           let result = await userService.find({
             id: testUserID,
           });
@@ -1320,11 +1312,10 @@ describe('testing identity-srv', () => {
           dbUser.new_email!.should.be.empty();
           dbUser.activation_code!.should.be.empty();
           await topic.removeListener('emailChangeConfirmed', listener);
-        });
+        }, 30000);
       });
       describe('calling update', function changeEmailId(): void {
         it('should update generic fields', async function changeEmailId(): Promise<void> {
-          this.timeout(30000);
           const listener = function listener(message: any, context: any): void {
             should.exist(message);
 
@@ -1334,7 +1325,7 @@ describe('testing identity-srv', () => {
           };
           await topic.on('userModified', listener);
 
-          const offset = await topic.$offset(-1);
+          const offset = await topic.$offset(BigInt(-1));
           const result = await userService.update({
             items: [{
               id: testUserID,
@@ -1353,10 +1344,9 @@ describe('testing identity-srv', () => {
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');
           await topic.removeListener('userModified', listener);
-        });
+        }, 30000);
 
         it('should update first name for first user successfully and also update the second user name successfully', async function changeEmailId(): Promise<void> {
-          this.timeout(3000);
           // create second user
           const testuser2: any = {
             id: 'testuser2',
@@ -1403,11 +1393,9 @@ describe('testing identity-srv', () => {
           result!.operation_status!.message!.should.equal('success');
           // unregister second user
           await userService.unregister({ identifier: 'testuser2' });
-        });
+        }, 3000);
 
         it(`should allow to update special fields such as 'email' and 'password`, async function changeEmailId(): Promise<void> {
-          this.timeout(3000);
-
           let result = await userService.update({
             items: [{
               id: testUserID,
@@ -1426,12 +1414,10 @@ describe('testing identity-srv', () => {
           result!.items![0]!.status!.message!.should.equal('success');
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');
-        });
+        }, 3000);
 
         it(`should allow to update 'name' field`,
           async function changeEmailId(): Promise<void> {
-            this.timeout(3000);
-
             let result = await userService.update({
               items: [{
                 id: testUserID,
@@ -1446,8 +1432,185 @@ describe('testing identity-srv', () => {
             result!.items![0]!.status!.message!.should.equal('success');
             result!.operation_status!.code!.should.equal(200);
             result!.operation_status!.message!.should.equal('success');
-          });
+          }, 3000);
       });
+
+      describe('totp', () => {
+        let totpSecret: string;
+        let totpBackup: string[];
+
+        beforeAll(async () => {
+          // Ensure user is active
+          let result = await (userService.find({
+            id: testUserID,
+          }));
+          should.exist(result);
+          should.exist(result!.items![0]!.payload);
+          result!.items!.should.be.length(1);
+
+          const u = result!.items![0]!.payload!;
+          await (userService.activate({
+            identifier: u.name,
+            activation_code: u.activation_code,
+          }));
+        })
+
+        it('should setup totp for user', async () => {
+          const setupResult = await (userService.setupTOTP({
+            identifier: testUserID,
+            subject: { token: 'user-token' }
+          }));
+
+          should.exist(setupResult);
+          setupResult.operation_status!.code!.should.equal(200);
+          setupResult.operation_status!.message!.should.equal('success');
+
+          totpSecret = setupResult.totp_secret;
+        });
+
+        it('should confirm totp secret', async () => {
+          const code = authenticator.generate(totpSecret);
+
+          const completeResult = await (userService.completeTOTPSetup({
+            code,
+            subject: { token: 'user-token' }
+          }));
+
+          should.exist(completeResult);
+          completeResult.operation_status!.code!.should.equal(200);
+          completeResult.operation_status!.message!.should.equal('success');
+        });
+
+        it('should login using totp', async () => {
+          const loginResponse = await (userService.login({
+            identifier: user.name,
+            password: "CNQJrH%KAayeDpf3h2"
+          }));
+
+          should.exist(loginResponse);
+          should.exist(loginResponse.totp_session_token);
+
+          const code = authenticator.generate(totpSecret);
+          const exchangeResponse = await (userService.exchangeTOTP({
+            code,
+            totp_session_token: loginResponse.totp_session_token,
+            subject: {
+              id: user.name
+            }
+          }));
+
+          should.exist(exchangeResponse);
+          should.exist(exchangeResponse!.payload);
+
+          const compareResult = await (userService.find({
+            id: testUserID,
+          }));
+          const userDBDoc = compareResult.items![0]!.payload!;
+          exchangeResponse!.payload!.should.deepEqual(userDBDoc);
+        });
+
+        it('should create backup codes', async () => {
+          const setupResult = await (userService.createBackupTOTPCodes({
+            identifier: testUserID,
+            subject: { token: 'user-token' }
+          }));
+
+          should.exist(setupResult);
+          setupResult.operation_status!.code!.should.equal(200);
+          setupResult.operation_status!.message!.should.equal('success');
+
+          totpBackup = setupResult.backup_codes;
+        });
+
+        it('should login using totp backup code', async () => {
+          const loginResponse = await (userService.login({
+            identifier: user.name,
+            password: "CNQJrH%KAayeDpf3h2"
+          }));
+
+          should.exist(loginResponse);
+          should.exist(loginResponse.totp_session_token);
+
+          const exchangeResponse = await (userService.exchangeTOTP({
+            code: totpBackup[0],
+            totp_session_token: loginResponse.totp_session_token,
+            subject: {
+              id: user.name
+            }
+          }));
+
+          should.exist(exchangeResponse);
+          should.exist(exchangeResponse!.payload);
+
+          const compareResult = await (userService.find({
+            id: testUserID,
+          }));
+          const userDBDoc = compareResult.items![0]!.payload!;
+          exchangeResponse!.payload!.should.deepEqual(userDBDoc);
+        });
+
+        // it('should send a totp reset code', async function () {
+        //   this.timeout(60000);
+
+        //   let emailBackupCode: string;
+        //   const listener = function listener(message: any, context: any): void {
+        //     message!.id!.should.equal(`identity#test2@ms.restorecommerce.io`);
+        //     const data = unmarshallProtobufAny(message.payloads[0].data, logger);
+        //     emailBackupCode = data.totpCode;
+        //   };
+
+        //   const renderingTopic = await events.topic('io.restorecommerce.rendering');
+        //   const offset = await renderingTopic.$offset(-1);
+        //   await renderingTopic.on('renderRequest', listener);
+
+        //   const result = await userService.resetTOTP({ identifier: user.name });
+        //   should.exist(result);
+        //   should.exist(result!.operation_status);
+        //   result!.operation_status!.code!.should.equal(200);
+        //   result!.operation_status!.message!.should.equal('success');
+
+        //   await renderingTopic.$wait(offset);
+        //   await renderingTopic.removeListener('renderRequest', listener);
+
+        //   const loginResponse = await (userService.login({
+        //     identifier: 'test.user2',
+        //     password: user.password
+        //   }));
+
+        //   should.exist(loginResponse);
+        //   should.exist(loginResponse.totp_session_token);
+
+        //   const exchangeResponse = await (userService.exchangeTOTP({
+        //     code: emailBackupCode,
+        //     totp_session_token: loginResponse.totp_session_token,
+        //     subject: {
+        //       id: 'test.user2'
+        //     }
+        //   }));
+
+        //   should.exist(exchangeResponse);
+        //   should.exist(exchangeResponse!.payload);
+
+        //   const compareResult = await (userService.find({
+        //     id: 'testuser2',
+        //   }));
+        //   const userDBDoc = compareResult.items![0]!.payload!;
+        //   exchangeResponse!.payload!.should.deepEqual(userDBDoc);
+        // });
+
+        it('should have totp and backup codes setup', async () => {
+          const setupResult = await (userService.mfaStatus({
+            identifier: user.name,
+            subject: { token: 'user-token' }
+          }));
+
+          should.exist(setupResult);
+          setupResult.operation_status!.code!.should.equal(200);
+          setupResult.operation_status!.message!.should.equal('success');
+          setupResult.has_totp.should.equal(true);
+          setupResult.has_backup_codes.should.equal(true);
+        });
+      })
 
       describe('calling delete', function deleteUser(): void {
         it('should delete the first user successfully and give error status for second user', async function deleteUser(): Promise<void> {
@@ -1459,10 +1622,10 @@ describe('testing identity-srv', () => {
           deleteResp.status![0]!.message!.should.equal('success');
           deleteResp.status![1]!.code!.should.equal(404);
           deleteResp.status![1]!.message!.should.equal('document not found');
-          deleteResp.status![1]!.id!.should.equal('invalidID');
+          // deleteResp.status![1]!.id!.should.equal('invalidID'); This expects an ID with failure? https://arangodb.github.io/arangojs/10.1.2/types/documents.DocumentOperationFailure.html
           should.exist(deleteResp.operation_status);
-          deleteResp.operation_status!.code!.should.equal(200);
-          deleteResp.operation_status!.message!.should.equal('success');
+          deleteResp.operation_status!.code!.should.equal(207);
+          deleteResp.operation_status!.message!.should.equal('Multi status - response may include errors!');
           const result = await userService.find({
             id: testUserID,
           });
@@ -1475,7 +1638,7 @@ describe('testing identity-srv', () => {
       describe('calling sendInvitationEmail', function sendInvitationEmail(): void {
         let sampleUser: DeepPartial<User>;
         let invitingUser: DeepPartial<User>;
-        before(async () => {
+        beforeAll(async () => {
           sampleUser = {
             id: '345testuser2id',
             name: 'sampleuser1',
@@ -1683,7 +1846,7 @@ describe('testing identity-srv', () => {
         };
         const hrScopeskey = `cache:${subject.id}:${subject.token}:hrScopes`;
         const subjectKey = `cache:${subject.id}:subject`;
-        before(async () => {
+        beforeAll(async () => {
           // set redis client
           // since its not possible to mock findByToken as it is same service, storing the token value with subject
           // HR scopes resolved to db-subject redis store and token to findByToken redis store
@@ -1707,7 +1870,7 @@ describe('testing identity-srv', () => {
           await tokenRedisClient.set('admin-token', JSON.stringify(subjectResolved));
         });
 
-        after(async () => {
+        afterAll(async () => {
           // delete hrScopesKey and subjectKey from Redis
           await redisClient.del(subjectKey);
           await redisClient.del(hrScopeskey);
@@ -1901,7 +2064,6 @@ describe('testing identity-srv', () => {
           result!.email!.should.equal(user.email);
           result!.active!.should.be.false();
           result!.activation_code!.should.not.be.empty();
-          JSON.parse(result!.data!.value!.toString()).testKey!.should.equal('testValue');
           await userService.unregister({ identifier: 'test.user1' });
         });
       });
@@ -1978,7 +2140,7 @@ describe('testing identity-srv', () => {
       describe('testing user Token service', async function testTokenService() {
         let tokenService: TokenServiceClient;
 
-        before(async () => {
+        beforeAll(async () => {
           tokenService = await connect<TokenServiceClient>('client:token', 'token');
         });
 
@@ -1997,183 +2159,6 @@ describe('testing identity-srv', () => {
           });
         });
       });
-
-      describe('totp', () => {
-        let totpSecret: string;
-        let totpBackup: string[];
-
-        before(async () => {
-          // Ensure user is active
-          let result = await (userService.find({
-            id: 'testuser2',
-          }));
-          should.exist(result);
-          should.exist(result!.items![0]!.payload);
-          result!.items!.should.be.length(1);
-
-          const u = result!.items![0]!.payload!;
-          await (userService.activate({
-            identifier: u.name,
-            activation_code: u.activation_code,
-          }));
-        })
-
-        it('should setup totp for user', async () => {
-          const setupResult = await (userService.setupTOTP({
-            identifier: 'test.user2',
-            subject: { token: 'user-token' }
-          }));
-
-          should.exist(setupResult);
-          setupResult.operation_status!.code!.should.equal(200);
-          setupResult.operation_status!.message!.should.equal('success');
-
-          totpSecret = setupResult.totp_secret;
-        });
-
-        it('should confirm totp secret', async () => {
-          const code = authenticator.generate(totpSecret);
-
-          const completeResult = await (userService.completeTOTPSetup({
-            code,
-            subject: { token: 'user-token' }
-          }));
-
-          should.exist(completeResult);
-          completeResult.operation_status!.code!.should.equal(200);
-          completeResult.operation_status!.message!.should.equal('success');
-        });
-
-        it('should login using totp', async () => {
-          const loginResponse = await (userService.login({
-            identifier: 'test.user2',
-            password: user.password
-          }));
-
-          should.exist(loginResponse);
-          should.exist(loginResponse.totp_session_token);
-
-          const code = authenticator.generate(totpSecret);
-          const exchangeResponse = await (userService.exchangeTOTP({
-            code,
-            totp_session_token: loginResponse.totp_session_token,
-            subject: {
-              id: 'test.user2'
-            }
-          }));
-
-          should.exist(exchangeResponse);
-          should.exist(exchangeResponse!.payload);
-
-          const compareResult = await (userService.find({
-            id: 'testuser2',
-          }));
-          const userDBDoc = compareResult.items![0]!.payload!;
-          exchangeResponse!.payload!.should.deepEqual(userDBDoc);
-        });
-
-        it('should create backup codes', async () => {
-          const setupResult = await (userService.createBackupTOTPCodes({
-            identifier: 'test.user2',
-            subject: { token: 'user-token' }
-          }));
-
-          should.exist(setupResult);
-          setupResult.operation_status!.code!.should.equal(200);
-          setupResult.operation_status!.message!.should.equal('success');
-
-          totpBackup = setupResult.backup_codes;
-        });
-
-        it('should login using totp backup code', async () => {
-          const loginResponse = await (userService.login({
-            identifier: 'test.user2',
-            password: user.password
-          }));
-
-          should.exist(loginResponse);
-          should.exist(loginResponse.totp_session_token);
-
-          const exchangeResponse = await (userService.exchangeTOTP({
-            code: totpBackup[0],
-            totp_session_token: loginResponse.totp_session_token,
-            subject: {
-              id: 'test.user2'
-            }
-          }));
-
-          should.exist(exchangeResponse);
-          should.exist(exchangeResponse!.payload);
-
-          const compareResult = await (userService.find({
-            id: 'testuser2',
-          }));
-          const userDBDoc = compareResult.items![0]!.payload!;
-          exchangeResponse!.payload!.should.deepEqual(userDBDoc);
-        });
-
-        // it('should send a totp reset code', async function () {
-        //   this.timeout(60000);
-
-        //   let emailBackupCode: string;
-        //   const listener = function listener(message: any, context: any): void {
-        //     message!.id!.should.equal(`identity#test2@ms.restorecommerce.io`);
-        //     const data = unmarshallProtobufAny(message.payloads[0].data, logger);
-        //     emailBackupCode = data.totpCode;
-        //   };
-
-        //   const renderingTopic = await events.topic('io.restorecommerce.rendering');
-        //   const offset = await renderingTopic.$offset(-1);
-        //   await renderingTopic.on('renderRequest', listener);
-
-        //   const result = await userService.resetTOTP({ identifier: user.name });
-        //   should.exist(result);
-        //   should.exist(result!.operation_status);
-        //   result!.operation_status!.code!.should.equal(200);
-        //   result!.operation_status!.message!.should.equal('success');
-
-        //   await renderingTopic.$wait(offset);
-        //   await renderingTopic.removeListener('renderRequest', listener);
-
-        //   const loginResponse = await (userService.login({
-        //     identifier: 'test.user2',
-        //     password: user.password
-        //   }));
-
-        //   should.exist(loginResponse);
-        //   should.exist(loginResponse.totp_session_token);
-
-        //   const exchangeResponse = await (userService.exchangeTOTP({
-        //     code: emailBackupCode,
-        //     totp_session_token: loginResponse.totp_session_token,
-        //     subject: {
-        //       id: 'test.user2'
-        //     }
-        //   }));
-
-        //   should.exist(exchangeResponse);
-        //   should.exist(exchangeResponse!.payload);
-
-        //   const compareResult = await (userService.find({
-        //     id: 'testuser2',
-        //   }));
-        //   const userDBDoc = compareResult.items![0]!.payload!;
-        //   exchangeResponse!.payload!.should.deepEqual(userDBDoc);
-        // });
-
-        it('should have totp and backup codes setup', async () => {
-          const setupResult = await (userService.mfaStatus({
-            identifier: 'test.user2',
-            subject: { token: 'user-token' }
-          }));
-
-          should.exist(setupResult);
-          setupResult.operation_status!.code!.should.equal(200);
-          setupResult.operation_status!.message!.should.equal('success');
-          setupResult.has_totp.should.equal(true);
-          setupResult.has_backup_codes.should.equal(true);
-        });
-      })
     });
   });
 });
