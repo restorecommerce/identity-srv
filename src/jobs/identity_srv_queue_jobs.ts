@@ -6,7 +6,7 @@ import {
 } from './implementation/delete_users_with_expired_activation_job.js';
 const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
-const main: DefaultExportFunc = async (cfg, logger, events: any, arangoDb, runWorker) => {
+const main: DefaultExportFunc = async (cfg, logger, events: any, runWorker) => {
   await runWorker(
     'identity-srv-queue', 1, cfg, logger, events,
     async (job: any) => {
