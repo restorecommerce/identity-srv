@@ -409,7 +409,11 @@
       "message": "Action not allowed on this resource"
     }
   },
-  "techUsers": [
+   "techUsers": [
+    {
+      "id": "hbs_user",
+      "token": "1a4c6789-6435-487a-9308-64d06384acf9"
+    }
   ],
   "defaultRegisterUserRoles": [
     {
