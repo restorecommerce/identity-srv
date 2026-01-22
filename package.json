@@ -35,7 +35,7 @@
     "bullmq": "^5.63.0",
     "cross-env": "^10.1.0",
     "jose": "^6.1.1",
-    "lodash-es": "^4.17.21",
+    "lodash-es": "^4.17.23",
     "nice-grpc-server-reflection": "^3.0.2",
     "node-fetch": "^3.3.2",
     "oauth": "^0.10.2",
