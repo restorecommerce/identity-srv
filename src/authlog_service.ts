@@ -1,5 +1,4 @@
 import * as _ from 'lodash-es';
-import * as uuid from 'uuid';
 import { ServiceBase, ResourcesAPIBase } from '@restorecommerce/resource-base-interface';
 import {
   ACSAuthZ,
@@ -25,6 +24,7 @@ import {
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
 import { Filter_ValueType } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/filter.js';
+import { randomUUID } from 'crypto';
 
 export class AuthenticationLogService extends ServiceBase<AuthenticationLogListResponse, AuthenticationLogList> implements AuthenticationLogServiceImplementation {
   cfg: any;
@@ -273,7 +273,7 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
 
     const setDefaultMeta = (resource: T) => {
       if (!resource.id?.length) {
-        resource.id = uuid.v4().replace(/-/g, '');
+        resource.id = randomUUID().replace(/-/g, '');
       }
 
       if (!resource.meta) {

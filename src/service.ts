@@ -1,5 +1,4 @@
 import * as _ from 'lodash-es';
-import * as uuid from 'uuid';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import {
   checkAccessRequest,
@@ -105,7 +104,7 @@ import fetch from 'node-fetch';
 
 import { authenticator } from 'otplib';
 import * as jose from 'jose';
-import crypto from 'node:crypto';
+import crypto, { randomUUID } from 'node:crypto';
 
 export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
@@ -909,7 +908,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                   value: user.id
                 }]
               }]
-            }), {});
+            }), {} as any);
             const dbUserPl = dbUser?.items?.[0]?.payload;
             dbUserRoleAssocs = dbUserPl?.role_associations ?? [];
           }
@@ -1511,7 +1510,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   }
 
   private idGen(): string {
-    return uuid.v4().replace(/-/g, '');
+    return randomUUID().replace(/-/g, '');
   }
 
   // validUsername validates user names using regular expressions
@@ -1992,7 +1991,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         if (!user.id) {
           // return returnStatus(400, 'Subject identifier missing for update operation');
           updateWithStatus.items.push(returnStatus(400, 'Subject identifier missing for update operation'));
-          items = _.filter(items, (item) => item.id) as User[];
+          items = items?.filter((item) => item.id);
           continue;
         }
         const filters = [{
@@ -2005,7 +2004,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         const users = await super.read(ReadRequest.fromPartial({ filters }), context);
         if (users.total_count === 0) {
           updateWithStatus.items.push(returnStatus(404, 'user not found for update', user.id));
-          items = _.filter(items, (item) => item.id !== user.id);
+          items = items?.filter((item) => item.id !== user.id);
           continue;
         }
         const dbUser = users.items[0].payload;
@@ -2015,7 +2014,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           const users = await super.read(ReadRequest.fromPartial({ filters }), context);
           if (users.total_count > 0) {
             updateWithStatus.items.push(returnStatus(409, `User name ${user.name} already exists`, user.id));
-            items = _.filter(items, (item) => item.name !== user.name);
+            items = items?.filter((item) => item.name !== user.name);
             continue;
           }
         }
@@ -2039,13 +2038,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
             // return returnStatus(err.code, err.message);
             updateWithStatus.items.push(returnStatus(err.code, err.message, user.id));
-            items = _.filter(items, (item) => item.id !== user.id);
+            items = items?.filter((item) => item.id !== user.id);
             continue;
           }
           if (acsResponse.decision != Response_Decision.PERMIT) {
             // return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
             updateWithStatus.items.push(returnStatus(acsResponse.operation_status.code, acsResponse.operation_status.message, user.id));
-            items = _.filter(items, (item) => item.id !== user.id);
+            items = items?.filter((item) => item.id !== user.id);
             continue;
           }
         }
@@ -2997,7 +2996,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     const setDefaultMeta = (resource: T) => {
       if (!resource.id?.length) {
-        resource.id = uuid.v4().replace(/-/g, '');
+        resource.id = randomUUID().replace(/-/g, '');
       }
 
       if (!resource.meta) {
@@ -3827,7 +3826,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
 
     const setDefaultMeta = (resource: T) => {
       if (!resource.id?.length) {
-        resource.id = uuid.v4().replace(/-/g, '');
+        resource.id = randomUUID().replace(/-/g, '');
       }
 
       if (!resource.meta) {
