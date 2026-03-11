@@ -105,6 +105,7 @@ import fetch from 'node-fetch';
 import { authenticator } from 'otplib';
 import * as jose from 'jose';
 import crypto, { randomUUID } from 'node:crypto';
+import { RenderRequestList, RenderResponseList } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rendering.js';
 
 export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
@@ -191,6 +192,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       this.uniqueEmailConstraint = false;
     }
     this.initMatcher();
+    this.fetchHbsTemplates();
   }
 
   async stop(): Promise<void> {
@@ -1468,7 +1470,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * Endpoint sendEmail to trigger sending mail notification.
    * @param  {any} renderResponse
    */
-  async sendEmail(renderResponse: any): Promise<void> {
+  async sendEmail(renderResponse: RenderResponseList): Promise<void> {
     const responseID: string = renderResponse?.id;
     if (!responseID?.startsWith('identity')) {
       this.logger.verbose(`Discarding render response ${responseID}`);
@@ -1503,9 +1505,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return;
     }
 
-    const responseBody = unmarshallProtobufAny(renderResponse?.responses[0], this.logger);
-    const responseSubject = unmarshallProtobufAny(renderResponse?.responses[1], this.logger);
-    const emailData = this.makeNotificationData(emailAddress, responseBody, responseSubject);
+    const body = renderResponse?.items?.reduce((a, b) => b?.payload?.bodies.find(body => body.id === 'body')?.body?.toString() ?? a, '');
+    const subject = renderResponse?.items?.reduce((a, b) => b?.payload?.bodies.find(body => body.id === 'subject')?.body?.toString() ?? a, '');
+    const emailData = this.makeNotificationData(
+      emailAddress, 
+      body,
+      subject,
+    );
     await this.topics?.notificationReq?.emit('sendEmail', emailData);
   }
 
@@ -2706,7 +2712,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const enableEmail = this.cfg.get('service:enableEmail');
 
     if (!_.isEmpty(hbsTemplates) && enableEmail) {
-      let response: any;
       try {
         const techUsersCfg = this.cfg.get('techUsers');
         let headers;
@@ -2716,46 +2721,26 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             headers = this.setAuthenticationHeaders(hbsUser.token);
           }
         }
-        response = await fetch(hbsTemplates.registrationSubjectTpl, { headers });
-        this.registrationSubjectTpl = await response.text();
-
-        response = await fetch(hbsTemplates.registrationBodyTpl, { headers });
-        this.registrationBodyTpl = await response.text();
-
-        response = await fetch(hbsTemplates.changePWEmailSubjectTpl, { headers });
-        this.changePWEmailSubjectTpl = await response.text();
-
-        response = await fetch(hbsTemplates.changePWEmailBodyTpl, { headers });
-        this.changePWEmailBodyTpl = await response.text();
-
-        response = await fetch(hbsTemplates.invitationSubjectTpl, { headers });
-        this.invitationSubjectTpl = await response.text();
-
-        response = await fetch(hbsTemplates.invitationBodyTpl, { headers });
-        this.invitationBodyTpl = await response.text();
-
-        response = await fetch(hbsTemplates.layoutTpl, { headers });
-        this.layoutTpl = await response.text();
-
-        response = await fetch(hbsTemplates.resetTotpSubjectTpl, { headers });
-        this.resetTotpSubjectTpl = await response.text();
-
-        response = await fetch(hbsTemplates.resetTotpBodyTpl, { headers });
-        this.resetTotpBodyTpl = await response.text();
-
-        response = await fetch(hbsTemplates.resourcesTpl, { headers });
-        if (response.status == 200) {
-          const externalRrc = JSON.parse(await response.text());
-          this.emailStyle = externalRrc.styleURL;
-        }
-
+        this.registrationSubjectTpl ??= await fetch(hbsTemplates.registrationSubjectTpl, { headers }).then(
+          resp => resp.text()
+        );
+        this.registrationBodyTpl ??= await fetch(hbsTemplates.registrationBodyTpl, { headers }).then(resp => resp.text());
+        this.changePWEmailSubjectTpl ??= await fetch(hbsTemplates.changePWEmailSubjectTpl, { headers }).then(resp => resp.text());
+        this.changePWEmailBodyTpl ??= await fetch(hbsTemplates.changePWEmailBodyTpl, { headers }).then(resp => resp.text());
+        this.invitationSubjectTpl ??= await fetch(hbsTemplates.invitationSubjectTpl, { headers }).then(resp => resp.text());
+        this.invitationBodyTpl ??= await fetch(hbsTemplates.invitationBodyTpl, { headers }).then(resp => resp.text());
+        this.layoutTpl ??= await fetch(hbsTemplates.layoutTpl, { headers }).then(resp => resp.text());
+        this.resetTotpSubjectTpl ??= await fetch(hbsTemplates.resetTotpSubjectTpl, { headers }).then(resp => resp.text());
+        this.resetTotpBodyTpl ??= await fetch(hbsTemplates.resetTotpBodyTpl, { headers }).then(resp => resp.text());
+        this.emailStyle ??= JSON.parse(await fetch(hbsTemplates.resourcesTpl, { headers }).then(resp => resp.text())).styleURL;
         this.emailEnabled = true;
       } catch (err: any) {
         if (err.code == 'ECONNREFUSED' || err.message == 'ECONNREFUSED') {
           this.logger.error('An error occurred while attempting to load email templates from'
             + ' remote server. Email operations will be disabled.');
         } else {
-          this.logger.error('Unexpected error occurred while loading email templates', { code: err.code, message: err.message, stack: err.stack });
+          const { code, message, stack } = err;
+          this.logger.error('Unexpected error occurred while loading email templates', { code, message, stack });
         }
       }
     } else {
@@ -2777,8 +2762,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     const emailBody = this.registrationBodyTpl;
     const emailSubject = this.registrationSubjectTpl;
-    return this.makeRenderRequestMsg(user, emailSubject, emailBody,
-      dataBody, dataSubject);
+    return this.makeRenderRequestMsg(
+      user, emailSubject, emailBody,
+      dataBody, dataSubject
+    );
   }
 
   private makeInvitationEmailData(user: User): any {
@@ -2803,11 +2790,20 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     const emailBody = this.invitationBodyTpl;
     const emailSubject = this.invitationSubjectTpl;
-    return this.makeRenderRequestMsg(user, emailSubject, emailBody,
-      dataBody, dataSubject);
+    return this.makeRenderRequestMsg(
+      user,
+      emailSubject,
+      emailBody,
+      dataBody, dataSubject
+    );
   }
 
-  private makeConfirmationData(user: DeepPartial<User>, passwordChange: boolean, identifier: string, email?: string): any {
+  private makeConfirmationData(
+    user: User,
+    passwordChange: boolean,
+    identifier: string,
+    email?: string
+  ): RenderRequestList {
     const emailBody = this.changePWEmailBodyTpl;
     const emailSubject = this.changePWEmailSubjectTpl;
 
@@ -2822,12 +2818,24 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       passwordChange
     };
     const dataSubject = { passwordChange };
-    return this.makeRenderRequestMsg(user, emailSubject, emailBody,
-      dataBody, dataSubject, email);
+    return this.makeRenderRequestMsg(
+      user,
+      emailSubject,
+      emailBody,
+      dataBody,
+      dataSubject,
+      email
+    );
   }
 
-  private makeRenderRequestMsg(user: DeepPartial<User>, subject: any, body: any,
-    dataBody: any, dataSubject: any, email?: string): any {
+  private makeRenderRequestMsg(
+    user: User,
+    subject: any,
+    body: any,
+    dataBody: any,
+    dataSubject: any,
+    email?: string
+  ): RenderRequestList {
     const userEmail = email ? email : user.email;
 
     // add optional data if it is provided in the configuration
@@ -2839,22 +2847,19 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
     return {
       id: `identity#${userEmail}`,
-      payloads: [{
-        templates: marshallProtobufAny({
-          body: { body, layout: this.layoutTpl },
-        }),
+      items: [{
+        templates: [{
+          id: 'body',
+          body: Buffer.from(body),
+          layout: this.layoutTpl && Buffer.from(this.layoutTpl)
+        },{
+          id: 'subject',
+          body: Buffer.from(subject),
+        }],
         data: marshallProtobufAny(dataBody),
         style_url: this.emailStyle, // URL to a style
         options: marshallProtobufAny({ texts: {} }),
         content_type: 'application/html'
-      },
-      {
-        templates: marshallProtobufAny({
-          subject: { body: subject }
-        }),
-        data: marshallProtobufAny(dataSubject),
-        options: marshallProtobufAny({ texts: {} }),
-        content_type: 'application/text'
       }]
     };
   }
@@ -2945,14 +2950,17 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     return roleID;
   }
 
-  private makeNotificationData(emailAddress: string, responseBody: any,
-    responseSubject: any): any {
+  private makeNotificationData(
+    emailAddress: string,
+    body: string,
+    subject: string
+  ): any {
     return {
       email: {
         to: emailAddress.split(',')
       },
-      body: responseBody.body,
-      subject: responseSubject.subject,
+      body,
+      subject,
       transport: 'email'
     };
   }
@@ -3475,8 +3483,12 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       lastName: user.last_name,
       totpCode,
     };
-    return this.makeRenderRequestMsg(user, emailSubject, emailBody,
-      dataBody, {}, user.email);
+    return this.makeRenderRequestMsg(
+      user,
+      emailSubject,
+      emailBody,
+      dataBody, {}, user.email
+    );
   }
 
   async mfaStatus(request: MfaStatusRequest, context: any): Promise<DeepPartial<MfaStatusResponse>> {

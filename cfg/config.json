@@ -282,10 +282,10 @@
         "messageObject": "io.restorecommerce.commandinterface.CommandResponse"
       },
       "renderRequest": {
-        "messageObject": "io.restorecommerce.rendering.RenderRequest"
+        "messageObject": "io.restorecommerce.rendering.RenderRequestList"
       },
       "renderResponse": {
-        "messageObject": "io.restorecommerce.rendering.RenderResponse"
+        "messageObject": "io.restorecommerce.rendering.RenderResponseList"
       },
       "sendEmail": {
         "messageObject": "io.restorecommerce.notification_req.NotificationReq"

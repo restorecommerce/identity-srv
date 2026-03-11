@@ -5,7 +5,7 @@ import { createLogger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
 import { Logger } from 'winston';
 import { UserService, RoleService } from './service.js';
-import { ACSAuthZ, initAuthZ, updateConfig, authZ as FallbackAuthZ, initializeCache } from '@restorecommerce/acs-client';
+import { ACSAuthZ, initAuthZ, updateConfig, initializeCache } from '@restorecommerce/acs-client';
 import { createClient, RedisClientType } from 'redis';
 import { AuthenticationLogService } from './authlog_service.js';
 import { TokenService } from './token_service.js';
@@ -240,8 +240,12 @@ export class Worker {
 
     const cis = new UserCommandInterface(server, this.cfg, logger, events, this.redisClient);
 
-    const identityServiceEventListener = async (msg: any,
-      context: any, config: any, eventName: string) => {
+    const identityServiceEventListener = async (
+      msg: any,
+      context: any,
+      config: any,
+      eventName: string
+    ) => {
       if (eventName === RENDER_RESPONSE_EVENT) {
         if (this?.userService?.emailEnabled) {
           await this.userService.sendEmail(msg);
