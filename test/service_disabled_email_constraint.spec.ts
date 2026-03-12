@@ -2,9 +2,9 @@ import should from 'should';
 import _ from 'lodash-es';
 import { createClient, createChannel } from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
+import { Topic } from '@restorecommerce/kafka-client';
 import { Worker } from '../src/worker.js';
 import { createServiceConfig } from '@restorecommerce/service-config';
-import { Topic } from '@restorecommerce/kafka-client/lib/events/provider/kafka';
 import { GrpcMockServer, ProtoUtils } from '@alenon/grpc-mock-server';
 import * as proto_loader from '@grpc/proto-loader';
 import * as grpc from '@grpc/grpc-js';
@@ -22,7 +22,7 @@ import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generate
 import { PolicySetRQ } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/policy_set.js';
 import { Effect, RuleRQ } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rule.js';
 import { expect, it, describe, beforeAll, afterAll } from 'vitest';
-import { Logger } from "winston";
+import { Logger } from '@restorecommerce/logger';
 
 const Events = kafkaClient.Events;
 
@@ -41,7 +41,7 @@ let roleService: RoleServiceClient;
 
 /* eslint-disable */
 async function start(): Promise<void> {
-  cfg = createServiceConfig(process.cwd() + '/test');
+  cfg = createServiceConfig(process.cwd());
   // disable unique email constraint, by default it is true
   cfg.set('service:uniqueEmailConstraint', false);
   worker = new Worker(cfg);
@@ -153,7 +153,7 @@ const proto: any = ProtoUtils.getProtoFromPkgDefinition(
   pkgDef
 );
 
-const mockServer = new GrpcMockServer('localhost:50061');
+const mockServer = new GrpcMockServer('localhost:50161');
 
 const startGrpcMockServer = async (methodWithOutput: MethodWithOutput[]) => {
   // create mock implementation based on the method name and output
@@ -593,7 +593,7 @@ describe('testing identity-srv', () => {
           const result_1 = await userService.register(user);
           user.name = 'test.user2';
           const result_2 = await userService.register(user);
-          activation_code = result_1.payload!.activation_code;
+          activation_code = result_1.payload!.activation_code!;
           const result = await userService.activate({
             identifier: result_1.payload!.email,
             activation_code
@@ -640,7 +640,7 @@ describe('testing identity-srv', () => {
           const user_mod = await userService.find({
             name: userName
           });
-          activation_code = user_mod.items![0]!.payload!.activation_code;
+          activation_code = user_mod.items![0]!.payload!.activation_code!;
           should.exist(activation_code);
         });
         it('should throw an error for ConfirmPasswordChange with email as identifier when is not unique', async () => {
@@ -701,7 +701,7 @@ describe('testing identity-srv', () => {
         });
         it('should throw an error when confirming invitation with email as identifier when not unique', async () => {
           const user = await userService.find({ name: userName });
-          activation_code = user.items![0]!.payload!.activation_code;
+          activation_code = user.items![0]!.payload!.activation_code!;
           const result = await userService.confirmUserInvitation({
             identifier: email,
             password: 'CNQJrH%5KAayeDpf3h',
@@ -748,7 +748,7 @@ describe('testing identity-srv', () => {
             name: userName
           });
           const new_email = user_mod.items![0]!.payload!.new_email;
-          activation_code = user_mod.items![0]!.payload!.activation_code;
+          activation_code = user_mod.items![0]!.payload!.activation_code!;
           new_email!.should.equal('new_test@ms.restorecommerce.io');
         });
         it('should throw an error when confirming email providing email as identifier when not unique', async () => {

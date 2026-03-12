@@ -48,6 +48,9 @@ import {
 import {
   protoMetadata as notificationReqMeta
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/notification_req.js';
+import {
+  protoMetadata as baseMeta
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 import { ServerReflectionService } from 'nice-grpc-server-reflection';
 import * as fs from 'node:fs';
 import { runWorker } from '@restorecommerce/scs-jobs';
@@ -61,7 +64,8 @@ registerProtoMeta(
   commandInterfaceMeta,
   renderingMeta,
   reflectionMeta,
-  notificationReqMeta
+  notificationReqMeta,
+  baseMeta,
 );
 
 const RENDER_RESPONSE_EVENT = 'renderResponse';
@@ -269,7 +273,7 @@ export class Worker {
       const topicName = kafkaCfg.topics[topicType].topic;
       this.topics[topicType] = await events.topic(topicName);
       const offSetValue = await this.offsetStore.getOffset(topicName);
-      logger.info('subscribing to topic with offset value', topicName, offSetValue);
+      logger.info('subscribing to topic with offset value', topicName, Number(offSetValue));
       if (kafkaCfg.topics[topicType].events) {
         const eventNames = kafkaCfg.topics[topicType].events;
         for (const eventName of eventNames) {

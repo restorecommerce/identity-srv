@@ -8,16 +8,14 @@
       "email"
     ],
     "hbs_templates": {
-      "registrationSubjectTpl": "http://localhost:5000/storage/internal/identity-srv/templates/registration_subject.hbs",
-      "registrationBodyTpl": "http://localhost:5000/storage/internal/identity-srv/templates/registration_body.hbs",
-      "changePWEmailSubjectTpl": "http://localhost:5000/storage/internal/identity-srv/templates/change_password_email_subject.hbs",
-      "changePWEmailBodyTpl": "http://localhost:5000/storage/internal/identity-srv/templates/change_password_email_body.hbs",
-      "invitationSubjectTpl": "http://localhost:5000/storage/internal/identity-srv/templates/invitation_subject.hbs",
-      "invitationBodyTpl": "http://localhost:5000/storage/internal/identity-srv/templates/invitation_body.hbs",
-      "layoutTpl": "http://localhost:5000/storage/internal/identity-srv/templates/layout.hbs",
-      "resourcesTpl": "http://localhost:5000/storage/internal/identity-srv/templates/resources.json",
-      "resetTotpSubjectTpl": "http://localhost:5000/storage/internal/identity-srv/templates/reset_totp_email_subject.hbs",
-      "resetTotpBodyTpl": "http://localhost:5000/storage/internal/identity-srv/templates/reset_totp_email_body.hbs"
+      "registrationSubjectTpl": "file://./templates/registration_subject.hbs",
+      "registrationBodyTpl": "file://./templates/registration_body.hbs",
+      "changePWEmailSubjectTpl": "file://./templates/change_password_email_subject.hbs",
+      "changePWEmailBodyTpl": "file://./templates/change_password_email_body.hbs",
+      "invitationSubjectTpl": "file://./templates/invitation_subject.hbs",
+      "invitationBodyTpl": "file://./templates/invitation_body.hbs",
+      "layoutTpl": "file://./templates/layout.hbs",
+      "resourcesTpl": "file://./templates/resources.json"
     },
     "activationURL": "https://console.restorecommerce.io/activate-account",
     "inactivatedAccountExpiry": "undefined",
@@ -184,6 +182,9 @@
       "omittedFields": {
         "ReadRequest": "custom_arguments"
       }
+    },
+    "ostorage": {
+      "address": "localhost:50066"
     }
   },
   "events": {
@@ -409,12 +410,12 @@
       "message": "Action not allowed on this resource"
     }
   },
-   "techUsers": [
-    {
+  "techUsers": {
+    "hbs_user": {
       "id": "hbs_user",
       "token": "1a4c6789-6435-487a-9308-64d06384acf9"
     }
-  ],
+  },
   "defaultRegisterUserRoles": [
     {
       "role": "user-r-id",

@@ -24,6 +24,9 @@
     },
     "user": {
       "address": "identity-srv:50051"
+    },
+    "ostorage": {
+      "address": "ostorage:50051"
     }
   },
   "service": {
