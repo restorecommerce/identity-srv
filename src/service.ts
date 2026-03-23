@@ -153,7 +153,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       'user',
       topics['user.resource'],
       logger,
-      new ResourcesAPIBase(db, 'users', resourceFieldConfig),
+      new ResourcesAPIBase(db, 'users', resourceFieldConfig, undefined, undefined, logger, 'user'),
       isEventsEnabled
     );
     this.cfg = cfg;
