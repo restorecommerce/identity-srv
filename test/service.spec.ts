@@ -944,6 +944,143 @@ describe('testing identity-srv', () => {
         });
       });
 
+      describe('impersonate', function impersonate(): void {
+
+        const testUserImp: any = {
+          id: 'testuserimp',
+          name: 'test.userimp',
+          first_name: 'testimp',
+          last_name: 'userimp',
+          password: 'CNQJrH%KAayeDpf3h',
+          email: 'testimp@restorecommerce.io',
+          role_associations: [{
+            role: 'user-r-id',
+            attributes: [{
+              id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+              value: 'urn:restorecommerce:acs:model:organization.Organization',
+              attributes: [{
+                id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                value: 'orgC'
+              }]
+            }]
+          }],
+          active: true
+        };
+
+        const subject = {
+          id: 'admin_user_id',
+          scope: 'orgA',
+          token: 'admin-token'
+        };
+
+        let expires_in = new Date(); 
+        expires_in.setDate(expires_in.getDate() + 1);
+
+        let subjectResolved = {
+          id: 'admin_user_id',
+          scope: 'orgA',
+          token: 'admin-token',
+          tokens: [{
+            token: 'admin-token',
+            expires_in: expires_in
+          }],
+          role_associations: [
+            {
+              role: 'admin-r-id',
+              attributes: [{
+                id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+                value: 'urn:restorecommerce:acs:model:organization.Organization',
+                attributes: [{
+                  id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                  value: 'mainOrg'
+                }]
+              }]
+            }
+          ],
+          hierarchical_scopes: [
+            {
+              id: 'mainOrg',
+              role: 'admin-r-id',
+              children: [{
+                id: 'orgA',
+                children: [{
+                  id: 'orgB',
+                  children: [{
+                    id: 'orgC'
+                  }]
+                }]
+              }]
+            }
+          ]
+        };
+
+        const hrScopeskey = `cache:${subject.id}:${subject.token}:hrScopes`;
+        const subjectKey = `cache:${subject.id}:subject`;
+        beforeAll(async () => {
+          // set redis client
+          // since its not possible to mock findByToken as it is same service, storing the token value with subject
+          // HR scopes resolved to db-subject redis store and token to findByToken redis store
+          const redisConfig = cfg.get('redis');
+          redisConfig.database = cfg.get('redis:db-indexes:db-subject') || 0;
+          redisClient = RedisCreateClient(redisConfig);
+          redisClient.on('error', (err) => logger.error('Redis Client Error', err));
+          await redisClient.connect();
+
+          // for findByToken
+          redisConfig.database = cfg.get('redis:db-indexes:db-findByToken') || 0;
+          tokenRedisClient = RedisCreateClient(redisConfig);
+          tokenRedisClient.on('error', (err) => logger.error('Redis client error in token cache store', err));
+          await tokenRedisClient.connect();
+
+          // store hrScopesKey and subjectKey to Redis index `db-subject`
+          await redisClient.set(subjectKey, JSON.stringify(subjectResolved));
+          await redisClient.set(hrScopeskey, JSON.stringify(subjectResolved.hierarchical_scopes));
+
+          // store user with tokens and role associations to Redis index `db-findByToken`
+          await tokenRedisClient.set('admin-token', JSON.stringify(subjectResolved));
+        });
+
+        afterAll(async () => {
+          // delete hrScopesKey and subjectKey from Redis
+          await redisClient.del(subjectKey);
+          await redisClient.del(hrScopeskey);
+          // delete token from redis
+          await tokenRedisClient.del('admin-token');
+        });
+
+        it('should return an error because of insufficient acs', async function impersonate(): Promise<void> {
+
+          const createResult = await userService.create({ items: [testUserImp] });
+          const userName = createResult!.items![0]!.payload!.name;
+
+          // enable and enforce authorization
+          cfg.set('authorization:enabled', true);
+          cfg.set('authorization:enforce', true);
+          updateConfig(cfg);
+          
+          subjectResolved.hierarchical_scopes = [];
+          subjectResolved.scope = 'orgZZZ';
+
+          let hrScopeskey = `cache:${subject.id}:${subject.token}:hrScopes`;
+          await redisClient.set(hrScopeskey, JSON.stringify(subjectResolved.hierarchical_scopes));
+
+          const result = await (userService.impersonate({
+            identifier: userName,
+            subject
+          }));
+          
+          should.not.exist(result!.payload);
+          result!.status!.code!.should.not.equal(200);
+          result!.status!.message!.should.not.equal('success');
+
+          await userService.unregister({ identifier: userName });
+
+          cfg.set('authorization:enabled', false);
+          cfg.set('authorization:enforce', false);
+          updateConfig(cfg);
+        });
+      });
+
       describe('login', function login(): void {
         it('should return an error for invalid user identifier', async function login(): Promise<void> {
           const result = await (userService.login({

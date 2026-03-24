@@ -67,7 +67,9 @@ import {
   CreateBackupTOTPCodesResponse,
   ResetTOTPRequest,
   MfaStatusRequest,
-  MfaStatusResponse
+  MfaStatusResponse,
+  ImpersonateRequest,
+  EndImpersonationRequest
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   Role,
@@ -2344,6 +2346,125 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       upsertWithStatus.total_count = upsertWithStatus?.items?.length;
       return upsertWithStatus;
     }
+  }
+
+  /**
+   * Endpoint allows a user to switch his identity to another user's.
+   */
+  async impersonate(request: ImpersonateRequest, context: any): Promise<DeepPartial<LoginResponse>> {
+
+    if (_.isEmpty(request) || _.isEmpty(request.identifier) || _.isEmpty(request.subject))
+    {
+      return returnStatus(400, 'Invalid request');
+    }
+
+    const identifier = request.identifier;
+
+    const filters = getDefaultFilter(identifier);
+    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+    if (!users || users.total_count === 0) {
+      return returnStatus(404, 'user does not exist');
+    } else if (users.total_count > 1) {
+      return returnStatus(400, `Invalid identifier provided for impersonate, multiple users found for identifier ${identifier}`);
+    }
+
+    const user = users.items[0].payload;
+
+    let acsResponse: DecisionResponse;
+    const subject = await resolveSubject(request.subject);
+    const acsResources = await this.createMetadata(user, AuthZAction.MODIFY, subject);
+
+    try {
+      if (!context) { context = {}; };
+      context.subject = subject;
+      context.resources = acsResources;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY,
+        Operation.isAllowed);
+    } catch (err: any) {
+      this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
+      return returnStatus(err.code, err.message);
+    }
+    if (acsResponse.decision != Response_Decision.PERMIT) {
+      return returnStatus(acsResponse.operation_status.code, acsResponse.operation_status.message);
+    }
+
+    const obfuscateAuthNErrorReason = this.cfg.get('obfuscateAuthNErrorReason') ?
+      this.cfg.get('obfuscateAuthNErrorReason') : false;
+
+    if (!user.active) {
+      if (obfuscateAuthNErrorReason) {
+        return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist', user.id);
+      } else {
+        return returnStatus(412, 'user is inactive', user.id);
+      }
+    }
+
+    user.impoersonated_by = request.subject.id;
+
+    const updateStatus = await super.update(UserList.fromPartial({
+      items: [user]
+    }), context);
+
+    return { payload: updateStatus.items[0].payload, status: { code: 200, message: 'success' } };
+  }
+
+  /**
+   * Endpoint allows a user to end impersonation.
+   */
+  async endImpersonation(request: EndImpersonationRequest, context: any): Promise<DeepPartial<LoginResponse>> {
+
+    if (_.isEmpty(request) || _.isEmpty(request.subject) || _.isEmpty(request.subject.id))
+    {
+      return returnStatus(400, 'Invalid request');
+    }
+
+    const users = await super.read(ReadRequest.fromPartial({
+      filters: [{
+        filters: [{
+          field: 'id',
+          operation: Filter_Operation.eq,
+          value: request.subject.id
+        }]
+      }]
+    }), context);
+
+    if (!users || users.total_count === 0) {
+      return returnStatus(404, 'User does not exist');
+    } else if (users.total_count > 1) {
+      return returnStatus(400, `Invalid user id provided for endImpersonation subject, multiple users found for id ${request.subject.id}`);
+    }
+    
+    const user = users.items[0].payload;
+    
+    if (_.isEmpty(user.impoersonated_by)) {
+      return returnStatus(400, 'User is not impersonator');
+    }
+
+    const impersonators = await super.read(ReadRequest.fromPartial({
+      filters: [{
+        filters: [{
+          field: 'id',
+          operation: Filter_Operation.eq,
+          value: user.impoersonated_by
+        }]
+      }]
+    }), context);
+
+    if (!impersonators || impersonators.total_count === 0) {
+      return returnStatus(404, 'Impersonator does not exist');
+    } else if (impersonators.total_count > 1) {
+      return returnStatus(400, `Invalid impersonator id, multiple users found for id ${user.impoersonated_by}`);
+    }
+
+    const impersonator = impersonators.items[0].payload;
+
+    user.impoersonated_by = null;
+
+    await super.update(UserList.fromPartial({
+      items: [user]
+    }), context);
+
+    return { payload: impersonator, status: { code: 200, message: 'success' } };
   }
 
   /**
