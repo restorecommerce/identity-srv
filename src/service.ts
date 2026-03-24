@@ -2362,7 +2362,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     const filters = getDefaultFilter(identifier);
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
-    if (!users || users.total_count === 0) {
+    if (_.isEmpty(users) || users.total_count === 0) {
       return returnStatus(404, 'user does not exist');
     } else if (users.total_count > 1) {
       return returnStatus(400, `Invalid identifier provided for impersonate, multiple users found for identifier ${identifier}`);
@@ -2386,6 +2386,21 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
       return returnStatus(acsResponse.operation_status.code, acsResponse.operation_status.message);
+    }
+
+    if (acsResponse.decision === Response_Decision.PERMIT) {
+      if (this.cfg.get('authorization:enabled')) {
+        try {
+          const verficationResponse = await this.verifyUserRoleAssociations([user], subject);
+          if (!_.isEmpty(verficationResponse) && verficationResponse?.status?.message) {
+            return returnStatus(verficationResponse.status.code, verficationResponse.status.message);
+          }
+        } catch (err: any) {
+          this.logger.error('Error caught verifying user role associations', { code: err.code, message: err.message, stack: err.stack });
+          const errMessage = err.details ? err.details : err.message;
+          return returnStatus(400, errMessage);
+        }
+      }
     }
 
     const obfuscateAuthNErrorReason = this.cfg.get('obfuscateAuthNErrorReason') ?
@@ -2428,7 +2443,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }]
     }), context);
 
-    if (!users || users.total_count === 0) {
+    if (_.isEmpty(users) || users?.total_count === 0) {
       return returnStatus(404, 'User does not exist');
     } else if (users.total_count > 1) {
       return returnStatus(400, `Invalid user id provided for endImpersonation subject, multiple users found for id ${request.subject.id}`);
@@ -2450,8 +2465,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }]
     }), context);
 
-    if (!impersonators || impersonators.total_count === 0) {
-      return returnStatus(404, 'Impersonator does not exist');
+    if (_.isEmpty(impersonators) || impersonators?.total_count === 0) {
+      return returnStatus(404, `Impersonator with id ${user.impoersonated_by} does not exist`);
     } else if (impersonators.total_count > 1) {
       return returnStatus(400, `Invalid impersonator id, multiple users found for id ${user.impoersonated_by}`);
     }
