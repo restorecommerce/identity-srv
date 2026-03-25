@@ -167,6 +167,55 @@ const permitUserRoleRule: Rule = {
   effect: Effect.PERMIT
 };
 
+const permitReadOnlyUser: Rule[] = [
+  {
+    id: 'permit_user_read_role_id',
+    target: {
+      actions: [{
+        id: 'urn:oasis:names:tc:xacml:1.0:action:action-id',
+        value: 'urn:restorecommerce:acs:names:action:read'
+      }],
+      resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:user.User', attributes: [] }],
+      subjects: [
+        {
+          id: 'urn:restorecommerce:acs:names:role',
+          value: 'user-readonly-r-id',
+          attributes: []
+        },
+        {
+          id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+          value: 'urn:restorecommerce:acs:model:organization.Organization',
+          attributes: []
+        }
+      ]
+    },
+    effect: Effect.PERMIT
+  },
+  {
+    id: 'deny_user_modify_role_id',
+    target: {
+      actions: [{
+        id: 'urn:oasis:names:tc:xacml:1.0:action:action-id',
+        value: 'urn:restorecommerce:acs:names:action:modify'
+      }],
+      resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:user.User', attributes: [] }],
+      subjects: [
+        {
+          id: 'urn:restorecommerce:acs:names:role',
+          value: 'user-readonly-r-id',
+          attributes: []
+        },
+        {
+          id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+          value: 'urn:restorecommerce:acs:model:organization.Organization',
+          attributes: []
+        }
+      ]
+    },
+    effect: Effect.DENY
+  }
+];
+
 let userRolePolicySetRQ = {
   policy_sets:
     [{
@@ -330,6 +379,13 @@ describe('testing identity-srv', () => {
             description: 'Normal user',
             meta,
             assignable_by_roles: ['admin-r-id']
+          },
+          {
+            id: 'user-readonly-r-id',
+            name: 'read_only_user',
+            description: 'Read only user',
+            meta,
+            assignable_by_roles: ['admin-r-id']
           }];
 
         const result = await roleService.create({
@@ -338,7 +394,7 @@ describe('testing identity-srv', () => {
         should.exist(result);
         should.exist(result!.items);
         should.exist(result!.operation_status);
-        result!.items!.should.have.length(3);
+        result!.items!.should.have.length(4);
         // validate overall status
         result!.operation_status!.code!.should.equal(200);
         result!.operation_status!.message!.should.equal('success');
@@ -392,8 +448,10 @@ describe('testing identity-srv', () => {
           registerResult.status!.code!.should.equal(200);
           registerResult.status!.message!.should.equal('success');
           userRolePolicySetRQ.policy_sets![0]!.policies![0]!.rules![0] = permitUserRule;
+          userRolePolicySetRQ.policy_sets![0]!.policies![0]!.rules![1] = permitReadOnlyUser[0];
+          userRolePolicySetRQ.policy_sets![0]!.policies![0]!.rules![2] = permitReadOnlyUser[1];
           userRolePolicySetRQ.policy_sets![0]!.policies!![1]!.rules![0] = permitRoleRule;
-          userRolePolicySetRQ.policy_sets![0]!.policies!![1]!.rules![1] = permitUserRoleRule;
+          userRolePolicySetRQ.policy_sets![0]!.policies!![1]!.rules![1] = permitUserRoleRule;          
           // start mock acs-srv - needed for read operation since acs-client makes a req to acs-srv
           // to get applicable policies although acs-lookup is disabled
           await startGrpcMockServer([{ method: 'WhatIsAllowed', output: userRolePolicySetRQ },
@@ -1076,9 +1134,12 @@ describe('testing identity-srv', () => {
 
       describe('impersonate', function impersonate(): void {
 
-        const userOrg = 'orgC';
+        const impOrg = 'orgA';
 
-        const testUserImp: any = {
+        let expires_in = new Date(); 
+        expires_in.setDate(expires_in.getDate() + 1);
+
+        const impersTestUser: any = {
           id: 'testuserimp',
           name: 'test.userimp',
           first_name: 'testimp',
@@ -1092,29 +1153,62 @@ describe('testing identity-srv', () => {
               value: 'urn:restorecommerce:acs:model:organization.Organization',
               attributes: [{
                 id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-                value: userOrg
+                value: impOrg
               }]
             }]
           }],
-          active: true
+          active: true,
+          token: 'testuserimp-token',
+          tokens: [{
+            token: 'testuserimp-token',
+            expires_in: expires_in
+          }],
+          scope: impOrg
         };
 
-        let subject = {
+        const readOnlyUser = {
+          id: 'testusereadonly',
+          name: 'test.userimpro',
+          first_name: 'testimpro',
+          last_name: 'userimpro',
+          password: 'CNQJrH%KAayeDpf3h',
+          email: 'testimpro@restorecommerce.io',
+          role_associations: [
+            {
+              role: 'user-readonly-r-id',
+              attributes: [{
+                id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+                value: 'urn:restorecommerce:acs:model:organization.Organization',
+                attributes: [{
+                  id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                  value: impOrg
+                }]
+              }]
+            }
+          ],
+          active: true,
+          token: 'testusereadonly-token',
+          tokens: [{
+            token: 'testusereadonly-token',
+            expires_in: expires_in
+          }],
+          scope: impOrg
+        };
+
+        const subject = {
           id: 'admin_user_id',
-          scope: 'orgA',
+          scope: impOrg,
           token: 'admin-token'
         };
 
-        let expires_in = new Date(); 
-        expires_in.setDate(expires_in.getDate() + 1);
-
-        let subjectResolved = {
-          id: 'admin_user_id',
-          scope: 'orgA',
-          token: 'admin-token',
+        const adminUserResolve = {
+          id: subject.id,
+          scope: impOrg,
+          token: subject.token,
           tokens: [{
-            token: 'admin-token',
-            expires_in: expires_in
+            token: subject.token,
+            expires_in: expires_in,
+            scopes: [impOrg]
           }],
           role_associations: [
             {
@@ -1134,134 +1228,86 @@ describe('testing identity-srv', () => {
               id: 'mainOrg',
               role: 'admin-r-id',
               children: [{
-                id: 'orgA',
-                children: [{
-                  id: 'orgB',
-                  children: [{
-                    id: 'orgC'
-                  }]
-                }]
+                id: impOrg,
+                children: []
               }]
             }
           ]
         };
 
-        const testAdminUser: any = {
-          id: subjectResolved.id,
-          name: 'test.userimptwo',
-          first_name: 'testimptwo',
-          last_name: 'userimptwo',
+        const adminUser = {
+          id: adminUserResolve.id,
+          name: 'test.userimpamd',
+          first_name: 'testimpamd',
+          last_name: 'userimpamd',
           password: 'CNQJrH%KAayeDpf3h',
-          email: 'testimptwo@restorecommerce.io',
-          role_associations: subjectResolved.role_associations,
+          email: 'testimpamd@restorecommerce.io',
+          role_associations: adminUserResolve.role_associations,
           active: true,
-          /*token: 'admin-token',
-          tokens: [{
-            token: 'admin-token',
-            expires_in: expires_in
-          }],*/
+          token: adminUserResolve.token,
+          tokens: adminUserResolve.tokens,
+          hierarchical_scopes: adminUserResolve.hierarchical_scopes,
+          scope: impOrg
         };
 
-        const hrScopeskey = `cache:${subject.id}:${subject.token}:hrScopes`;
-        const subjectKey = `cache:${subject.id}:subject`;
+        const hrScopeskeyAdm = `cache:${adminUserResolve.id}:${adminUserResolve.token}:hrScopes`;
+        const subjectKeyAdm = `cache:${adminUserResolve.id}:subject`;
         beforeAll(async () => {
-          // set redis client
-          // since its not possible to mock findByToken as it is same service, storing the token value with subject
-          // HR scopes resolved to db-subject redis store and token to findByToken redis store
           const redisConfig = cfg.get('redis');
           redisConfig.database = cfg.get('redis:db-indexes:db-subject') || 0;
           redisClient = RedisCreateClient(redisConfig);
           redisClient.on('error', (err) => logger.error('Redis Client Error', err));
           await redisClient.connect();
-
-          // for findByToken
           redisConfig.database = cfg.get('redis:db-indexes:db-findByToken') || 0;
           tokenRedisClient = RedisCreateClient(redisConfig);
           tokenRedisClient.on('error', (err) => logger.error('Redis client error in token cache store', err));
           await tokenRedisClient.connect();
 
-          // store hrScopesKey and subjectKey to Redis index `db-subject`
-          await redisClient.set(subjectKey, JSON.stringify(subjectResolved));
-          await redisClient.set(hrScopeskey, JSON.stringify(subjectResolved.hierarchical_scopes));
+          await redisClient.set(subjectKeyAdm, JSON.stringify(adminUserResolve));
+          await redisClient.set(hrScopeskeyAdm, JSON.stringify(adminUserResolve.hierarchical_scopes));
+          await tokenRedisClient.set(adminUserResolve.token, JSON.stringify(adminUserResolve));
 
-          // store user with tokens and role associations to Redis index `db-findByToken`
-          await tokenRedisClient.set('admin-token', JSON.stringify(subjectResolved));
+          const createResult = await userService.create({ items: [adminUser], subject });
+          should.exist(createResult!.items![0]!.payload);
+          should.exist(createResult!.items![0]!.payload!.name);
         });
-
         afterAll(async () => {
-          // delete hrScopesKey and subjectKey from Redis
-          await redisClient.del(subjectKey);
-          await redisClient.del(hrScopeskey);
-          // delete token from redis
-          await tokenRedisClient.del('admin-token');
+          await redisClient.del(subjectKeyAdm);
+          await redisClient.del(hrScopeskeyAdm);
+          await tokenRedisClient.del(adminUserResolve.token);
+
+          await userService.unregister({ identifier: adminUser.name });
         });
 
         it('should return an error because of insufficient acs', async function impersonate(): Promise<void> {
 
-          const createAdminResult = await userService.create({ items: [testAdminUser] });
-          should.exist(createAdminResult!.items![0]!.payload!.name);
+          const createResult = await userService.create({ items: [impersTestUser], subject });
+          should.exist(createResult!.items![0]!.payload);
+          should.exist(createResult!.items![0]!.payload!.name);
           
           // enable and enforce authorization
           cfg.set('authorization:enabled', true);
           cfg.set('authorization:enforce', true);
           updateConfig(cfg);
-
-          const createResult = await userService.create({ items: [testUserImp], subject });
-          should.exist(createResult!.items![0]!.payload!.name);
-
-          // auth_context not containing valid role (admin-r-id)
-          subjectResolved.hierarchical_scopes = [
-            {
-              id: 'mainOrg',
-              role: 'user-r-id',
-              children: [{
-                id: 'orgA',
-                children: [{
-                  id: 'orgB',
-                  children: []
-                }]
-              }]
-            }
-          ];
-
-          await redisClient.set(subjectKey, JSON.stringify(subjectResolved));
-          await redisClient.set(hrScopeskey, JSON.stringify(subjectResolved.hierarchical_scopes));
-          await tokenRedisClient.set('admin-token', JSON.stringify(subjectResolved));
   
           const result = await (userService.impersonate({
-            identifier: testUserImp.name,
-            subject
+            identifier: impersTestUser.name,
+            subject: {
+              id: readOnlyUser.id,
+              scope: readOnlyUser.scope,
+              token: readOnlyUser.token
+            }
           }));
           
           should.not.exist(result!.payload);
           result!.status!.code!.should.not.equal(200);
-          result!.status!.message!.should.not.equal('success');
+          result!.status!.message!.should.equal(`Access not allowed for request with subject:testusereadonly, resource:user, action:MODIFY, target_scope:${impOrg}; the response was DENY`);
         });
 
-        it('should return login response', async function impersonate(): Promise<void> {
-
-          subjectResolved.hierarchical_scopes = [
-            {
-              id: 'mainOrg',
-              role: 'admin-r-id',
-              children: [{
-                id: 'orgA',
-                children: [{
-                  id: 'orgB',
-                  children: [{
-                    id: 'orgC'
-                  }]
-                }]
-              }]
-            }
-          ];
-
-          await redisClient.set(subjectKey, JSON.stringify(subjectResolved));
-          await redisClient.set(hrScopeskey, JSON.stringify(subjectResolved.hierarchical_scopes));
-          await tokenRedisClient.set('admin-token', JSON.stringify(subjectResolved));
+        it('should return login response including impoersonated_by', async function impersonate(): Promise<void> {
   
           const result = await (userService.impersonate({
-            identifier: testUserImp.name,
+            identifier: impersTestUser.name,
             subject
           }));
           
@@ -1269,32 +1315,40 @@ describe('testing identity-srv', () => {
           result!.status!.code!.should.equal(200);
           result!.status!.message!.should.equal('success');
           result!.payload!.impoersonated_by!.should.equal(subject.id);
-          result!.payload!.id!.should.equal(testUserImp.id);
+          result!.payload!.id!.should.equal(impersTestUser.id);
         });
 
-        it('should fail because user is not impersoned', async function impersonate(): Promise<void> {
+        it('should fail with code 400 and message User is not impersonator', async function impersonate(): Promise<void> {
+          // User misses user.impoersonated_by ID
+          const createResult = await userService.create({ items: [readOnlyUser], subject });
+          should.exist(createResult!.items![0]!.payload);
+          should.exist(createResult!.items![0]!.payload!.name);
 
           const result = await (userService.endImpersonation(
             {
               subject: {
-                id: testAdminUser.id,
-                scope: userOrg
+                id: readOnlyUser.id,
+                scope: readOnlyUser.scope,
+                token: readOnlyUser.token
               }
             }
           ));
           
           should.not.exist(result!.payload);
-          result!.status!.code!.should.not.equal(200);
-          result!.status!.message!.should.not.equal('success');
+          result!.status!.code!.should.equal(400);
+          result!.status!.message!.should.equal('User is not impersonator');
+
+          await userService.unregister({ identifier: readOnlyUser.name });
         });
 
-        it('should work because user is impersonator', async function impersonate(): Promise<void> {
-  
+        it('should allow to end impersonation and return impersonator user', async function impersonate(): Promise<void> {
+          // User has user.impoersonated_by ID and this ID belongs to a another existing user
           const result = await (userService.endImpersonation(
             {
               subject: {
-                id: testUserImp.id,
-                scope: userOrg
+                id: impersTestUser.id,
+                scope: impersTestUser.scope,
+                token: impersTestUser.token
               }
             }
           ));
@@ -1304,8 +1358,7 @@ describe('testing identity-srv', () => {
           result!.status!.message!.should.equal('success');
           result!.payload!.id!.should.equal(subject.id);
 
-          await userService.unregister({ identifier: testUserImp.name });
-          await userService.unregister({ identifier: testAdminUser.name });
+          await userService.unregister({ identifier: impersTestUser.name });
 
           cfg.set('authorization:enabled', false);
           cfg.set('authorization:enforce', false);
@@ -2215,7 +2268,7 @@ describe('testing identity-srv', () => {
           testUser.role_associations![0]!.role = 'super-admin-r-id';
           const result = await userService.create({ items: [testUser], subject });
           result!.items![0]!.status!.code!.should.equal(403);
-          result!.items![0]!.status!.message!.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as the user roles [admin-r-id, admin-r-id, user-r-id] does not have the required permission');
+          result!.items![0]!.status!.message!.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as the user roles [admin-r-id, user-readonly-r-id, admin-r-id, user-r-id] does not have the required permission');
           result!.items![0]!.status!.id!.should.equal('testuser');
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');

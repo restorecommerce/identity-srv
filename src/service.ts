@@ -2379,28 +2379,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       context.subject = subject;
       context.resources = acsResources;
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY,
-        Operation.isAllowed);
+        Operation.whatIsAllowed);
     } catch (err: any) {
       this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
       return returnStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
       return returnStatus(acsResponse.operation_status.code, acsResponse.operation_status.message);
-    }
-
-    if (acsResponse.decision === Response_Decision.PERMIT) {
-      if (this.cfg.get('authorization:enabled')) {
-        try {
-          const verficationResponse = await this.verifyUserRoleAssociations([user], subject);
-          if (!_.isEmpty(verficationResponse) && verficationResponse?.status?.message) {
-            return returnStatus(verficationResponse.status.code, verficationResponse.status.message);
-          }
-        } catch (err: any) {
-          this.logger.error('Error caught verifying user role associations', { code: err.code, message: err.message, stack: err.stack });
-          const errMessage = err.details ? err.details : err.message;
-          return returnStatus(400, errMessage);
-        }
-      }
     }
 
     const obfuscateAuthNErrorReason = this.cfg.get('obfuscateAuthNErrorReason') ?
@@ -2428,28 +2413,18 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    */
   async endImpersonation(request: EndImpersonationRequest, context: any): Promise<DeepPartial<LoginResponse>> {
 
-    if (_.isEmpty(request) || _.isEmpty(request.subject) || _.isEmpty(request.subject.id))
+    if (_.isEmpty(request) || _.isEmpty(request.subject) || _.isEmpty(request.subject.token))
     {
       return returnStatus(400, 'Invalid request');
     }
 
-    const users = await super.read(ReadRequest.fromPartial({
-      filters: [{
-        filters: [{
-          field: 'id',
-          operation: Filter_Operation.eq,
-          value: request.subject.id
-        }]
-      }]
-    }), context);
+    const userByToken = await this.findByToken({ token: request.subject.token }, context);
 
-    if (_.isEmpty(users) || users?.total_count === 0) {
-      return returnStatus(404, 'User does not exist');
-    } else if (users.total_count > 1) {
-      return returnStatus(400, `Invalid user id provided for endImpersonation subject, multiple users found for id ${request.subject.id}`);
+    if (!userByToken?.payload) {
+      return returnStatus(400, 'Invalid request');
     }
-    
-    const user = users.items[0].payload;
+
+    const user = userByToken.payload;
     
     if (_.isEmpty(user.impoersonated_by)) {
       return returnStatus(400, 'User is not impersonator');
