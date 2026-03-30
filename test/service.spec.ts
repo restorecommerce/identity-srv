@@ -1161,9 +1161,12 @@ describe('testing identity-srv', () => {
           token: 'testuserimp-token',
           tokens: [{
             token: 'testuserimp-token',
-            expires_in: expires_in
+            expires_in: expires_in,
+            client_id: 'bmslsa',
+            type: 'AccessToken'
           }],
-          scope: impOrg
+          scope: impOrg,
+          default_scope: 'bmslsa'
         };
 
         const readOnlyUser = {
@@ -1190,9 +1193,12 @@ describe('testing identity-srv', () => {
           token: 'testusereadonly-token',
           tokens: [{
             token: 'testusereadonly-token',
-            expires_in: expires_in
+            expires_in: expires_in,
+            client_id: 'bmslsa',
+            type: 'AccessToken'
           }],
-          scope: impOrg
+          scope: impOrg,
+          default_scope: 'bmslsa'
         };
 
         const subject = {
@@ -1208,7 +1214,9 @@ describe('testing identity-srv', () => {
           tokens: [{
             token: subject.token,
             expires_in: expires_in,
-            scopes: [impOrg]
+            scopes: [impOrg],
+            client_id: 'bmslsa',
+            type: 'AccessToken'
           }],
           role_associations: [
             {
@@ -1250,8 +1258,13 @@ describe('testing identity-srv', () => {
           scope: impOrg
         };
 
+        let tokenService: TokenServiceClient;
+
+        let newACToken: any;
+
         const hrScopeskeyAdm = `cache:${adminUserResolve.id}:${adminUserResolve.token}:hrScopes`;
         const subjectKeyAdm = `cache:${adminUserResolve.id}:subject`;
+        
         beforeAll(async () => {
           const redisConfig = cfg.get('redis');
           redisConfig.database = cfg.get('redis:db-indexes:db-subject') || 0;
@@ -1270,6 +1283,8 @@ describe('testing identity-srv', () => {
           const createResult = await userService.create({ items: [adminUser], subject });
           should.exist(createResult!.items![0]!.payload);
           should.exist(createResult!.items![0]!.payload!.name);
+
+          tokenService = await connect<TokenServiceClient>('client:token', 'token');
         });
         afterAll(async () => {
           await redisClient.del(subjectKeyAdm);
@@ -1304,7 +1319,7 @@ describe('testing identity-srv', () => {
           result!.status!.message!.should.equal(`Access not allowed for request with subject:testusereadonly, resource:user, action:MODIFY, target_scope:${impOrg}; the response was DENY`);
         });
 
-        it('should return login response including impoersonated_by', async function impersonate(): Promise<void> {
+        it('should return token response and token should access impersTestUser and have impoersonated_by set', async function impersonate(): Promise<void> {
   
           const result = await (userService.impersonate({
             identifier: impersTestUser.name,
@@ -1314,8 +1329,23 @@ describe('testing identity-srv', () => {
           should.exist(result!.payload);
           result!.status!.code!.should.equal(200);
           result!.status!.message!.should.equal('success');
-          result!.payload!.impoersonated_by!.should.equal(subject.id);
-          result!.payload!.id!.should.equal(impersTestUser.id);
+          should.exist(result!.payload!.access_token);
+
+          newACToken = result!.payload!.access_token;
+
+          const tokenFindResult = await (userService.findByToken({
+            token: newACToken
+          }));
+
+          should.exist(tokenFindResult!.payload);
+          should.exist(tokenFindResult!.status);
+          tokenFindResult!.status!.code!.should.equal(200);
+          should.exist(tokenFindResult!.payload!.tokens);
+          tokenFindResult!.payload!.tokens!.should.be.Array();
+
+          tokenFindResult!.payload!.tokens!.some(
+            token => token!.impersonated_by === subject.id
+          ).should.be.true();
         });
 
         it('should fail with code 400 and message User is not impersonator', async function impersonate(): Promise<void> {
@@ -1341,14 +1371,14 @@ describe('testing identity-srv', () => {
           await userService.unregister({ identifier: readOnlyUser.name });
         });
 
-        it('should allow to end impersonation and return impersonator user', async function impersonate(): Promise<void> {
+        it('should allow to end impersonation and return impersonator token data', async function impersonate(): Promise<void> {
           // User has user.impoersonated_by ID and this ID belongs to a another existing user
           const result = await (userService.endImpersonation(
             {
               subject: {
                 id: impersTestUser.id,
                 scope: impersTestUser.scope,
-                token: impersTestUser.token
+                token: newACToken
               }
             }
           ));
@@ -1356,7 +1386,7 @@ describe('testing identity-srv', () => {
           should.exist(result!.payload);
           result!.status!.code!.should.equal(200);
           result!.status!.message!.should.equal('success');
-          result!.payload!.id!.should.equal(subject.id);
+          result!.payload!.access_token!.should.equal(subject.token);
 
           await userService.unregister({ identifier: impersTestUser.name });
 

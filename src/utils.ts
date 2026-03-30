@@ -22,6 +22,7 @@ import {
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
 import { OperationStatus, Status } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/status.js';
+import { customAlphabet } from 'nanoid';
 
 // Create a ids client instance
 let idsClientInstance: UserServiceClient;
@@ -286,3 +287,9 @@ export const getACSFilters = (
   (e) => e?.resource === resource
     && e?.filters[0]?.filters?.length
 )?.filters ?? [];
+
+
+export const generateAT = (): string => {
+  const generate = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-', 43);
+  return generate();
+};

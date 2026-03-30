@@ -85,7 +85,8 @@ export class TokenService implements TokenServiceImplementation {
           type,
           interactive: true,
           last_login: new Date(),
-          client_id: payload?.clientId
+          client_id: payload?.clientId,
+          impersonated_by: payload?.impersonatedBy
         };
         try {
           // append tokens on user entity
@@ -168,7 +169,8 @@ export class TokenService implements TokenServiceImplementation {
           claims: user,
           kind: tokenData.type,
           jti: tokenData.token,
-          clientId: tokenData?.client_id
+          clientId: tokenData?.client_id,
+          impersonatedBy: tokenData?.impersonated_by
         };
       }
       if (!data) {

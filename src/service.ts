@@ -13,7 +13,8 @@ import {
   returnCodeMessage,
   returnOperationStatus,
   returnStatus,
-  unmarshallProtobufAny
+  unmarshallProtobufAny,
+  generateAT
 } from './utils.js';
 import { ResourcesAPIBase, ServiceBase, FilterValueType } from '@restorecommerce/resource-base-interface';
 import { Logger } from 'winston';
@@ -69,7 +70,10 @@ import {
   MfaStatusRequest,
   MfaStatusResponse,
   ImpersonateRequest,
-  EndImpersonationRequest
+  EndImpersonationRequest,
+  AccessTokenData,
+  ImpersonateResponse,
+  EndImpersonateResponse
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   Role,
@@ -109,6 +113,8 @@ import { authenticator } from 'otplib';
 import * as jose from 'jose';
 import crypto from 'node:crypto';
 
+import { TokenService } from './token_service.js';
+
 export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
 export class UserService extends ServiceBase<UserListResponse, UserList> implements UserServiceImplementation {
@@ -137,6 +143,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   authZCheck: boolean;
   tokenRedisClient: RedisClientType<any, any>;
   uniqueEmailConstraint: boolean;
+
+  tokenService: TokenService;
 
   constructor(
     cfg: any,
@@ -2351,11 +2359,17 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   /**
    * Endpoint allows a user to switch his identity to another user's.
    */
-  async impersonate(request: ImpersonateRequest, context: any): Promise<DeepPartial<LoginResponse>> {
+  async impersonate(request: ImpersonateRequest, context: any): Promise<DeepPartial<ImpersonateResponse>> {
 
-    if (_.isEmpty(request) || _.isEmpty(request.identifier) || _.isEmpty(request.subject))
+    if (_.isEmpty(request) || _.isEmpty(request.identifier) || _.isEmpty(request.subject) || _.isEmpty(request.subject.token))
     {
       return returnStatus(400, 'Invalid request');
+    }
+
+    const impersonatorByToken = await this.findByToken({ token: request.subject.token }, context);
+
+    if (!impersonatorByToken?.payload) {
+      return returnStatus(401, 'No user found for provided subject token value');
     }
 
     const identifier = request.identifier;
@@ -2399,19 +2413,50 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
     }
 
-    user.impoersonated_by = request.subject.id;
+    const at = generateAT();
+    const expiresIn = new Date(Date.now() + 86400 * 1000); // TODO: how long actually?
+    const tokenName = uuid.v4().replace(/-/g, '');
 
-    const updateStatus = await super.update(UserList.fromPartial({
-      items: [user]
-    }), context);
+    const tokenUpsertResponse = await this.tokenService.upsert({
+      id: user.id,
+      type: 'AccessToken',
+      expires_in: expiresIn,
+      payload: {
+        value: Buffer.from(
+          JSON.stringify({
+            jti: at,
+            accountId: user.id,
+            clientId: user.default_scope,
+            claims: {
+              token_name: tokenName
+            },
+            impersonatedBy: request.subject.id
+          })
+        )
+      }
+    }, context);
 
-    return { payload: updateStatus.items[0].payload, status: { code: 200, message: 'success' } };
+    const tokenUpsertResponseObj = unmarshallProtobufAny(tokenUpsertResponse, this.logger);
+
+    if (tokenUpsertResponseObj.status.code !== 200) {
+      return returnStatus(tokenUpsertResponseObj.status.code, tokenUpsertResponseObj.status.message);
+    }
+
+    const responsePayload: AccessTokenData = {
+      'access_token' : at,
+      'expires_in' : expiresIn,
+      'token_type': 'Bearer',
+      'scope': 'openid',
+      'token_name': tokenName
+    };
+
+    return { payload: responsePayload, status: { code: 200, message: 'success' } };
   }
 
   /**
    * Endpoint allows a user to end impersonation.
    */
-  async endImpersonation(request: EndImpersonationRequest, context: any): Promise<DeepPartial<LoginResponse>> {
+  async endImpersonation(request: EndImpersonationRequest, context: any): Promise<DeepPartial<EndImpersonateResponse>> {
 
     if (_.isEmpty(request) || _.isEmpty(request.subject) || _.isEmpty(request.subject.token))
     {
@@ -2421,12 +2466,28 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const userByToken = await this.findByToken({ token: request.subject.token }, context);
 
     if (!userByToken?.payload) {
-      return returnStatus(400, 'Invalid request');
+      return returnStatus(401, 'No user found for provided subject token value');
     }
 
     const user = userByToken.payload;
-    
-    if (_.isEmpty(user.impoersonated_by)) {
+
+    let userTokenData;
+    if (user?.tokens?.length > 0) {
+      const userTokens = user.tokens;
+      for (const token of userTokens) {
+        if (token.token === request.subject.token) {
+          userTokenData = token;
+          break;
+        }
+      }
+    }
+
+    if (_.isEmpty(userTokenData)) {
+      this.logger.error('Token missing in User Data!', { user });
+      return returnStatus(500, 'Token missing in User Data');
+    }
+  
+    if (_.isEmpty(userTokenData?.impersonated_by)) {
       return returnStatus(400, 'User is not impersonator');
     }
 
@@ -2435,26 +2496,45 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         filters: [{
           field: 'id',
           operation: Filter_Operation.eq,
-          value: user.impoersonated_by
+          value: userTokenData.impersonated_by
         }]
       }]
     }), context);
 
     if (_.isEmpty(impersonators) || impersonators?.total_count === 0) {
-      return returnStatus(404, `Impersonator with id ${user.impoersonated_by} does not exist`);
+      return returnStatus(404, `Impersonator with id ${userTokenData.impersonated_by} does not exist`);
     } else if (impersonators.total_count > 1) {
-      return returnStatus(400, `Invalid impersonator id, multiple users found for id ${user.impoersonated_by}`);
+      return returnStatus(400, `Invalid impersonator id, multiple users found for id ${userTokenData.impersonated_by}`);
     }
 
     const impersonator = impersonators.items[0].payload;
 
-    user.impoersonated_by = null;
+    let impersonatorACTokenData;
+    if (impersonator.tokens?.length > 0) {
+      const impersonatorTokens = impersonator.tokens;
+      for (const token of impersonatorTokens) {
+        if (token.type === 'AccessToken') {
+          impersonatorACTokenData = token;
+          break;
+        }
+      }
+    }
 
-    await super.update(UserList.fromPartial({
-      items: [user]
-    }), context);
+    if (_.isEmpty(impersonatorACTokenData)) {
+      return returnStatus(404, 'No valid access token for impersonator');
+    }
 
-    return { payload: impersonator, status: { code: 200, message: 'success' } };
+    await this.removeToken(user.id, [userTokenData]);
+
+    const responsePayload: AccessTokenData = {
+      'access_token' : impersonatorACTokenData.token,
+      'expires_in' : impersonatorACTokenData.expires_in,
+      'token_type': 'Bearer',
+      'scope': 'openid',
+      'token_name': impersonatorACTokenData.name
+    };
+
+    return { payload: responsePayload, status: { code: 200, message: 'success' } };
   }
 
   /**
