@@ -1,5 +1,5 @@
+import * as fs from 'node:fs';
 import * as _ from 'lodash-es';
-import * as uuid from 'uuid';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import {
   checkAccessRequest,
@@ -19,8 +19,8 @@ import {
 import { ResourcesAPIBase, ServiceBase, FilterValueType } from '@restorecommerce/resource-base-interface';
 import { Logger } from 'winston';
 import {
-  ACSAuthZ, authZ,
-  AuthZAction, cfg,
+  ACSAuthZ,
+  AuthZAction,
   DecisionResponse,
   HierarchicalScope,
   Operation,
@@ -28,7 +28,7 @@ import {
   ResolvedSubject,
   updateConfig
 } from '@restorecommerce/acs-client';
-import { createClient, RedisClientType } from 'redis';
+import { createClient as createRedisClient, RedisClientType } from 'redis';
 import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common.js';
 import { validateAllChar, validateEmail, validateFirstChar, validateStrLen, validateSymbolRepeat } from './validation.js';
 import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base.js';
@@ -107,42 +107,34 @@ import * as zxcvbnCommonPackage from '@zxcvbn-ts/language-common';
 import * as zxcvbnEnPackage from '@zxcvbn-ts/language-en';
 import * as zxcvbnDePackage from '@zxcvbn-ts/language-de';
 import { matcherPwnedFactory } from '@zxcvbn-ts/matcher-pwned';
-import fetch from 'node-fetch';
-
 import { authenticator } from 'otplib';
 import * as jose from 'jose';
-import crypto from 'node:crypto';
+import crypto, { randomUUID } from 'node:crypto';
+import { RenderRequestList, RenderResponseList } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rendering.js';
+import { Client, createChannel, GrpcClientConfig, createClient } from '@restorecommerce/grpc-client';
+import {
+  ObjectServiceDefinition,
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage.js';
 
 import { TokenService } from './token_service.js';
 
 export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
 export class UserService extends ServiceBase<UserListResponse, UserList> implements UserServiceImplementation {
-  db: Arango;
-  topics: any;
-  cfg: any;
-
-  layoutTpl: string;
-  registrationSubjectTpl: string;
-  registrationBodyTpl: string;
-
-  changePWEmailSubjectTpl: string;
-  changePWEmailBodyTpl: string;
-
-  invitationSubjectTpl: string;
-  invitationBodyTpl: string;
-
-  resetTotpSubjectTpl: string;
-  resetTotpBodyTpl: string;
-
+  protected readonly db: Arango;
+  protected readonly topics: any;
+  protected readonly cfg: any;
+  protected readonly templates: Record<string, any> = {};
   emailEnabled: boolean;
-  emailStyle: string;
-  roleService: RoleService;
-  authZ: ACSAuthZ;
-  redisClient: RedisClientType<any, any>;
-  authZCheck: boolean;
-  tokenRedisClient: RedisClientType<any, any>;
-  uniqueEmailConstraint: boolean;
+
+  protected readonly roleService: RoleService;
+  protected readonly authZ: ACSAuthZ;
+  protected readonly redisClient: RedisClientType<any, any>;
+  protected readonly authZCheck: boolean;
+  protected readonly tokenRedisClient: RedisClientType<any, any>;
+  protected readonly uniqueEmailConstraint: boolean;
+
+  ostorageService: Client<ObjectServiceDefinition>;
 
   tokenService: TokenService;
 
@@ -172,7 +164,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       'user',
       topics['user.resource'],
       logger,
-      new ResourcesAPIBase(db, 'users', resourceFieldConfig),
+      new ResourcesAPIBase(db, 'users', resourceFieldConfig, undefined, undefined, logger, 'user'),
       isEventsEnabled
     );
     this.cfg = cfg;
@@ -182,13 +174,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     this.authZ = authZ;
     const redisConfig = cfg.get('redis');
     redisConfig.database = cfg.get('redis:db-indexes:db-subject');
-    this.redisClient = createClient(redisConfig);
+    this.redisClient = createRedisClient(redisConfig);
     this.redisClient.on('error', (err) => logger.error('Redis client error in subject store', err));
     this.redisClient.connect().then((val) =>
       logger.info('Redis client connection successful for subject store')).catch(err => logger.error('Redis connection error', err));
     this.authZCheck = this.cfg.get('authorization:enabled');
     redisConfig.database = this.cfg.get('redis:db-indexes:db-findByToken') || 0;
-    this.tokenRedisClient = createClient(redisConfig);
+    this.tokenRedisClient = createRedisClient(redisConfig);
     this.tokenRedisClient.on('error', (err) => logger.error('Redis client error in token cache store', err));
     this.tokenRedisClient.connect().then((val) =>
       logger.info('Redis client connection successful for token cache store')).catch(err => logger.error('Redis connection error', err));
@@ -201,7 +193,27 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // if config is set to false in config
       this.uniqueEmailConstraint = false;
     }
+
+    const ostorage_cfg = cfg?.get('client:ostorage');
+    if (ostorage_cfg?.disabled?.toString() === 'true') {
+      logger?.info('Ostorage disabled!');
+    }
+    else if (ostorage_cfg) {
+      this.ostorageService = createClient(
+        {
+          ...ostorage_cfg,
+          logger
+        } as GrpcClientConfig,
+        ObjectServiceDefinition,
+        createChannel(ostorage_cfg.address),
+      );
+    }
+    else {
+      logger?.warn('ostorage config is missing!');
+    }
+
     this.initMatcher();
+    this.fetchHbsTemplates();
   }
 
   async stop(): Promise<void> {
@@ -919,7 +931,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                   value: user.id
                 }]
               }]
-            }), {});
+            }), {} as any);
             const dbUserPl = dbUser?.items?.[0]?.payload;
             dbUserRoleAssocs = dbUserPl?.role_associations ?? [];
           }
@@ -1479,7 +1491,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * Endpoint sendEmail to trigger sending mail notification.
    * @param  {any} renderResponse
    */
-  async sendEmail(renderResponse: any): Promise<void> {
+  async sendEmail(renderResponse: RenderResponseList): Promise<void> {
     const responseID: string = renderResponse?.id;
     if (!responseID?.startsWith('identity')) {
       this.logger.verbose(`Discarding render response ${responseID}`);
@@ -1514,14 +1526,18 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return;
     }
 
-    const responseBody = unmarshallProtobufAny(renderResponse?.responses[0], this.logger);
-    const responseSubject = unmarshallProtobufAny(renderResponse?.responses[1], this.logger);
-    const emailData = this.makeNotificationData(emailAddress, responseBody, responseSubject);
+    const body = renderResponse?.items?.reduce((a, b) => b?.payload?.bodies.find(body => body.id === 'body')?.body?.toString() ?? a, '');
+    const subject = renderResponse?.items?.reduce((a, b) => b?.payload?.bodies.find(body => body.id === 'subject')?.body?.toString() ?? a, '');
+    const emailData = this.makeNotificationData(
+      emailAddress, 
+      body,
+      subject,
+    );
     await this.topics?.notificationReq?.emit('sendEmail', emailData);
   }
 
   private idGen(): string {
-    return uuid.v4().replace(/-/g, '');
+    return randomUUID().replace(/-/g, '');
   }
 
   // validUsername validates user names using regular expressions
@@ -2002,7 +2018,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         if (!user.id) {
           // return returnStatus(400, 'Subject identifier missing for update operation');
           updateWithStatus.items.push(returnStatus(400, 'Subject identifier missing for update operation'));
-          items = _.filter(items, (item) => item.id) as User[];
+          items = items?.filter((item) => item.id);
           continue;
         }
         const filters = [{
@@ -2015,7 +2031,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         const users = await super.read(ReadRequest.fromPartial({ filters }), context);
         if (users.total_count === 0) {
           updateWithStatus.items.push(returnStatus(404, 'user not found for update', user.id));
-          items = _.filter(items, (item) => item.id !== user.id);
+          items = items?.filter((item) => item.id !== user.id);
           continue;
         }
         const dbUser = users.items[0].payload;
@@ -2025,7 +2041,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           const users = await super.read(ReadRequest.fromPartial({ filters }), context);
           if (users.total_count > 0) {
             updateWithStatus.items.push(returnStatus(409, `User name ${user.name} already exists`, user.id));
-            items = _.filter(items, (item) => item.name !== user.name);
+            items = items?.filter((item) => item.name !== user.name);
             continue;
           }
         }
@@ -2049,13 +2065,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
             // return returnStatus(err.code, err.message);
             updateWithStatus.items.push(returnStatus(err.code, err.message, user.id));
-            items = _.filter(items, (item) => item.id !== user.id);
+            items = items?.filter((item) => item.id !== user.id);
             continue;
           }
           if (acsResponse.decision != Response_Decision.PERMIT) {
             // return returnStatus(acsResponse.response.status.code, acsResponse.response.status.message);
             updateWithStatus.items.push(returnStatus(acsResponse.operation_status.code, acsResponse.operation_status.message, user.id));
-            items = _.filter(items, (item) => item.id !== user.id);
+            items = items?.filter((item) => item.id !== user.id);
             continue;
           }
         }
@@ -2423,7 +2439,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     const at = generateAT();
     const expiresIn = new Date(Date.now() + 86400 * 1000); // TODO: how long actually?
-    const tokenName = uuid.v4().replace(/-/g, '');
+    const tokenName = randomUUID().replace(/-/g, '');
 
     const tokenUpsertResponse = await this.tokenService.upsert({
       id: user.id,
@@ -2670,7 +2686,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.DELETE,
         Operation.isAllowed);
     } catch (err: any) {
-      this.logger.error('Error occurred requesting access-control-srv unregistering user', { code: err.code, message: err.message, stack: err.stack });
+      const { code, message, stack } = err;
+      this.logger.error('Error occurred requesting access-control-srv unregistering user', { code, message, stack });
       return returnOperationStatus(err.code, err.message);
     }
     if (acsResponse.decision != Response_Decision.PERMIT) {
@@ -2902,73 +2919,89 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
   }
 
-  private setAuthenticationHeaders(token: string) {
-    return {
-      Authorization: `Bearer ${token}`
-    };
+  protected async fetchFile(url: string, subject?: Subject): Promise<string> {
+    this.logger.debug('Fetching file:', url);
+    if (url?.startsWith('file://')) {
+      return fs.readFileSync(url.slice(7))?.toString();
+    }
+    else if (url?.startsWith('http')) {
+      return fetch(
+        url,
+        subject?.token ? {
+          headers: {
+            Authorization: `Bearer ${subject.token}`
+          }
+        } : undefined
+      ).then(
+        resp => {
+          if (resp.status !== 200) {
+            throw new class extends Error {
+              public code = resp.status;
+            }(resp.statusText);
+          }
+          return resp.text();
+        }
+      )
+    }
+    else if (this.ostorageService && url?.startsWith('//')) {
+      const splits = url.match(/[^/]+/g);
+      const bucket = splits[0];
+      const key = splits.slice(1).join('/');
+      const buffer = new Array<Buffer>();
+      for await(const chunk of this.ostorageService.get({
+        bucket,
+        key,
+        download: true,
+        subject,
+      })) {
+        if (chunk.response?.status?.code !== 200) {
+          throw new class extends Error {
+            id = chunk.response?.status?.id;
+            code = chunk.response?.status?.code;
+          }(chunk.response?.status?.message);
+        }
+        buffer.push(chunk.response.payload.object);
+      }
+      return Buffer.concat(buffer)?.toString();
+    }
+    else {
+      throw new Error(`Protocol of ${url} not supported!`);
+    }
   }
 
   // Initializes useful data for rendering requests
   // before sending emails (user registration / change).
-  async fetchHbsTemplates(): Promise<any> {
-    const hbsTemplates = this.cfg.get('service:hbs_templates');
-    const enableEmail = this.cfg.get('service:enableEmail');
+  async fetchHbsTemplates(): Promise<void> {
+    try {
+      const hbsTemplates = this.cfg.get('service:hbs_templates');
+      const enableEmail = this.cfg.get('service:enableEmail');
+      const hbsUser = this.cfg.get('techUsers:hbs_user');
 
-    if (!_.isEmpty(hbsTemplates) && enableEmail) {
-      let response: any;
-      try {
-        const techUsersCfg = this.cfg.get('techUsers');
-        let headers;
-        if (techUsersCfg?.length > 0) {
-          const hbsUser = _.find(techUsersCfg, { id: 'hbs_user' });
-          if (hbsUser) {
-            headers = this.setAuthenticationHeaders(hbsUser.token);
-          }
-        }
-        response = await fetch(hbsTemplates.registrationSubjectTpl, { headers });
-        this.registrationSubjectTpl = await response.text();
-
-        response = await fetch(hbsTemplates.registrationBodyTpl, { headers });
-        this.registrationBodyTpl = await response.text();
-
-        response = await fetch(hbsTemplates.changePWEmailSubjectTpl, { headers });
-        this.changePWEmailSubjectTpl = await response.text();
-
-        response = await fetch(hbsTemplates.changePWEmailBodyTpl, { headers });
-        this.changePWEmailBodyTpl = await response.text();
-
-        response = await fetch(hbsTemplates.invitationSubjectTpl, { headers });
-        this.invitationSubjectTpl = await response.text();
-
-        response = await fetch(hbsTemplates.invitationBodyTpl, { headers });
-        this.invitationBodyTpl = await response.text();
-
-        response = await fetch(hbsTemplates.layoutTpl, { headers });
-        this.layoutTpl = await response.text();
-
-        response = await fetch(hbsTemplates.resetTotpSubjectTpl, { headers });
-        this.resetTotpSubjectTpl = await response.text();
-
-        response = await fetch(hbsTemplates.resetTotpBodyTpl, { headers });
-        this.resetTotpBodyTpl = await response.text();
-
-        response = await fetch(hbsTemplates.resourcesTpl, { headers });
-        if (response.status == 200) {
-          const externalRrc = JSON.parse(await response.text());
-          this.emailStyle = externalRrc.styleURL;
-        }
-
+      if (hbsTemplates && enableEmail) {
+        await Promise.all(
+          Object.entries<string>(hbsTemplates ?? {}).map(
+            async ([k, v]) => {
+              if (v?.endsWith('.json')) {
+                this.templates[k] ??= JSON.parse(await this.fetchFile(v, hbsUser));
+              }
+              else {
+                this.templates[k] ??= await this.fetchFile(v, hbsUser)
+              }
+            }
+          )
+        );
         this.emailEnabled = true;
-      } catch (err: any) {
-        if (err.code == 'ECONNREFUSED' || err.message == 'ECONNREFUSED') {
-          this.logger.error('An error occurred while attempting to load email templates from'
-            + ' remote server. Email operations will be disabled.');
-        } else {
-          this.logger.error('Unexpected error occurred while loading email templates', { code: err.code, message: err.message, stack: err.stack });
-        }
+      } else {
+        this.logger.info('Email sending is disabled');
       }
-    } else {
-      this.logger.info('Email sending is disabled');
+    } catch (err: any) {
+      if (err.code == 'ECONNREFUSED' || err.message == 'ECONNREFUSED') {
+        this.logger.error('An error occurred while attempting to load email templates from'
+          + ' remote server. Email operations will be disabled.');
+      } else {
+        const { code, message, stack } = err;
+        this.logger.error('Unexpected error occurred while loading email templates', { code, message, stack });
+      }
     }
   }
 
@@ -2984,10 +3017,12 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     // since there are no place holders in subject
     const dataSubject = { userName: user.name };
 
-    const emailBody = this.registrationBodyTpl;
-    const emailSubject = this.registrationSubjectTpl;
-    return this.makeRenderRequestMsg(user, emailSubject, emailBody,
-      dataBody, dataSubject);
+    const emailBody = this.templates.registrationBodyTpl;
+    const emailSubject = this.templates.registrationSubjectTpl;
+    return this.makeRenderRequestMsg(
+      user, emailSubject, emailBody,
+      dataBody, dataSubject
+    );
   }
 
   private makeInvitationEmailData(user: User): any {
@@ -3010,15 +3045,24 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       invitedByUserLastName: user.invited_by_user_last_name
     };
 
-    const emailBody = this.invitationBodyTpl;
-    const emailSubject = this.invitationSubjectTpl;
-    return this.makeRenderRequestMsg(user, emailSubject, emailBody,
-      dataBody, dataSubject);
+    const emailBody = this.templates.invitationBodyTpl;
+    const emailSubject = this.templates.invitationSubjectTpl;
+    return this.makeRenderRequestMsg(
+      user,
+      emailSubject,
+      emailBody,
+      dataBody, dataSubject
+    );
   }
 
-  private makeConfirmationData(user: DeepPartial<User>, passwordChange: boolean, identifier: string, email?: string): any {
-    const emailBody = this.changePWEmailBodyTpl;
-    const emailSubject = this.changePWEmailSubjectTpl;
+  private makeConfirmationData(
+    user: User,
+    passwordChange: boolean,
+    identifier: string,
+    email?: string
+  ): RenderRequestList {
+    const emailBody = this.templates.changePWEmailBodyTpl;
+    const emailSubject = this.templates.changePWEmailSubjectTpl;
 
     let URL: string = passwordChange ? this.cfg.get('service:passwordChangeConfirmationURL')
       : this.cfg.get('service:emailConfirmationURL'); // prefix
@@ -3031,13 +3075,31 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       passwordChange
     };
     const dataSubject = { passwordChange };
-    return this.makeRenderRequestMsg(user, emailSubject, emailBody,
-      dataBody, dataSubject, email);
+    return this.makeRenderRequestMsg(
+      user,
+      emailSubject,
+      emailBody,
+      dataBody,
+      dataSubject,
+      email
+    );
   }
 
-  private makeRenderRequestMsg(user: DeepPartial<User>, subject: any, body: any,
-    dataBody: any, dataSubject: any, email?: string): any {
+  private makeRenderRequestMsg(
+    user: User,
+    subject: any,
+    body: any,
+    dataBody: any,
+    dataSubject: any,
+    email?: string
+  ): RenderRequestList {
     const userEmail = email ? email : user.email;
+    if (!body) {
+      throw new Error('Template for E-Mail body is undefined!');
+    }
+    else if (!subject) {
+      throw new Error('Template for E-Mail subject is undefined!');
+    }
 
     // add optional data if it is provided in the configuration
     // in the field "data"
@@ -3048,22 +3110,19 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
     return {
       id: `identity#${userEmail}`,
-      payloads: [{
-        templates: marshallProtobufAny({
-          body: { body, layout: this.layoutTpl },
-        }),
+      items: [{
+        templates: [{
+          id: 'body',
+          body: Buffer.from(body),
+          layout: this.templates.layoutTpl && Buffer.from(this.templates.layoutTpl)
+        },{
+          id: 'subject',
+          body: Buffer.from(subject),
+        }],
         data: marshallProtobufAny(dataBody),
-        style_url: this.emailStyle, // URL to a style
+        style_url: this.templates.resourceTpl?.styleURL, // URL to a style
         options: marshallProtobufAny({ texts: {} }),
         content_type: 'application/html'
-      },
-      {
-        templates: marshallProtobufAny({
-          subject: { body: subject }
-        }),
-        data: marshallProtobufAny(dataSubject),
-        options: marshallProtobufAny({ texts: {} }),
-        content_type: 'application/text'
       }]
     };
   }
@@ -3154,14 +3213,17 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     return roleID;
   }
 
-  private makeNotificationData(emailAddress: string, responseBody: any,
-    responseSubject: any): any {
+  private makeNotificationData(
+    emailAddress: string,
+    body: string,
+    subject: string
+  ): any {
     return {
       email: {
         to: emailAddress.split(',')
       },
-      body: responseBody.body,
-      subject: responseSubject.subject,
+      body,
+      subject,
       transport: 'email'
     };
   }
@@ -3205,7 +3267,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     const setDefaultMeta = (resource: T) => {
       if (!resource.id?.length) {
-        resource.id = uuid.v4().replace(/-/g, '');
+        resource.id = randomUUID().replace(/-/g, '');
       }
 
       if (!resource.meta) {
@@ -3676,16 +3738,20 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   }
 
   private makeTOTPResetData(user: DeepPartial<User>, totpCode: string): any {
-    const emailBody = this.resetTotpBodyTpl;
-    const emailSubject = this.resetTotpSubjectTpl;
+    const emailBody = this.templates.resetTotpBodyTpl;
+    const emailSubject = this.templates.resetTotpSubjectTpl;
 
     const dataBody = {
       firstName: user.first_name,
       lastName: user.last_name,
       totpCode,
     };
-    return this.makeRenderRequestMsg(user, emailSubject, emailBody,
-      dataBody, {}, user.email);
+    return this.makeRenderRequestMsg(
+      user,
+      emailSubject,
+      emailBody,
+      dataBody, {}, user.email
+    );
   }
 
   async mfaStatus(request: MfaStatusRequest, context: any): Promise<DeepPartial<MfaStatusResponse>> {
@@ -3764,7 +3830,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
     super('role', roleTopic as any, logger, new ResourcesAPIBase(db, 'roles', resourceFieldConfig), isEventsEnabled);
     const redisConfig = cfg.get('redis');
     redisConfig.database = cfg.get('redis:db-indexes:db-subject');
-    this.redisClient = createClient(redisConfig);
+    this.redisClient = createRedisClient(redisConfig);
     this.redisClient.on('error', (err) => logger.error('Redis client error in subject store', err));
     this.redisClient.connect().then((val) =>
       logger.info('Redis client connection successful for subject store')).catch(err => logger.error('Redis connection error', err));
@@ -4035,7 +4101,7 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
 
     const setDefaultMeta = (resource: T) => {
       if (!resource.id?.length) {
-        resource.id = uuid.v4().replace(/-/g, '');
+        resource.id = randomUUID().replace(/-/g, '');
       }
 
       if (!resource.meta) {

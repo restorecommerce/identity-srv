@@ -2,7 +2,6 @@ import { Logger } from 'winston';
 import { OAuth2 } from 'oauth';
 import { UserService } from './service.js';
 import * as _ from 'lodash-es';
-import * as uuid from 'uuid';
 import * as jose from 'jose';
 import {
   DeepPartial,
@@ -22,6 +21,7 @@ import {
   ReadRequest
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 import fetch from 'node-fetch';
+import { randomUUID } from 'crypto';
 
 export const accountResolvers: { [key: string]: (access_token: string) => Promise<string> } = {
   google: async access_token => {
@@ -166,7 +166,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         .encode();
 
       const authToken: any = {
-        name: uuid.v4().replace(/-/g, ''),
+        name: randomUUID().replace(/-/g, ''),
         expires_in: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30 * 6), // 6 months
         token,
         type: 'access_token',

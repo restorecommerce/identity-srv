@@ -1,9 +1,7 @@
 import * as _ from 'lodash-es';
-import { Logger } from 'winston';
 import { ACSAuthZ, AuthZAction, DecisionResponse, Operation, PolicySetRQResponse } from '@restorecommerce/acs-client';
 import { checkAccessRequest, createMetadata } from './utils.js';
 import { UserService } from './service.js';
-import * as uuid from 'uuid';
 import {
   DeepPartial, GrantId,
   Identifier,
@@ -19,6 +17,7 @@ import {
   Response_Decision
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 import { Filter_Operation, ReadRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
+import { randomUUID } from 'crypto';
 
 const unmarshallProtobufAny = (msg: Any): any => JSON.parse(msg.value.toString());
 
@@ -76,7 +75,7 @@ export class TokenService implements TokenServiceImplementation {
         if (payload.claims?.token_name) {
           token_name = payload.claims.token_name;
         } else {
-          token_name = uuid.v4().replace(/-/g, '');
+          token_name = randomUUID().replace(/-/g, '');
         }
         const token = {
           name: token_name,

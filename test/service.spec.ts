@@ -27,7 +27,6 @@ import {
   TokenServiceDefinition
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/token.js';
 import { authenticator } from 'otplib';
-import { unmarshallProtobufAny } from "../src/utils.js";
 import { it, describe, beforeAll, afterAll } from 'vitest';
 
 /*
@@ -36,7 +35,6 @@ import { it, describe, beforeAll, afterAll } from 'vitest';
 
 let cfg: any;
 let worker: Worker;
-let client: any;
 let logger: any;
 let redisClient: RedisClientType;
 let tokenRedisClient: RedisClientType;
@@ -48,7 +46,7 @@ let roleService: RoleServiceClient;
 
 /* eslint-disable */
 async function start(): Promise<void> {
-  cfg = createServiceConfig(process.cwd() + '/test');
+  cfg = createServiceConfig(process.cwd());
   worker = new Worker(cfg);
   await worker.start();
 }
@@ -279,7 +277,7 @@ const proto: any = ProtoUtils.getProtoFromPkgDefinition(
   pkgDef
 );
 
-const mockServer = new GrpcMockServer('localhost:50061');
+const mockServer = new GrpcMockServer('localhost:50161');
 
 const startGrpcMockServer = async (methodWithOutput: MethodWithOutput[]) => {
   // create mock implementation based on the method name and output
@@ -342,7 +340,7 @@ describe('testing identity-srv', () => {
 
   afterAll(async function stopServer(): Promise<void> {
     // delete user and roles collection
-    const userService: UserServiceClient = await connect('client:user', 'user');
+    // const userService: UserServiceClient = await connect('client:user', 'user');
     // await userService.delete({
     //   collection: true
     // });
@@ -396,6 +394,7 @@ describe('testing identity-srv', () => {
         should.exist(result!.operation_status);
         result!.items!.should.have.length(4);
         // validate overall status
+        console.log(result!.operation_status);
         result!.operation_status!.code!.should.equal(200);
         result!.operation_status!.message!.should.equal('success');
         // validate individual status
@@ -1791,7 +1790,7 @@ describe('testing identity-srv', () => {
           setupResult.operation_status!.code!.should.equal(200);
           setupResult.operation_status!.message!.should.equal('success');
 
-          totpSecret = setupResult.totp_secret;
+          totpSecret = setupResult.totp_secret!;
         });
 
         it('should confirm totp secret', async () => {
@@ -1845,7 +1844,7 @@ describe('testing identity-srv', () => {
           setupResult.operation_status!.code!.should.equal(200);
           setupResult.operation_status!.message!.should.equal('success');
 
-          totpBackup = setupResult.backup_codes;
+          totpBackup = setupResult.backup_codes!;
         });
 
         it('should login using totp backup code', async () => {
@@ -1933,8 +1932,8 @@ describe('testing identity-srv', () => {
           should.exist(setupResult);
           setupResult.operation_status!.code!.should.equal(200);
           setupResult.operation_status!.message!.should.equal('success');
-          setupResult.has_totp.should.equal(true);
-          setupResult.has_backup_codes.should.equal(true);
+          setupResult.has_totp!.should.equal(true);
+          setupResult.has_backup_codes!.should.equal(true);
         });
       })
 
