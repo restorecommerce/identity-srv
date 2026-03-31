@@ -13,6 +13,8 @@ import {
   returnCodeMessage,
   returnOperationStatus,
   returnStatus,
+  unmarshallProtobufAny,
+  generateAT
 } from './utils.js';
 import { ResourcesAPIBase, ServiceBase, FilterValueType } from '@restorecommerce/resource-base-interface';
 import { Logger } from 'winston';
@@ -66,7 +68,12 @@ import {
   CreateBackupTOTPCodesResponse,
   ResetTOTPRequest,
   MfaStatusRequest,
-  MfaStatusResponse
+  MfaStatusResponse,
+  ImpersonateRequest,
+  EndImpersonationRequest,
+  AccessTokenData,
+  ImpersonateResponse,
+  EndImpersonateResponse
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   Role,
@@ -109,6 +116,8 @@ import {
   ObjectServiceDefinition,
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage.js';
 
+import { TokenService } from './token_service.js';
+
 export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
 export class UserService extends ServiceBase<UserListResponse, UserList> implements UserServiceImplementation {
@@ -126,6 +135,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   protected readonly uniqueEmailConstraint: boolean;
 
   ostorageService: Client<ObjectServiceDefinition>;
+
+  tokenService: TokenService;
 
   constructor(
     cfg: any,
@@ -2359,6 +2370,204 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       upsertWithStatus.total_count = upsertWithStatus?.items?.length;
       return upsertWithStatus;
     }
+  }
+
+  /**
+   * Endpoint allows a user to switch his identity to another user's.
+   */
+  async impersonate(request: ImpersonateRequest, context: any): Promise<DeepPartial<ImpersonateResponse>> {
+
+    if (_.isEmpty(request) || _.isEmpty(request.identifier) || _.isEmpty(request.subject) || _.isEmpty(request.subject.token))
+    {
+      return returnStatus(400, 'Invalid request');
+    }
+
+    const impersonatorByToken = await this.findByToken({ token: request.subject.token }, context);
+
+    if (!impersonatorByToken?.payload) {
+      return returnStatus(401, 'No user found for provided subject token value');
+    }
+
+    const impersonator = impersonatorByToken.payload;
+    request.subject.id = impersonator.id;
+    const subject = request.subject;
+    
+    const identifier = request.identifier;
+
+    const filters = getDefaultFilter(identifier);
+    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+    if (_.isEmpty(users) || users.total_count === 0) {
+      return returnStatus(404, 'user does not exist');
+    } else if (users.total_count > 1) {
+      return returnStatus(400, `Invalid identifier provided for impersonate, multiple users found for identifier ${identifier}`);
+    }
+
+    const user = users.items[0].payload;
+
+    if (user.id === subject.id) {
+      return returnStatus(400, 'Invalid request');
+    }
+
+    let acsResponse: DecisionResponse;
+    
+    const acsResources = await this.createMetadata(user, AuthZAction.MODIFY, subject);
+
+    try {
+      if (!context) { context = {}; };
+      context.subject = subject;
+      context.resources = acsResources;
+      acsResponse = await checkAccessRequest(context, [{ resource: 'user', id: acsResources.map(e => e.id) }], AuthZAction.MODIFY,
+        Operation.whatIsAllowed);
+    } catch (err: any) {
+      this.logger.error('Error occurred requesting access-control-srv for update', { code: err.code, message: err.message, stack: err.stack });
+      return returnStatus(err.code, err.message);
+    }
+    if (acsResponse.decision != Response_Decision.PERMIT) {
+      return returnStatus(acsResponse.operation_status.code, acsResponse.operation_status.message);
+    }
+
+    const obfuscateAuthNErrorReason = this.cfg.get('obfuscateAuthNErrorReason') ?
+      this.cfg.get('obfuscateAuthNErrorReason') : false;
+
+    if (!user.active) {
+      if (obfuscateAuthNErrorReason) {
+        return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist', user.id);
+      } else {
+        return returnStatus(412, 'user is inactive', user.id);
+      }
+    }
+
+    const at = generateAT();
+    const expiresIn = new Date(Date.now() + 86400 * 1000); // TODO: how long actually?
+    const tokenName = randomUUID().replace(/-/g, '');
+
+    const tokenUpsertResponse = await this.tokenService.upsert({
+      id: user.id,
+      type: 'AccessToken',
+      expires_in: expiresIn,
+      payload: {
+        value: Buffer.from(
+          JSON.stringify({
+            jti: at,
+            accountId: user.id,
+            clientId: user.default_scope,
+            claims: {
+              token_name: tokenName
+            },
+            impersonatedBy: subject.id
+          })
+        )
+      }
+    }, context);
+
+    const tokenUpsertResponseObj = unmarshallProtobufAny(tokenUpsertResponse, this.logger);
+
+    if (tokenUpsertResponseObj.status.code !== 200) {
+      return returnStatus(tokenUpsertResponseObj.status.code, tokenUpsertResponseObj.status.message);
+    }
+
+    const responsePayload: AccessTokenData = {
+      'access_token' : at,
+      'expires_in' : expiresIn,
+      'token_type': 'Bearer',
+      'scope': 'openid',
+      'token_name': tokenName
+    };
+
+    return { payload: responsePayload, status: { code: 200, message: 'success' } };
+  }
+
+  /**
+   * Endpoint allows a user to end impersonation.
+   */
+  async endImpersonation(request: EndImpersonationRequest, context: any): Promise<DeepPartial<EndImpersonateResponse>> {
+
+    if (_.isEmpty(request) || _.isEmpty(request.subject) || _.isEmpty(request.subject.token))
+    {
+      return returnStatus(400, 'Invalid request');
+    }
+
+    const userByToken = await this.findByToken({ token: request.subject.token }, context);
+
+    if (!userByToken?.payload) {
+      return returnStatus(401, 'No user found for provided subject token value');
+    }
+
+    const user = userByToken.payload;
+
+    let userTokenData;
+    if (user?.tokens?.length > 0) {
+      const userTokens = user.tokens;
+      for (const token of userTokens) {
+        if (token.token === request.subject.token) {
+          userTokenData = token;
+          break;
+        }
+      }
+    }
+
+    if (_.isEmpty(userTokenData)) {
+      this.logger.error('Token missing in User Data!', { user });
+      return returnStatus(500, 'Token missing in User Data');
+    }
+  
+    if (_.isEmpty(userTokenData?.impersonated_by)) {
+      return returnStatus(400, 'User is not impersonator');
+    }
+
+    const impersonators = await super.read(ReadRequest.fromPartial({
+      filters: [{
+        filters: [{
+          field: 'id',
+          operation: Filter_Operation.eq,
+          value: userTokenData.impersonated_by
+        }]
+      }]
+    }), context);
+
+    if (_.isEmpty(impersonators) || impersonators?.total_count === 0) {
+      return returnStatus(404, `Impersonator with id ${userTokenData.impersonated_by} does not exist`);
+    } else if (impersonators.total_count > 1) {
+      return returnStatus(400, `Invalid impersonator id, multiple users found for id ${userTokenData.impersonated_by}`);
+    }
+
+    const impersonator = impersonators.items[0].payload;
+
+    let impersonatorACTokenData;
+    if (impersonator.tokens?.length > 0) {
+      const impersonatorTokens = impersonator.tokens;
+      for (const token of impersonatorTokens) {
+        if (token.type === 'AccessToken') {
+          impersonatorACTokenData = token;
+          break;
+        }
+      }
+    }
+
+    if (_.isEmpty(impersonatorACTokenData)) {
+      return returnStatus(404, 'No valid access token for impersonator');
+    }
+
+    await this.removeToken(user.id, user?.tokens?.filter((obj) => {
+      if (obj.token === request.subject.token) {
+        // since AQL is used to remove object - convert DateObject to time in ms
+        (obj as any).expires_in = obj.expires_in ? obj.expires_in.getTime() : undefined;
+        (obj as any).last_login = obj.last_login ? obj.last_login.getTime() : undefined;
+        return obj;
+      }
+    }));
+
+    await this.tokenRedisClient.del(request.subject.token);
+
+    const responsePayload: AccessTokenData = {
+      'access_token' : impersonatorACTokenData.token,
+      'expires_in' : impersonatorACTokenData.expires_in,
+      'token_type': 'Bearer',
+      'scope': 'openid',
+      'token_name': impersonatorACTokenData.name
+    };
+
+    return { payload: responsePayload, status: { code: 200, message: 'success' } };
   }
 
   /**

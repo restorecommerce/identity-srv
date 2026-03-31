@@ -165,6 +165,55 @@ const permitUserRoleRule: Rule = {
   effect: Effect.PERMIT
 };
 
+const permitReadOnlyUser: Rule[] = [
+  {
+    id: 'permit_user_read_role_id',
+    target: {
+      actions: [{
+        id: 'urn:oasis:names:tc:xacml:1.0:action:action-id',
+        value: 'urn:restorecommerce:acs:names:action:read'
+      }],
+      resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:user.User', attributes: [] }],
+      subjects: [
+        {
+          id: 'urn:restorecommerce:acs:names:role',
+          value: 'user-readonly-r-id',
+          attributes: []
+        },
+        {
+          id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+          value: 'urn:restorecommerce:acs:model:organization.Organization',
+          attributes: []
+        }
+      ]
+    },
+    effect: Effect.PERMIT
+  },
+  {
+    id: 'deny_user_modify_role_id',
+    target: {
+      actions: [{
+        id: 'urn:oasis:names:tc:xacml:1.0:action:action-id',
+        value: 'urn:restorecommerce:acs:names:action:modify'
+      }],
+      resources: [{ id: 'urn:restorecommerce:acs:names:model:entity', value: 'urn:restorecommerce:acs:model:user.User', attributes: [] }],
+      subjects: [
+        {
+          id: 'urn:restorecommerce:acs:names:role',
+          value: 'user-readonly-r-id',
+          attributes: []
+        },
+        {
+          id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+          value: 'urn:restorecommerce:acs:model:organization.Organization',
+          attributes: []
+        }
+      ]
+    },
+    effect: Effect.DENY
+  }
+];
+
 let userRolePolicySetRQ = {
   policy_sets:
     [{
@@ -328,6 +377,13 @@ describe('testing identity-srv', () => {
             description: 'Normal user',
             meta,
             assignable_by_roles: ['admin-r-id']
+          },
+          {
+            id: 'user-readonly-r-id',
+            name: 'read_only_user',
+            description: 'Read only user',
+            meta,
+            assignable_by_roles: ['admin-r-id']
           }];
 
         const result = await roleService.create({
@@ -336,7 +392,7 @@ describe('testing identity-srv', () => {
         should.exist(result);
         should.exist(result!.items);
         should.exist(result!.operation_status);
-        result!.items!.should.have.length(3);
+        result!.items!.should.have.length(4);
         // validate overall status
         console.log(result!.operation_status);
         result!.operation_status!.code!.should.equal(200);
@@ -391,8 +447,10 @@ describe('testing identity-srv', () => {
           registerResult.status!.code!.should.equal(200);
           registerResult.status!.message!.should.equal('success');
           userRolePolicySetRQ.policy_sets![0]!.policies![0]!.rules![0] = permitUserRule;
+          userRolePolicySetRQ.policy_sets![0]!.policies![0]!.rules![1] = permitReadOnlyUser[0];
+          userRolePolicySetRQ.policy_sets![0]!.policies![0]!.rules![2] = permitReadOnlyUser[1];
           userRolePolicySetRQ.policy_sets![0]!.policies!![1]!.rules![0] = permitRoleRule;
-          userRolePolicySetRQ.policy_sets![0]!.policies!![1]!.rules![1] = permitUserRoleRule;
+          userRolePolicySetRQ.policy_sets![0]!.policies!![1]!.rules![1] = permitUserRoleRule;          
           // start mock acs-srv - needed for read operation since acs-client makes a req to acs-srv
           // to get applicable policies although acs-lookup is disabled
           await startGrpcMockServer([{ method: 'WhatIsAllowed', output: userRolePolicySetRQ },
@@ -1071,6 +1129,274 @@ describe('testing identity-srv', () => {
           result!.status!.code!.should.equal(401);
           result!.status!.message!.should.equal('password does not match');
         });
+      });
+
+      describe('impersonate', function impersonate(): void {
+
+        const impOrg = 'orgA';
+
+        let expires_in = new Date(); 
+        expires_in.setDate(expires_in.getDate() + 1);
+
+        const impersTestUser: any = {
+          id: 'testuserimp',
+          name: 'test.userimp',
+          first_name: 'testimp',
+          last_name: 'userimp',
+          password: 'CNQJrH%KAayeDpf3h',
+          email: 'testimp@restorecommerce.io',
+          role_associations: [{
+            role: 'user-r-id',
+            attributes: [{
+              id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+              value: 'urn:restorecommerce:acs:model:organization.Organization',
+              attributes: [{
+                id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                value: impOrg
+              }]
+            }]
+          }],
+          active: true,
+          token: 'testuserimp-token',
+          tokens: [{
+            token: 'testuserimp-token',
+            expires_in: expires_in,
+            client_id: 'bmslsa',
+            type: 'AccessToken'
+          }],
+          scope: impOrg,
+          default_scope: 'bmslsa'
+        };
+
+        const readOnlyUser = {
+          id: 'testusereadonly',
+          name: 'test.userimpro',
+          first_name: 'testimpro',
+          last_name: 'userimpro',
+          password: 'CNQJrH%KAayeDpf3h',
+          email: 'testimpro@restorecommerce.io',
+          role_associations: [
+            {
+              role: 'user-readonly-r-id',
+              attributes: [{
+                id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+                value: 'urn:restorecommerce:acs:model:organization.Organization',
+                attributes: [{
+                  id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                  value: impOrg
+                }]
+              }]
+            }
+          ],
+          active: true,
+          token: 'testusereadonly-token',
+          tokens: [{
+            token: 'testusereadonly-token',
+            expires_in: expires_in,
+            client_id: 'bmslsa',
+            type: 'AccessToken'
+          }],
+          scope: impOrg,
+          default_scope: 'bmslsa'
+        };
+
+        const subject = {
+          id: 'admin_user_id',
+          scope: impOrg,
+          token: 'admin-token'
+        };
+
+        const adminUserResolve = {
+          id: subject.id,
+          scope: impOrg,
+          token: subject.token,
+          tokens: [{
+            token: subject.token,
+            expires_in: expires_in,
+            scopes: [impOrg],
+            client_id: 'bmslsa',
+            type: 'AccessToken'
+          }],
+          role_associations: [
+            {
+              role: 'admin-r-id',
+              attributes: [{
+                id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+                value: 'urn:restorecommerce:acs:model:organization.Organization',
+                attributes: [{
+                  id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                  value: 'mainOrg'
+                }]
+              }]
+            }
+          ],
+          hierarchical_scopes: [
+            {
+              id: 'mainOrg',
+              role: 'admin-r-id',
+              children: [{
+                id: impOrg,
+                children: []
+              }]
+            }
+          ]
+        };
+
+        const adminUser = {
+          id: adminUserResolve.id,
+          name: 'test.userimpamd',
+          first_name: 'testimpamd',
+          last_name: 'userimpamd',
+          password: 'CNQJrH%KAayeDpf3h',
+          email: 'testimpamd@restorecommerce.io',
+          role_associations: adminUserResolve.role_associations,
+          active: true,
+          token: adminUserResolve.token,
+          tokens: adminUserResolve.tokens,
+          hierarchical_scopes: adminUserResolve.hierarchical_scopes,
+          scope: impOrg
+        };
+
+        let tokenService: TokenServiceClient;
+
+        let newACToken: any;
+
+        const hrScopeskeyAdm = `cache:${adminUserResolve.id}:${adminUserResolve.token}:hrScopes`;
+        const subjectKeyAdm = `cache:${adminUserResolve.id}:subject`;
+        
+        beforeAll(async () => {
+          const redisConfig = cfg.get('redis');
+          redisConfig.database = cfg.get('redis:db-indexes:db-subject') || 0;
+          redisClient = RedisCreateClient(redisConfig);
+          redisClient.on('error', (err) => logger.error('Redis Client Error', err));
+          await redisClient.connect();
+          redisConfig.database = cfg.get('redis:db-indexes:db-findByToken') || 0;
+          tokenRedisClient = RedisCreateClient(redisConfig);
+          tokenRedisClient.on('error', (err) => logger.error('Redis client error in token cache store', err));
+          await tokenRedisClient.connect();
+
+          await redisClient.set(subjectKeyAdm, JSON.stringify(adminUserResolve));
+          await redisClient.set(hrScopeskeyAdm, JSON.stringify(adminUserResolve.hierarchical_scopes));
+          await tokenRedisClient.set(adminUserResolve.token, JSON.stringify(adminUserResolve));
+
+          const createResult = await userService.create({ items: [adminUser], subject });
+          should.exist(createResult!.items![0]!.payload);
+          should.exist(createResult!.items![0]!.payload!.name);
+
+          tokenService = await connect<TokenServiceClient>('client:token', 'token');
+        });
+        afterAll(async () => {
+          await redisClient.del(subjectKeyAdm);
+          await redisClient.del(hrScopeskeyAdm);
+          await tokenRedisClient.del(adminUserResolve.token);
+
+          await userService.unregister({ identifier: adminUser.name });
+        });
+
+        it('should return an error because of insufficient acs', async function impersonate(): Promise<void> {
+
+          const createResult1 = await userService.create({ items: [impersTestUser], subject });
+          should.exist(createResult1!.items![0]!.payload);
+          should.exist(createResult1!.items![0]!.payload!.name);
+          
+          // enable and enforce authorization
+          cfg.set('authorization:enabled', true);
+          cfg.set('authorization:enforce', true);
+          updateConfig(cfg);
+
+          const createResult2 = await userService.create({ items: [readOnlyUser], subject });
+          should.exist(createResult2!.items![0]!.payload);
+          should.exist(createResult2!.items![0]!.payload!.name);
+  
+          const result = await (userService.impersonate({
+            identifier: impersTestUser.name,
+            subject: {
+              id: readOnlyUser.id,
+              scope: readOnlyUser.scope,
+              token: readOnlyUser.token
+            }
+          }));
+          
+          should.not.exist(result!.payload);
+          result!.status!.code!.should.not.equal(200);
+          result!.status!.message!.should.equal(`Access not allowed for request with subject:testusereadonly, resource:user, action:MODIFY, target_scope:${impOrg}; the response was DENY`);
+        });
+
+        it('should return token response and token should access impersTestUser and have impoersonated_by set', async function impersonate(): Promise<void> {
+  
+          const result = await (userService.impersonate({
+            identifier: impersTestUser.name,
+            subject
+          }));
+          
+          should.exist(result!.payload);
+          result!.status!.code!.should.equal(200);
+          result!.status!.message!.should.equal('success');
+          should.exist(result!.payload!.access_token);
+
+          newACToken = result!.payload!.access_token;
+
+          const tokenFindResult = await (userService.findByToken({
+            token: newACToken
+          }));
+
+          should.exist(tokenFindResult!.payload);
+          should.exist(tokenFindResult!.status);
+          tokenFindResult!.status!.code!.should.equal(200);
+          should.exist(tokenFindResult!.payload!.tokens);
+          tokenFindResult!.payload!.tokens!.should.be.Array();
+
+          tokenFindResult!.payload!.tokens!.some(
+            token => token!.impersonated_by === subject.id
+          ).should.be.true();
+        });
+
+        it('should fail with code 400 and message User is not impersonator', async function impersonate(): Promise<void> {
+          // User misses user.impoersonated_by ID
+
+          const result = await (userService.endImpersonation(
+            {
+              subject: {
+                id: readOnlyUser.id,
+                scope: readOnlyUser.scope,
+                token: readOnlyUser.token
+              }
+            }
+          ));
+          
+          should.not.exist(result!.payload);
+          result!.status!.code!.should.equal(400);
+          result!.status!.message!.should.equal('User is not impersonator');
+
+          await userService.unregister({ identifier: readOnlyUser.name });
+        });
+
+        it('should allow to end impersonation and return impersonator token data', async function impersonate(): Promise<void> {
+          // User has user.impoersonated_by ID and this ID belongs to a another existing user
+          const result = await (userService.endImpersonation(
+            {
+              subject: {
+                id: impersTestUser.id,
+                scope: impersTestUser.scope,
+                token: newACToken
+              }
+            }
+          ));
+
+          should.exist(result!.payload);
+          result!.status!.code!.should.equal(200);
+          result!.status!.message!.should.equal('success');
+          result!.payload!.access_token!.should.equal(subject.token);
+
+          await userService.unregister({ identifier: impersTestUser.name });
+
+          cfg.set('authorization:enabled', false);
+          cfg.set('authorization:enforce', false);
+          updateConfig(cfg);
+        });
+
+        // TODO: add test, that checks if impersonate created token is removed
+        
       });
 
       describe('passwordChange', function changePassword(): void {
@@ -1974,7 +2300,7 @@ describe('testing identity-srv', () => {
           testUser.role_associations![0]!.role = 'super-admin-r-id';
           const result = await userService.create({ items: [testUser], subject });
           result!.items![0]!.status!.code!.should.equal(403);
-          result!.items![0]!.status!.message!.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as the user roles [admin-r-id, admin-r-id, user-r-id] does not have the required permission');
+          result!.items![0]!.status!.message!.should.equal('The target role super-admin-r-id cannot be assigned to user test.user as the user roles [admin-r-id, user-readonly-r-id, admin-r-id, user-r-id] does not have the required permission');
           result!.items![0]!.status!.id!.should.equal('testuser');
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');
@@ -2158,6 +2484,8 @@ describe('testing identity-srv', () => {
           });
         });
       });
+
+      
     });
   });
 });

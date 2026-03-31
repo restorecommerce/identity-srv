@@ -291,6 +291,7 @@ export class Worker {
 
     // token service
     const tokenService = new TokenService(cfg, logger, this.userService);
+    this.userService.tokenService = tokenService;
 
     // oauth service
     const oauthServices = cfg.get('oauth:services');
