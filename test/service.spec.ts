@@ -1296,14 +1296,18 @@ describe('testing identity-srv', () => {
 
         it('should return an error because of insufficient acs', async function impersonate(): Promise<void> {
 
-          const createResult = await userService.create({ items: [impersTestUser], subject });
-          should.exist(createResult!.items![0]!.payload);
-          should.exist(createResult!.items![0]!.payload!.name);
+          const createResult1 = await userService.create({ items: [impersTestUser], subject });
+          should.exist(createResult1!.items![0]!.payload);
+          should.exist(createResult1!.items![0]!.payload!.name);
           
           // enable and enforce authorization
           cfg.set('authorization:enabled', true);
           cfg.set('authorization:enforce', true);
           updateConfig(cfg);
+
+          const createResult2 = await userService.create({ items: [readOnlyUser], subject });
+          should.exist(createResult2!.items![0]!.payload);
+          should.exist(createResult2!.items![0]!.payload!.name);
   
           const result = await (userService.impersonate({
             identifier: impersTestUser.name,
@@ -1350,9 +1354,6 @@ describe('testing identity-srv', () => {
 
         it('should fail with code 400 and message User is not impersonator', async function impersonate(): Promise<void> {
           // User misses user.impoersonated_by ID
-          const createResult = await userService.create({ items: [readOnlyUser], subject });
-          should.exist(createResult!.items![0]!.payload);
-          should.exist(createResult!.items![0]!.payload!.name);
 
           const result = await (userService.endImpersonation(
             {
