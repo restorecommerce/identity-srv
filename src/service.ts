@@ -2372,6 +2372,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return returnStatus(401, 'No user found for provided subject token value');
     }
 
+    const impersonator = impersonatorByToken.payload;
+    request.subject.id = impersonator.id;
+    const subject = request.subject;
+    
     const identifier = request.identifier;
 
     const filters = getDefaultFilter(identifier);
@@ -2384,12 +2388,12 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     const user = users.items[0].payload;
 
-    if (user.id === request.subject.id) {
+    if (user.id === subject.id) {
       return returnStatus(400, 'Invalid request');
     }
 
     let acsResponse: DecisionResponse;
-    const subject = await resolveSubject(request.subject);
+    
     const acsResources = await this.createMetadata(user, AuthZAction.MODIFY, subject);
 
     try {
@@ -2434,7 +2438,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             claims: {
               token_name: tokenName
             },
-            impersonatedBy: request.subject.id
+            impersonatedBy: subject.id
           })
         )
       }
