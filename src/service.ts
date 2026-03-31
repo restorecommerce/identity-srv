@@ -2384,6 +2384,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
     const user = users.items[0].payload;
 
+    if (user.id === request.subject.id) {
+      return returnStatus(400, 'Invalid request');
+    }
+
     let acsResponse: DecisionResponse;
     const subject = await resolveSubject(request.subject);
     const acsResources = await this.createMetadata(user, AuthZAction.MODIFY, subject);
