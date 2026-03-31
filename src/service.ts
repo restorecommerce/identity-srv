@@ -2524,7 +2524,16 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       return returnStatus(404, 'No valid access token for impersonator');
     }
 
-    await this.removeToken(user.id, [userTokenData]);
+    await this.removeToken(user.id, user?.tokens?.filter((obj) => {
+      if (obj.token === request.subject.token) {
+        // since AQL is used to remove object - convert DateObject to time in ms
+        (obj as any).expires_in = obj.expires_in ? obj.expires_in.getTime() : undefined;
+        (obj as any).last_login = obj.last_login ? obj.last_login.getTime() : undefined;
+        return obj;
+      }
+    }));
+
+    await this.tokenRedisClient.del(request.subject.token);
 
     const responsePayload: AccessTokenData = {
       'access_token' : impersonatorACTokenData.token,

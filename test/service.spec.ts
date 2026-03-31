@@ -1394,6 +1394,8 @@ describe('testing identity-srv', () => {
           cfg.set('authorization:enforce', false);
           updateConfig(cfg);
         });
+
+        // TODO: add test, that checks if impersonate created token is removed
         
       });
 
