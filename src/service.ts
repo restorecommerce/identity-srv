@@ -2538,6 +2538,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const impersonatorTokens = impersonator.tokens;
       for (const token of impersonatorTokens) {
         if (token.type === 'AccessToken') {
+          if (token?.expires_in && (token.expires_in.getTime() < new Date().getTime())) {
+            continue;
+          }
+
           impersonatorACTokenData = token;
           break;
         }
