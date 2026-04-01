@@ -2437,9 +2437,41 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
     }
 
+    let exUserTokenData;
+    if (user?.tokens?.length > 0) {
+      const exUserTokens = user.tokens;
+      
+      for (const exToken of exUserTokens) {
+        if (exToken?.expires_in && (exToken.expires_in.getTime() < new Date().getTime())) {
+          continue;
+        }
+
+        if (exToken?.impersonated_by && exToken?.impersonated_by === subject.id) {
+          exUserTokenData = exToken;
+
+          const responsePayload: AccessTokenData = {
+            'access_token' : exUserTokenData?.token,
+            'expires_in' : exUserTokenData?.expires_in,
+            'token_type': 'Bearer',
+            'scope': 'openid',
+            'token_name': exUserTokenData.name
+          };
+          
+          return { payload: responsePayload, status: { code: 200, message: 'success' } };
+        }
+      }
+    }
+
     const at = generateAT();
-    const expiresIn = new Date(Date.now() + 86400 * 1000); // TODO: how long actually?
     const tokenName = randomUUID().replace(/-/g, '');
+    let expiresIn;
+    
+    if(request?.token_ttl) {
+      expiresIn = new Date(Date.now() + request.token_ttl * 1000);
+    } else {
+      expiresIn = this.cfg.get('impersonateDefaultTokenTTL') ?
+        new Date(Date.now() + this.cfg.get('impersonateDefaultTokenTTL') * 1000) : undefined;
+    }
 
     const tokenUpsertResponse = await this.tokenService.upsert({
       id: user.id,
