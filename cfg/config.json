@@ -132,6 +132,7 @@
     "ownerInstance": "urn:restorecommerce:acs:names:ownerInstance"
   },
   "obfuscateAuthNErrorReason": false,
+  "impersonateDefaultTokenTTL": null,
   "authorization": {
     "service": "acs-srv",
     "enabled": true,
