@@ -1416,11 +1416,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   async confirmUserInvitation(request: ConfirmUserInvitationRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
     // find the actual user object from DB using the UserInvitationReq identifier
     // activate user and update password
-    const loginIdentifierProperty = this.cfg.get('service:loginIdentifierProperty') ?? 'name';
+    //const loginIdentifierProperty = this.cfg.get('service:loginIdentifierProperty') ?? ['name', 'email'];
     const identifier = request.identifier;
     const subject = request.subject;
-    const filters = getLoginIdentifierFilter(loginIdentifierProperty, identifier);
-    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+    const filters = getDefaultFilter(identifier);
+    const users = await super.read(ReadRequest.fromPartial({ filters, limit: 2 }), context);
     
     if (users?.total_count === 0) {
       return returnOperationStatus(404, `user not found for identifier ${identifier}`);
@@ -2625,7 +2625,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       loginIdentifierProperty = ['name', 'email'];
     }
     const filters = getLoginIdentifierFilter(loginIdentifierProperty, identifier);
-    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+    const users = await super.read(ReadRequest.fromPartial({ filters, limit: 2 }), context);
     if (users.total_count === 0) {
       if (obfuscateAuthNErrorReason) {
         return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist');
@@ -3607,7 +3607,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       loginIdentifierProperty = ['name', 'email'];
     }
     const filters = getLoginIdentifierFilter(loginIdentifierProperty, subject.id);
-    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+    const users = await super.read(ReadRequest.fromPartial({ filters, limit: 2 }), context);
 
     if (!users || users.total_count === 0) {
       this.logger.debug('user does not exist', { identifier: subject.id });
@@ -3743,7 +3743,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       loginIdentifierProperty = ['name', 'email'];
     }
     const filters = getLoginIdentifierFilter(loginIdentifierProperty, subject.id);
-    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+    const users = await super.read(ReadRequest.fromPartial({ filters, limit: 2 }), context);
 
     if (!users || users.total_count === 0) {
       this.logger.debug('user does not exist', { identifier: subject.id });
