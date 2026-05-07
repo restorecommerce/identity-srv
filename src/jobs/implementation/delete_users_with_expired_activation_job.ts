@@ -31,7 +31,7 @@ const getUserServiceClient = (): UserServiceClient => {
   return idsClientInstance;
 };
 
-export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): Promise<any> => {
+export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any, events: any): Promise<any> => {
   try {
     const idsClient = await getUserServiceClient();
     if (!idsClient) {
@@ -70,9 +70,9 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
 
     if (users?.total_count > 0) {
       const usersToDelete = users?.items?.filter((user) => {
-        if (user?.payload?.meta?.modified !== null && user?.payload?.activation_code !== undefined || user?.payload?.activation_code === '') {
-          const modifiedTimestamp = new Date(user.payload.meta.modified).getTime();
-          return modifiedTimestamp < expirationTimestamp;
+        if (user?.payload?.meta?.created !== null && user?.payload?.activation_code !== undefined || user?.payload?.activation_code === '') {
+          const createdTimestamp = new Date(user.payload.meta.created).getTime();
+          return createdTimestamp < expirationTimestamp;
         }
         return false;
       });
@@ -88,6 +88,15 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
       // Call the delete function to delete expired inactivated user accounts
       const deleteStatusArr = await idsClient.delete(DeleteRequest.fromPartial({ ids: userIDsToDelete, subject: { token: tokenTechUser.token } }), {});
       logger.info('Deleted users: ', deleteStatusArr);
+
+      const topic = await events.topic('io.restorecommerce.users');
+      for (const userId of userIDsToDelete) {
+        await topic.emit('userDeleted', {
+          id: userId
+        });
+
+        logger.info('[userDeleted emitted]', { userId });
+      }
       return deleteStatusArr;
     }
     else {

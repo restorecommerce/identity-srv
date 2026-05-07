@@ -11,8 +11,11 @@ const main: DefaultExportFunc = async (cfg, logger, events: any, runWorker) => {
     'identity-srv-queue', 1, cfg, logger, events,
     async (job: any) => {
       const name = job.type ?? job.name;
+      logger.info('[JOB RECEIVED]', {name});
       if (name === DELETE_USERS_WITH_EXPIRED_ACTIVATION) {
-        await deleteUsersWithExpiredActivation(cfg, logger);
+        logger.info('[DELETE_USERS_WITH_EXPIRED_ACTIVATION] started');
+        await deleteUsersWithExpiredActivation(cfg, logger, events);
+        logger.info('[DELETE_USERS_WITH_EXPIRED_ACTIVATION] finished');
       }
     }
   );

@@ -3489,6 +3489,16 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         return returnOperationStatus(200, 'user already active');
       }
       if (this.emailEnabled && user.invite) {
+        // update modified timestamp, invited_at and generate new activation_code
+        // generating new activation code and update user modified timestamp
+        user.activation_code = this.idGen();
+        user.meta.modified = new Date();
+        user.invited_at = new Date();
+        const updateStatus = await super.update({ items: [user] } as UserList, context);
+        if (updateStatus?.items[0]?.status?.code !== 200) {
+          return { operation_status: updateStatus?.items[0]?.status };
+        }
+
         const userForInvitation = await this.makeUserForInvitationData(user, invited_by_user_identifier);
         // error
         if (userForInvitation && userForInvitation.operation_status && userForInvitation.operation_status.code) {
