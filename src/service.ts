@@ -1476,6 +1476,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       user.active = true;
       user.activation_code = '';
       user.invite = false;
+      user.meta.modified = new Date();
 
       user.password_hash = password.hash(request.password);
       const updateStatus = await super.update(UserList.fromPartial({
@@ -1627,7 +1628,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
 
       user.active = true;
-
+      user.meta.modified = new Date();
       user.activation_code = '';
       const updateStatus = await super.update(UserList.fromPartial({
         items: [user]
