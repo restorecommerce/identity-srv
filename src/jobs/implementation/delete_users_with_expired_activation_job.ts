@@ -81,16 +81,6 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any, ev
     const users = await idsClient.read({ filters, subject: { token: tokenTechUser.token } }, {});
     logger.info('Retrieved users: ', users);
 
-    // Old implementation - TODO Remove after complete testing
-    // if (users?.total_count > 0) {
-    //   const usersToDelete = users?.items?.filter((user) => {
-    //     if (user?.payload?.meta?.created !== null && user?.payload?.activation_code !== undefined || user?.payload?.activation_code === '') {
-    //       const createdTimestamp = new Date(user.payload.meta.created).getTime();
-    //       return createdTimestamp < expirationTimestamp;
-    //     }
-    //     return false;
-    //   });
-
     const deletingUserFilters =
       jobData.deletingExpiredActivationAccount ?? [];
 
