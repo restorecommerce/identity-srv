@@ -70,4 +70,4 @@ jobs:
           workflow: upgrade-services.yaml
           ref: master
           repo: restorecommerce/charts
-          token: "${{ secrets.GITHUB_TOKEN }}" # "${{ secrets.CHARTS_WORKFLOW_TOKEN }}"
+          token: "${{ secrets.CHARTS_WORKFLOW_TOKEN }}"
