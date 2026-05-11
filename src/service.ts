@@ -1460,9 +1460,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // Check if inactivatedAccountExpiry is set and positive
       if (inactivatedAccountExpiry != undefined && inactivatedAccountExpiry > 0) {
 
-        if (user?.meta?.created) {
+        if (user?.invited_at) {
           const currentTimestamp = new Date(); // Current Unix timestamp in seconds
-          const activationTimestamp = user.meta.created;
+          const activationTimestamp = user.invited_at;
 
           // Check if the activation code has expired
           // calculate the difference between currentTimestamp.getTime() and activationTimestamp.getTime(). This gives the time difference in milliseconds.
@@ -1476,6 +1476,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       user.active = true;
       user.activation_code = '';
       user.invite = false;
+      user.meta.modified = new Date();
 
       user.password_hash = password.hash(request.password);
       const updateStatus = await super.update(UserList.fromPartial({
@@ -1627,7 +1628,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
 
       user.active = true;
-
+      user.meta.modified = new Date();
       user.activation_code = '';
       const updateStatus = await super.update(UserList.fromPartial({
         items: [user]
@@ -3489,6 +3490,16 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         return returnOperationStatus(200, 'user already active');
       }
       if (this.emailEnabled && user.invite) {
+        // update modified timestamp, invited_at and generate new activation_code
+        // generating new activation code and update user modified timestamp
+        user.activation_code = this.idGen();
+        user.meta.modified = new Date();
+        user.invited_at = new Date();
+        const updateStatus = await super.update({ items: [user] } as UserList, context);
+        if (updateStatus?.items[0]?.status?.code !== 200) {
+          return { operation_status: updateStatus?.items[0]?.status };
+        }
+
         const userForInvitation = await this.makeUserForInvitationData(user, invited_by_user_identifier);
         // error
         if (userForInvitation && userForInvitation.operation_status && userForInvitation.operation_status.code) {

@@ -31,8 +31,21 @@ const getUserServiceClient = (): UserServiceClient => {
   return idsClientInstance;
 };
 
-export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): Promise<any> => {
+export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any, events: any, jobPayload: any): Promise<any> => {
   try {
+    logger.info('[deleteUsersWithExpiredActivation] jobPayload', jobPayload);
+
+    let jobData: any;
+    try {
+      jobData = JSON.parse(
+        Buffer.from(jobPayload?.value?.data).toString()
+      );
+    } catch (err) {
+      logger.error('[JOB PAYLOAD PARSE FAILED]', { name, err });
+      return;
+    }
+    logger.info('[deleteUsersWithExpiredActivation] jobData', jobData);
+
     const idsClient = await getUserServiceClient();
     if (!idsClient) {
       logger.error('Identity service client not initialized');
@@ -68,13 +81,53 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
     const users = await idsClient.read({ filters, subject: { token: tokenTechUser.token } }, {});
     logger.info('Retrieved users: ', users);
 
+    const deletingUserFilters =
+      jobData.deletingExpiredActivationAccount ?? [];
+
+    logger.info('[deleteUsersWithExpiredActivation] deletingUserFilters', deletingUserFilters);
+
     if (users?.total_count > 0) {
       const usersToDelete = users?.items?.filter((user) => {
-        if (user?.payload?.meta?.modified !== null && user?.payload?.activation_code !== undefined || user?.payload?.activation_code === '') {
-          const modifiedTimestamp = new Date(user.payload.meta.modified).getTime();
-          return modifiedTimestamp < expirationTimestamp;
+        const payload = user?.payload;
+
+        const hasActivationCode =
+          payload?.activation_code !== undefined &&
+          payload?.activation_code !== '';
+
+        if (!hasActivationCode) {
+          return false;
         }
-        return false;
+
+        // map configured filter names to actual timestamps
+        const timestampsToCheck: Array<Date | undefined> = [];
+
+        if (deletingUserFilters.includes('created')) {
+          timestampsToCheck.push(payload?.meta?.created);
+        }
+
+        if (deletingUserFilters.includes('modified')) {
+          timestampsToCheck.push(payload?.meta?.modified);
+        }
+
+        if (deletingUserFilters.includes('invited_at')) {
+          timestampsToCheck.push(payload?.invited_at);
+        }
+
+        // if no valid configured timestamps exist
+        if (timestampsToCheck.length === 0) {
+          return false;
+        }
+
+        // delete if ANY configured timestamp is expired
+        return timestampsToCheck.some((timestamp) => {
+          if (!timestamp) {
+            return false;
+          }
+
+          const ts = new Date(timestamp).getTime();
+
+          return ts < expirationTimestamp;
+        });
       });
 
       if (usersToDelete?.length === 0) {
@@ -88,6 +141,18 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
       // Call the delete function to delete expired inactivated user accounts
       const deleteStatusArr = await idsClient.delete(DeleteRequest.fromPartial({ ids: userIDsToDelete, subject: { token: tokenTechUser.token } }), {});
       logger.info('Deleted users: ', deleteStatusArr);
+
+      const topic = await events.topic('io.restorecommerce.user');
+      for (const user of usersToDelete) {
+        const userId = user?.payload?.id;
+        const defaultScope = user?.payload?.default_scope;
+        await topic.emit('userDeleted', {
+          id: userId,
+          default_scope: defaultScope
+        });
+
+        logger.info('[userDeleted emitted]', { userId, defaultScope });
+      }
       return deleteStatusArr;
     }
     else {
@@ -96,7 +161,7 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any): P
     }
 
   } catch (error: any) {
-    logger.error('Error in delete_expired_users_job', {code: error.code, message: error.message, stack: error.stack });
+    logger.error('Error in delete_expired_users_job', { code: error.code, message: error.message, stack: error.stack });
     return { operation_status: { code: 500, message: 'Internal Server Error' } };
   }
 };
