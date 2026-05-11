@@ -1460,9 +1460,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // Check if inactivatedAccountExpiry is set and positive
       if (inactivatedAccountExpiry != undefined && inactivatedAccountExpiry > 0) {
 
-        if (user?.meta?.created) {
+        if (user?.invited_at) {
           const currentTimestamp = new Date(); // Current Unix timestamp in seconds
-          const activationTimestamp = user.meta.created;
+          const activationTimestamp = user.invited_at;
 
           // Check if the activation code has expired
           // calculate the difference between currentTimestamp.getTime() and activationTimestamp.getTime(). This gives the time difference in milliseconds.
