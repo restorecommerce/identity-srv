@@ -1416,20 +1416,19 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   async confirmUserInvitation(request: ConfirmUserInvitationRequest, context: any): Promise<DeepPartial<OperationStatusObj>> {
     // find the actual user object from DB using the UserInvitationReq identifier
     // activate user and update password
+    //const loginIdentifierProperty = this.cfg.get('service:loginIdentifierProperty') ?? ['name', 'email'];
     const identifier = request.identifier;
     const subject = request.subject;
     const filters = getDefaultFilter(identifier);
-    let user: DeepPartial<User>;
-    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
-
-    if (users?.total_count === 1) {
-      user = users?.items[0]?.payload;
-    } else if (users?.total_count === 0) {
+    const users = await super.read(ReadRequest.fromPartial({ filters, limit: 2 }), context);
+    
+    if (users?.total_count === 0) {
       return returnOperationStatus(404, `user not found for identifier ${identifier}`);
     } else if (users?.total_count > 1) {
       return returnOperationStatus(400, `Invalid identifier provided for user invitation confirmation, multiple users found for identifier ${identifier}`);
     }
 
+    const user = users?.items[0]?.payload;
     let acsResponse: DecisionResponse;
     try {
       acsResponse = await checkAccessRequest({
@@ -1461,9 +1460,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       // Check if inactivatedAccountExpiry is set and positive
       if (inactivatedAccountExpiry != undefined && inactivatedAccountExpiry > 0) {
 
-        if (user?.meta?.created) {
+        if (user?.invited_at) {
           const currentTimestamp = new Date(); // Current Unix timestamp in seconds
-          const activationTimestamp = user.meta.created;
+          const activationTimestamp = user.invited_at;
 
           // Check if the activation code has expired
           // calculate the difference between currentTimestamp.getTime() and activationTimestamp.getTime(). This gives the time difference in milliseconds.
@@ -1477,6 +1476,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       user.active = true;
       user.activation_code = '';
       user.invite = false;
+      user.meta.modified = new Date();
 
       user.password_hash = password.hash(request.password);
       const updateStatus = await super.update(UserList.fromPartial({
@@ -1628,7 +1628,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }
 
       user.active = true;
-
+      user.meta.modified = new Date();
       user.activation_code = '';
       const updateStatus = await super.update(UserList.fromPartial({
         items: [user]
@@ -2626,7 +2626,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       loginIdentifierProperty = ['name', 'email'];
     }
     const filters = getLoginIdentifierFilter(loginIdentifierProperty, identifier);
-    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+    const users = await super.read(ReadRequest.fromPartial({ filters, limit: 2 }), context);
     if (users.total_count === 0) {
       if (obfuscateAuthNErrorReason) {
         return returnStatus(412, 'Invalid credentials provided, user inactive or account does not exist');
@@ -3490,6 +3490,16 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         return returnOperationStatus(200, 'user already active');
       }
       if (this.emailEnabled && user.invite) {
+        // update modified timestamp, invited_at and generate new activation_code
+        // generating new activation code and update user modified timestamp
+        user.activation_code = this.idGen();
+        user.meta.modified = new Date();
+        user.invited_at = new Date();
+        const updateStatus = await super.update({ items: [user] } as UserList, context);
+        if (updateStatus?.items[0]?.status?.code !== 200) {
+          return { operation_status: updateStatus?.items[0]?.status };
+        }
+
         const userForInvitation = await this.makeUserForInvitationData(user, invited_by_user_identifier);
         // error
         if (userForInvitation && userForInvitation.operation_status && userForInvitation.operation_status.code) {
@@ -3608,7 +3618,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       loginIdentifierProperty = ['name', 'email'];
     }
     const filters = getLoginIdentifierFilter(loginIdentifierProperty, subject.id);
-    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+    const users = await super.read(ReadRequest.fromPartial({ filters, limit: 2 }), context);
 
     if (!users || users.total_count === 0) {
       this.logger.debug('user does not exist', { identifier: subject.id });
@@ -3744,7 +3754,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       loginIdentifierProperty = ['name', 'email'];
     }
     const filters = getLoginIdentifierFilter(loginIdentifierProperty, subject.id);
-    const users = await super.read(ReadRequest.fromPartial({ filters }), context);
+    const users = await super.read(ReadRequest.fromPartial({ filters, limit: 2 }), context);
 
     if (!users || users.total_count === 0) {
       this.logger.debug('user does not exist', { identifier: subject.id });
