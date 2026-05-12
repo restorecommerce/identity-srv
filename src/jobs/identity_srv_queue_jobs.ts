@@ -22,7 +22,7 @@ const main: DefaultExportFunc = async (cfg, logger, events: any, runWorker) => {
       if (name === DELETE_USERS_WITH_EXPIRED_ACTIVATION) {
         logger.info('[DELETE_USERS_WITH_EXPIRED_ACTIVATION] started');
         await deleteUsersWithExpiredActivation(cfg, logger, events, jobPayload);
-        logger.info('[DELETE_USERS_WITH_EXPIRED_ACTIVATION] finished ');
+        logger.info('[DELETE_USERS_WITH_EXPIRED_ACTIVATION] finished');
       }
     }
   );

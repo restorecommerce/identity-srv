@@ -208,6 +208,9 @@
       "userDeleted": {
         "messageObject": "io.restorecommerce.user.Deleted"
       },
+      "expiredUserDeleted": {
+        "messageObject": "io.restorecommerce.user.User"
+      },
       "userDeletedAll": {
         "messageObject": "io.restorecommerce.user.Deleted"
       },

@@ -144,14 +144,11 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any, ev
 
       const topic = await events.topic('io.restorecommerce.user');
       for (const user of usersToDelete) {
-        const userId = user?.payload?.id;
-        const defaultScope = user?.payload?.default_scope;
-        await topic.emit('userDeleted', {
-          id: userId,
-          default_scope: defaultScope
+        await topic.emit('expiredUserDeleted', {
+          user: user?.payload
         });
 
-        logger.info('[userDeleted emitted]', { userId, defaultScope });
+        logger.info('[expiredUserDeleted emitted]', { user });
       }
       return deleteStatusArr;
     }
