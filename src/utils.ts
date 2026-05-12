@@ -207,6 +207,21 @@ export const getNameFilter = (userName: string) => [{
   }]
 }];
 
+export const getNameIdFilter = (userName: string, userId: string) => [{
+  filters: [
+    {
+      field: 'name',
+      operation: Filter_Operation.eq,
+      value: userName
+    },
+    {
+      field: 'id',
+      operation: Filter_Operation.eq,
+      value: userId
+    }],
+  operator: FilterOp_Operator.or
+}];
+
 export const getLoginIdentifierFilter = (
   loginIdentifiers: any,
   value: string

@@ -450,7 +450,7 @@ describe('testing identity-srv', () => {
           userRolePolicySetRQ.policy_sets![0]!.policies![0]!.rules![1] = permitReadOnlyUser[0];
           userRolePolicySetRQ.policy_sets![0]!.policies![0]!.rules![2] = permitReadOnlyUser[1];
           userRolePolicySetRQ.policy_sets![0]!.policies!![1]!.rules![0] = permitRoleRule;
-          userRolePolicySetRQ.policy_sets![0]!.policies!![1]!.rules![1] = permitUserRoleRule;          
+          userRolePolicySetRQ.policy_sets![0]!.policies!![1]!.rules![1] = permitUserRoleRule;
           // start mock acs-srv - needed for read operation since acs-client makes a req to acs-srv
           // to get applicable policies although acs-lookup is disabled
           await startGrpcMockServer([{ method: 'WhatIsAllowed', output: userRolePolicySetRQ },
@@ -1135,7 +1135,7 @@ describe('testing identity-srv', () => {
 
         const impOrg = 'orgA';
 
-        let expires_in = new Date(); 
+        let expires_in = new Date();
         expires_in.setDate(expires_in.getDate() + 1);
 
         const impersTestUser: any = {
@@ -1263,7 +1263,7 @@ describe('testing identity-srv', () => {
 
         const hrScopeskeyAdm = `cache:${adminUserResolve.id}:${adminUserResolve.token}:hrScopes`;
         const subjectKeyAdm = `cache:${adminUserResolve.id}:subject`;
-        
+
         beforeAll(async () => {
           const redisConfig = cfg.get('redis');
           redisConfig.database = cfg.get('redis:db-indexes:db-subject') || 0;
@@ -1298,7 +1298,7 @@ describe('testing identity-srv', () => {
           const createResult1 = await userService.create({ items: [impersTestUser], subject });
           should.exist(createResult1!.items![0]!.payload);
           should.exist(createResult1!.items![0]!.payload!.name);
-          
+
           // enable and enforce authorization
           cfg.set('authorization:enabled', true);
           cfg.set('authorization:enforce', true);
@@ -1307,7 +1307,7 @@ describe('testing identity-srv', () => {
           const createResult2 = await userService.create({ items: [readOnlyUser], subject });
           should.exist(createResult2!.items![0]!.payload);
           should.exist(createResult2!.items![0]!.payload!.name);
-  
+
           const result = await (userService.impersonate({
             identifier: impersTestUser.name,
             subject: {
@@ -1316,19 +1316,19 @@ describe('testing identity-srv', () => {
               token: readOnlyUser.token
             }
           }));
-          
+
           should.not.exist(result!.payload);
           result!.status!.code!.should.not.equal(200);
           result!.status!.message!.should.equal(`Access not allowed for request with subject:testusereadonly, resource:user, action:MODIFY, target_scope:${impOrg}; the response was DENY`);
         });
 
         it('should return token response and token should access impersTestUser and have impoersonated_by set', async function impersonate(): Promise<void> {
-  
+
           const result = await (userService.impersonate({
             identifier: impersTestUser.name,
             subject
           }));
-          
+
           should.exist(result!.payload);
           result!.status!.code!.should.equal(200);
           result!.status!.message!.should.equal('success');
@@ -1363,7 +1363,7 @@ describe('testing identity-srv', () => {
               }
             }
           ));
-          
+
           should.not.exist(result!.payload);
           result!.status!.code!.should.equal(400);
           result!.status!.message!.should.equal('User is not impersonator');
@@ -1396,7 +1396,7 @@ describe('testing identity-srv', () => {
         });
 
         // TODO: add test, that checks if impersonate created token is removed
-        
+
       });
 
       describe('passwordChange', function changePassword(): void {
@@ -2049,6 +2049,94 @@ describe('testing identity-srv', () => {
           result!.operation_status!.message!.should.equal('success');
         });
 
+        it('should fail trying to upsert the user name to a already existing one', async function update(): Promise<void> {
+          // sampleuser1 already exists in DB, so changing the `upseruser` name to `sampleuser1` should fail
+          let result = await userService.upsert({
+            items: [{
+              id: 'test-upsert-update-user-id',
+              name: 'sampleuser1',
+              email: 'upsert-new@restorecommerce.io',
+              password: 'RNZzHwG&jpv5RS4Ev',
+              first_name: 'John',
+              last_name: 'upsert'
+            }]
+          });
+          // validate fail result
+          should.exist(result!.items);
+          result!.items![0]!.status!.code!.should.equal(404);
+          result!.items![0]!.status!.message!.should.equal('user not found for update');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
+        });
+
+        it('should pass trying to upsert the user name to a unique name in system', async function update(): Promise<void> {
+          let result = await userService.upsert({
+            items: [{
+              id: 'test-upsert-update-user-id',
+              name: 'unique_username',
+              email: 'upsert-new@restorecommerce.io',
+              password: 'RNZzHwG&jpv5RS4Ev',
+              first_name: 'John',
+              last_name: 'upsert'
+            }]
+          });
+          // validate success result
+          should.exist(result);
+          should.exist(result!.items);
+          result!.items![0]!.payload!.name!.should.equal('unique_username');
+          result!.items![0]!.payload!.email!.should.equal('upsert-new@restorecommerce.io');
+          // validate item status and overall status
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
+        });
+
+        it('should pass trying to update the user name to a new unique name in system', async function update(): Promise<void> {
+          let result = await userService.update({
+            items: [{
+              id: 'test-upsert-update-user-id',
+              name: 'new_unique_username',
+              email: 'upsert-new@restorecommerce.io',
+              password: 'RNZzHwG&jpv5RS4Ev',
+              first_name: 'John',
+              last_name: 'upsert'
+            }]
+          });
+          // validate success result
+          // validate success result
+          should.exist(result);
+          should.exist(result!.items);
+          result!.items![0]!.payload!.name!.should.equal('new_unique_username');
+          result!.items![0]!.payload!.email!.should.equal('upsert-new@restorecommerce.io');
+          // validate item status and overall status
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
+          
+        });
+
+        it('should fail trying to update the user name to a already existing one', async function update(): Promise<void> {
+          // sampleuser1 already exists in DB, so changing the `upseruser` name to `sampleuser1` should fail
+          let result = await userService.update({
+            items: [{
+              id: 'test-upsert-update-user-id',
+              name: 'sampleuser1',
+              email: 'upsert@restorecommerce.io',
+              password: 'RNZzHwG&jpv5RS4Ev',
+              first_name: 'John',
+              last_name: 'upsert'
+            }]
+          });
+          // validate fail result
+          should.exist(result!.items);
+          result!.items![0]!.status!.code!.should.equal(409);
+          result!.items![0]!.status!.message!.should.equal('User name sampleuser1 already exists');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
+        });
+
         it('should fail trying to update invalid / not existing user', async function update(): Promise<void> {
           // sampleuser1 already exists in DB, so changing the `upseruser` name to `sampleuser1` should fail
           let result = await userService.update({
@@ -2395,7 +2483,8 @@ describe('testing identity-srv', () => {
 
       describe('testing unauthenticated users', function registerUser(): void {
         it('should create unauthenticated users and retrieve their tokens', async () => {
-          const aaaa = await userService.create({items: [
+          const aaaa = await userService.create({
+            items: [
               {
                 id: 'example-unauthenticated-user',
                 active: true,
@@ -2438,7 +2527,8 @@ describe('testing identity-srv', () => {
                   }
                 ]
               }
-          ]});
+            ]
+          });
 
           const exampleToken = await userService.getUnauthenticatedSubjectTokenForTenant({
             domain: 'example.com'
@@ -2485,7 +2575,7 @@ describe('testing identity-srv', () => {
         });
       });
 
-      
+
     });
   });
 });

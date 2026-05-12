@@ -14,7 +14,8 @@ import {
   returnOperationStatus,
   returnStatus,
   unmarshallProtobufAny,
-  generateAT
+  generateAT,
+  getNameIdFilter
 } from './utils.js';
 import { ResourcesAPIBase, ServiceBase, FilterValueType } from '@restorecommerce/resource-base-interface';
 import { Logger } from 'winston';
@@ -1321,7 +1322,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         operator: FilterOp_Operator.or
       }];
     } else {
-      filters = getNameFilter(user.name);
+      filters = getNameIdFilter(user.name, user.id);
     }
     const users = await super.read(ReadRequest.fromPartial({ filters }), context);
     if (users.total_count > 0) {
@@ -2337,7 +2338,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         const user = usersList[i];
         let filters;
         if (this.uniqueEmailConstraint) {
-
           filters = [{
             filters: [{
               field: 'name',
@@ -2352,7 +2352,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             operator: FilterOp_Operator.or
           }];
         } else {
-          filters = getNameFilter(user.name);
+          filters = getNameIdFilter(user.name, user.id);
         }
 
         const users = await super.read(ReadRequest.fromPartial({ filters }), context);
