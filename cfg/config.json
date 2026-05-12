@@ -379,6 +379,7 @@
         "fields": [
           "meta.created",
           "meta.modified",
+          "invited_at",
           "last_access",
           "tokens.[0].expires_in",
           "tokens.[0].last_login"
@@ -414,12 +415,16 @@
       "message": "Action not allowed on this resource"
     }
   },
-  "techUsers": {
-    "hbs_user": {
+  "techUsers": [
+    {
       "id": "hbs_user",
       "token": "1a4c6789-6435-487a-9308-64d06384acf9"
+    },
+    {
+      "id": "delete_tech_user",
+      "token": "0878535e54df44f686f6ea2cae936fc5"
     }
-  },
+  ],
   "defaultRegisterUserRoles": [
     {
       "role": "user-r-id",

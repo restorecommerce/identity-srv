@@ -74,8 +74,8 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any, ev
     }];
     let tokenTechUser: any = {};
     const techUsersCfg = cfg.get('techUsers');
-    if (techUsersCfg && techUsersCfg.length > 0) {
-      tokenTechUser = techUsersCfg?.find((obj: any) => obj.id === 'upsert_user_tokens');
+    if (techUsersCfg?.length) {
+      tokenTechUser = techUsersCfg?.find((obj: any) => obj.id === 'delete_tech_user');
     }
 
     const users = await idsClient.read({ filters, subject: { token: tokenTechUser.token } }, {});
@@ -144,11 +144,9 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any, ev
 
       const topic = await events.topic('io.restorecommerce.user');
       for (const user of usersToDelete) {
-        await topic.emit('expiredUserDeleted', {
-          user: user?.payload
-        });
+        await topic.emit('expiredUserDeleted', user?.payload);
 
-        logger.info('[expiredUserDeleted emitted]', { user });
+        logger.info('[expiredUserDeleted emitted]', { user: user?.payload });
       }
       return deleteStatusArr;
     }

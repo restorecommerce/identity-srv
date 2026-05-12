@@ -741,6 +741,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           if (user.invite) {
             user.active = false;
             user.activation_code = this.idGen();
+            user.invited_at = new Date();
           }
           const createdUser = await this.createUser(user, context);
           insertedUsers.items.push(createdUser);
@@ -3011,7 +3012,12 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     try {
       const hbsTemplates = this.cfg.get('service:hbs_templates');
       const enableEmail = this.cfg.get('service:enableEmail');
-      const hbsUser = this.cfg.get('techUsers:hbs_user');
+      let hbsUser: any = {};
+      const techUsersCfg = this.cfg.get('techUsers');
+      if (techUsersCfg?.length) {
+        hbsUser = techUsersCfg?.find((obj: any) => obj.id === 'hbs_user');
+      }
+
 
       if (hbsTemplates && enableEmail) {
         await Promise.all(
@@ -3495,7 +3501,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         user.activation_code = this.idGen();
         user.meta.modified = new Date();
         user.invited_at = new Date();
-        const updateStatus = await super.update({ items: [user] } as UserList, context);
+        const updateStatus = await super.update(UserList.fromPartial({
+          items: [user]
+        }), context);
         if (updateStatus?.items[0]?.status?.code !== 200) {
           return { operation_status: updateStatus?.items[0]?.status };
         }
