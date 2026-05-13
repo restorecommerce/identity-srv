@@ -288,8 +288,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     // add ACS filters if subject is not tech user
     let acsFilterObj, techUser;
     const techUsersCfg = this.cfg.get('techUsers');
-    if (techUsersCfg?.length > 0) {
-      techUser = _.find(techUsersCfg, { id: subject.id });
+    if (techUsersCfg?.length) {
+      techUser = techUsersCfg?.find((obj: any) => obj.id === subject?.id);
     }
     const filters = getACSFilters(acsResponse, 'user');
     if (!techUser && filters) {
@@ -1485,7 +1485,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         items: [user]
       }), context);
       this.logger.info('password updated for invited user', { identifier });
-      return { operation_status: updateStatus?.items[0]?.status };
+      return { operation_status: updateStatus?.items?.[0]?.status };
     }
   }
 
@@ -1635,11 +1635,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const updateStatus = await super.update(UserList.fromPartial({
         items: [user]
       }), context);
-      if (updateStatus?.items[0]?.status?.message === 'success') {
+      if (updateStatus?.items?.[0]?.status?.message === 'success') {
         logger.info('user activated', user);
         await this.topics['user.resource'].emit('activated', { id: user.id });
       }
-      return { operation_status: updateStatus?.items[0]?.status };
+      return { operation_status: updateStatus?.items?.[0]?.status };
     }
   }
 
@@ -1726,11 +1726,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const updateStatus = await super.update(UserList.fromPartial({
         items: [user]
       }), context);
-      if (updateStatus?.items[0]?.status?.message === 'success') {
+      if (updateStatus?.items?.[0]?.status?.message === 'success') {
         logger.info('password changed for user', { identifier: subject.id });
         await this.topics['user.resource'].emit('passwordChanged', user);
       }
-      return { operation_status: updateStatus?.items[0]?.status };
+      return { operation_status: updateStatus?.items?.[0]?.status };
     }
   }
 
@@ -1761,7 +1761,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const updateStatus = await super.update(UserList.fromPartial({
       items: [user]
     }), context);
-    if (updateStatus?.items[0]?.status?.message === 'success') {
+    if (updateStatus?.items?.[0]?.status?.message === 'success') {
       await this.topics['user.resource'].emit('passwordChangeRequested', user);
 
       // sending activation code via email
@@ -1771,7 +1771,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         await this.topics.rendering.emit('renderRequest', renderRequest);
       }
     }
-    return { operation_status: updateStatus?.items[0]?.status };
+    return { operation_status: updateStatus?.items?.[0]?.status };
   }
 
   /**
@@ -1835,11 +1835,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const updateStatus = await super.update(UserList.fromPartial({
         items: [user]
       }), context);
-      if (updateStatus?.items[0]?.status?.message === 'success') {
+      if (updateStatus?.items?.[0]?.status?.message === 'success') {
         logger.info('password changed for user', user.id);
         await this.topics['user.resource'].emit('passwordChanged', user);
       }
-      return { operation_status: updateStatus?.items[0]?.status };
+      return { operation_status: updateStatus?.items?.[0]?.status };
     }
   }
 
@@ -1883,7 +1883,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const updateStatus = await super.update(UserList.fromPartial({
         items: [user]
       }), context);
-      if (updateStatus?.items[0]?.status?.message === 'success') {
+      if (updateStatus?.items?.[0]?.status?.message === 'success') {
         logger.info('Email change requested for user', { email: new_email });
         await this.topics['user.resource'].emit('emailChangeRequested', user);
 
@@ -1893,7 +1893,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           await this.topics.rendering.emit('renderRequest', renderRequest);
         }
       }
-      return { operation_status: updateStatus?.items[0]?.status };
+      return { operation_status: updateStatus?.items?.[0]?.status };
     }
   }
 
@@ -1948,11 +1948,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const updateStatus = await super.update(UserList.fromPartial({
         items: [user]
       }), context);
-      if (updateStatus?.items[0]?.status?.message === 'success') {
+      if (updateStatus?.items?.[0]?.status?.message === 'success') {
         logger.info('Email address changed for user', user.id);
         await this.topics['user.resource'].emit('emailChangeConfirmed', user);
       }
-      return { operation_status: updateStatus?.items[0]?.status };
+      return { operation_status: updateStatus?.items?.[0]?.status };
     }
   }
 
@@ -3446,7 +3446,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         const updateStatus = await super.update(UserList.fromPartial({
           items: [user]
         }), context);
-        if (updateStatus?.items[0]?.status?.code === 200) {
+        if (updateStatus?.items?.[0]?.status?.code === 200) {
           // sending activation code via email
           await this.fetchHbsTemplates();
           const renderRequest = this.makeActivationEmailData(user);
@@ -3504,8 +3504,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         const updateStatus = await super.update(UserList.fromPartial({
           items: [user]
         }), context);
-        if (updateStatus?.items[0]?.status?.code !== 200) {
-          return { operation_status: updateStatus?.items[0]?.status };
+        if (updateStatus?.items?.[0]?.status?.code !== 200) {
+          return { operation_status: updateStatus?.items?.[0]?.status };
         }
 
         const userForInvitation = await this.makeUserForInvitationData(user, invited_by_user_identifier);
@@ -3556,7 +3556,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }), context);
     return {
       totp_secret: totpSecret,
-      operation_status: updateStatus?.items[0]?.status
+      operation_status: updateStatus?.items?.[0]?.status
     };
   }
 
@@ -3611,10 +3611,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const updateStatus = await super.update(UserList.fromPartial({
       items: [user]
     }), context);
-    if (updateStatus?.items[0]?.status?.message === 'success') {
+    if (updateStatus?.items?.[0]?.status?.message === 'success') {
       this.logger.info('totp secret changed for user', { identifier: user.id });
     }
-    return { operation_status: updateStatus?.items[0]?.status };
+    return { operation_status: updateStatus?.items?.[0]?.status };
   }
 
   async exchangeTOTP(request: ExchangeTOTPRequest, context: any): Promise<DeepPartial<UserResponse>> {
@@ -3750,7 +3750,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }), context);
     return {
       backup_codes: totp_recovery_codes,
-      operation_status: updateStatus?.items[0]?.status
+      operation_status: updateStatus?.items?.[0]?.status
     };
   }
 
@@ -3787,7 +3787,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     return {
-      operation_status: updateStatus?.items[0]?.status
+      operation_status: updateStatus?.items?.[0]?.status
     };
   }
 
