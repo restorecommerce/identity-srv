@@ -11,6 +11,7 @@ const main: DefaultExportFunc = async (cfg, logger, events: any, runWorker) => {
     'identity-srv-queue', 1, cfg, logger, events,
     async (job: any) => {
       const name = job.type ?? job.name;
+      logger.info('[JOB RECEIVED]', { name });
       let jobPayload: any;
       try {
         jobPayload = JSON.parse(job?.data?.payload?.value?.toString());
@@ -18,7 +19,6 @@ const main: DefaultExportFunc = async (cfg, logger, events: any, runWorker) => {
         logger.error('[JOB PAYLOAD PARSE FAILED]', { name, err });
         return;
       }
-      logger.info('[JOB RECEIVED]', {name});
       if (name === DELETE_USERS_WITH_EXPIRED_ACTIVATION) {
         logger.info('[DELETE_USERS_WITH_EXPIRED_ACTIVATION] started');
         await deleteUsersWithExpiredActivation(cfg, logger, events, jobPayload);

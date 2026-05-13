@@ -3504,8 +3504,14 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         const updateStatus = await super.update(UserList.fromPartial({
           items: [user]
         }), context);
-        if (updateStatus?.items?.[0]?.status?.code !== 200) {
-          return { operation_status: updateStatus?.items?.[0]?.status };
+        const error = updateStatus?.operation_status?.code !== 200
+          ? updateStatus?.operation_status
+          : updateStatus?.items?.find(item => item?.status?.code !== 200)?.status;
+        if (error) {
+          return returnOperationStatus(
+            error.code ?? 500,
+            error.message ?? 'Unknown error!'
+          );
         }
 
         const userForInvitation = await this.makeUserForInvitationData(user, invited_by_user_identifier);
