@@ -449,6 +449,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           if (userData?.meta?.created) userData.meta.created = new Date(userData.meta.created);
           if (userData?.meta?.modified) userData.meta.modified = new Date(userData.meta.modified);
           if (userData?.last_access) userData.last_access = new Date(userData.last_access);
+          if (userData?.invited_at) userData.invited_at = new Date(userData.invited_at);
           userData?.tokens?.forEach((t: Tokens) => {
             t.expires_in = t.expires_in ? new Date(t.expires_in) : undefined;
             t.last_login = t.last_login ? new Date(t.last_login) : undefined;
@@ -1423,7 +1424,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const subject = request.subject;
     const filters = getDefaultFilter(identifier);
     const users = await super.read(ReadRequest.fromPartial({ filters, limit: 2 }), context);
-    
+
     if (users?.total_count === 0) {
       return returnOperationStatus(404, `user not found for identifier ${identifier}`);
     } else if (users?.total_count > 1) {
@@ -1531,7 +1532,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const body = renderResponse?.items?.reduce((a, b) => b?.payload?.bodies.find(body => body.id === 'body')?.body?.toString() ?? a, '');
     const subject = renderResponse?.items?.reduce((a, b) => b?.payload?.bodies.find(body => body.id === 'subject')?.body?.toString() ?? a, '');
     const emailData = this.makeNotificationData(
-      emailAddress, 
+      emailAddress,
       body,
       subject,
     );
@@ -2378,8 +2379,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    */
   async impersonate(request: ImpersonateRequest, context: any): Promise<DeepPartial<ImpersonateResponse>> {
 
-    if (_.isEmpty(request) || _.isEmpty(request.identifier) || _.isEmpty(request.subject) || _.isEmpty(request.subject.token))
-    {
+    if (_.isEmpty(request) || _.isEmpty(request.identifier) || _.isEmpty(request.subject) || _.isEmpty(request.subject.token)) {
       return returnStatus(400, 'Invalid request');
     }
 
@@ -2392,7 +2392,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const impersonator = impersonatorByToken.payload;
     request.subject.id = impersonator.id;
     const subject = request.subject;
-    
+
     const identifier = request.identifier;
 
     const filters = getDefaultFilter(identifier);
@@ -2410,7 +2410,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     let acsResponse: DecisionResponse;
-    
+
     const acsResources = await this.createMetadata(user, AuthZAction.MODIFY, subject);
 
     try {
@@ -2441,7 +2441,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     let exUserTokenData;
     if (user?.tokens?.length > 0) {
       const exUserTokens = user.tokens;
-      
+
       for (const exToken of exUserTokens) {
         if (exToken?.expires_in && (exToken.expires_in.getTime() < new Date().getTime())) {
           continue;
@@ -2451,13 +2451,13 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           exUserTokenData = exToken;
 
           const responsePayload: AccessTokenData = {
-            'access_token' : exUserTokenData?.token,
-            'expires_in' : exUserTokenData?.expires_in,
+            'access_token': exUserTokenData?.token,
+            'expires_in': exUserTokenData?.expires_in,
             'token_type': 'Bearer',
             'scope': 'openid',
             'token_name': exUserTokenData.name
           };
-          
+
           return { payload: responsePayload, status: { code: 200, message: 'success' } };
         }
       }
@@ -2466,8 +2466,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     const at = generateAT();
     const tokenName = randomUUID().replace(/-/g, '');
     let expiresIn;
-    
-    if(request?.token_ttl) {
+
+    if (request?.token_ttl) {
       expiresIn = new Date(Date.now() + request.token_ttl * 1000);
     } else {
       expiresIn = this.cfg.get('impersonateDefaultTokenTTL') ?
@@ -2500,8 +2500,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     const responsePayload: AccessTokenData = {
-      'access_token' : at,
-      'expires_in' : expiresIn,
+      'access_token': at,
+      'expires_in': expiresIn,
       'token_type': 'Bearer',
       'scope': 'openid',
       'token_name': tokenName
@@ -2515,8 +2515,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    */
   async endImpersonation(request: EndImpersonationRequest, context: any): Promise<DeepPartial<EndImpersonateResponse>> {
 
-    if (_.isEmpty(request) || _.isEmpty(request.subject) || _.isEmpty(request.subject.token))
-    {
+    if (_.isEmpty(request) || _.isEmpty(request.subject) || _.isEmpty(request.subject.token)) {
       return returnStatus(400, 'Invalid request');
     }
 
@@ -2543,7 +2542,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       this.logger.error('Token missing in User Data!', { user });
       return returnStatus(500, 'Token missing in User Data');
     }
-  
+
     if (_.isEmpty(userTokenData?.impersonated_by)) {
       return returnStatus(400, 'User is not impersonator');
     }
@@ -2597,8 +2596,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     await this.tokenRedisClient.del(request.subject.token);
 
     const responsePayload: AccessTokenData = {
-      'access_token' : impersonatorACTokenData.token,
-      'expires_in' : impersonatorACTokenData.expires_in,
+      'access_token': impersonatorACTokenData.token,
+      'expires_in': impersonatorACTokenData.expires_in,
       'token_type': 'Bearer',
       'scope': 'openid',
       'token_name': impersonatorACTokenData.name
@@ -2985,7 +2984,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const bucket = splits[0];
       const key = splits.slice(1).join('/');
       const buffer = new Array<Buffer>();
-      for await(const chunk of this.ostorageService.get({
+      for await (const chunk of this.ostorageService.get({
         bucket,
         key,
         download: true,
@@ -3157,7 +3156,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           id: 'body',
           body: Buffer.from(body),
           layout: this.templates.layoutTpl && Buffer.from(this.templates.layoutTpl)
-        },{
+        }, {
           id: 'subject',
           body: Buffer.from(subject),
         }],
