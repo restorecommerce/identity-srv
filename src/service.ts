@@ -3504,12 +3504,12 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           items: [user]
         }), context);
         const error = updateStatus?.operation_status?.code !== 200
-          ? updateStatus?.operation_status
+          ? updateStatus?.operation_status ?? {}
           : updateStatus?.items?.find(item => item?.status?.code !== 200)?.status;
         if (error) {
           return returnOperationStatus(
-            error.code ?? 500,
-            error.message ?? 'Unknown error!'
+            error?.code ?? 500,
+            error?.message ?? 'Unknown error!'
           );
         }
 

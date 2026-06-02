@@ -46,7 +46,7 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any, ev
     }
     logger.info('[deleteUsersWithExpiredActivation] jobData', jobData);
 
-    const idsClient = await getUserServiceClient();
+    const idsClient = getUserServiceClient();
     if (!idsClient) {
       logger.error('Identity service client not initialized');
       return { operation_status: { code: 503, message: 'Identity service client not initialized' } };
