@@ -47,6 +47,7 @@
     "@alenon/grpc-mock-server": "^3.2.9",
     "@commitlint/cli": "^20.1.0",
     "@commitlint/config-conventional": "^20.0.0",
+    "@grpc/proto-loader": "^0.8.1",
     "@restorecommerce/dev": "^0.2.0",
     "@restorecommerce/protos": "^6.15.1",
     "@semantic-release-plus/docker": "^3.1.3",
