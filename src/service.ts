@@ -132,7 +132,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   protected readonly authZ: ACSAuthZ;
   protected readonly redisClient: RedisClientType<any, any>;
   protected readonly authZCheck: boolean;
-  protected readonly tokenRedisClient: RedisClientType<any, any>;
+  public readonly tokenRedisClient: RedisClientType<any, any>;
   protected readonly uniqueEmailConstraint: boolean;
 
   ostorageService: Client<ObjectServiceDefinition>;
