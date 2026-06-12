@@ -382,7 +382,8 @@
           "invited_at",
           "last_access",
           "tokens.[0].expires_in",
-          "tokens.[0].last_login"
+          "tokens.[0].last_use",
+          "tokens.[0].created_at"
         ],
         "entities": [
           "users",

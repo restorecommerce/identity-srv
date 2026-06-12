@@ -544,8 +544,9 @@ A Token resource.
 |token |string |optional |token value
 |scopes | string []|optional |identifier for RoleAssociation `io.restorecommerce.auth.RoleAssociation.id`
 |type | string |optional |token type ex: access_token, refresh_token etc
-|last_login | `google.protobuf.Timestamp` |optional |timestamp of user last logged in
+|last_use | `google.protobuf.Timestamp` |optional |last used token timestamp
 |interactive| bool |optional |flag to indicate a login from GUI
+|created_at | `google.protobuf.Timestamp` |optional |token created timestamp
 |==========================================================================================================================
 
 [#api_token_crud]

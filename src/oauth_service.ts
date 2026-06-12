@@ -171,7 +171,8 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         token,
         type: 'access_token',
         interactive: true,
-        last_login: new Date()
+        last_use: new Date(),
+        creeated_at: new Date()
       };
 
       const accessToken = {
@@ -180,7 +181,8 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         token: data.access_token,
         type: 'access_token',
         interactive: true,
-        last_login: new Date()
+        last_use: new Date(),
+        creeated_at: new Date()
       };
 
       const refreshToken = {
@@ -189,7 +191,8 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         token: data.refresh_token,
         type: 'refresh_token',
         interactive: true,
-        last_login: new Date()
+        last_use: new Date(),
+        creeated_at: new Date()
       };
 
       // append access token on user entity
@@ -334,7 +337,8 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         token: data.access_token,
         type: 'access_token',
         interactive: true,
-        last_login: new Date()
+        last_use: new Date(),
+        creeated_at: new Date()
       };
 
       // append access token on user entity

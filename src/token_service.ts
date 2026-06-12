@@ -83,9 +83,10 @@ export class TokenService implements TokenServiceImplementation {
           token: payload.jti,
           type,
           interactive: true,
-          last_login: new Date(),
+          last_use: new Date(),
           client_id: payload?.clientId,
-          impersonated_by: payload?.impersonatedBy
+          impersonated_by: payload?.impersonatedBy,
+          created_at: new Date()
         };
         try {
           // append tokens on user entity
@@ -234,7 +235,8 @@ export class TokenService implements TokenServiceImplementation {
                 if (obj.token === request.id) {
                   // since AQL is used to remove object - convert DateObject to time in ms
                   (obj as any).expires_in = obj.expires_in ? obj.expires_in.getTime() : undefined;
-                  (obj as any).last_login = obj.last_login ? obj.last_login.getTime() : undefined;
+                  (obj as any).last_use = obj.last_use ? obj.last_use.getTime() : undefined;
+                  (obj as any).created_at = obj.created_at ? obj.last_created_at.getTime() : undefined;
                   return obj;
                 }
               }));

@@ -325,9 +325,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   * @param id subject id
   * @param token token value for which the last login should be updated
   */
-  async updateTokenLastLogin(id: string, token: string) {
-    // update last_login
-    const aql_last_login = `
+  async updateTokenLastUse(id: string, token: string) {
+    // update last_use
+    const aql_last_use = `
       FOR u IN users
         FILTER u._key == @docID OR u.id == @docID
         LIMIT 1
@@ -335,19 +335,20 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           tokens: (
             FOR tokenObj in u.tokens
               RETURN tokenObj.token == @token
-                ? MERGE( tokenObj, {last_login: @last_login })
+                ? MERGE( tokenObj, {last_use: @last_use })
                 : tokenObj
           )
         } IN users
+        OPTIONS { ignoreErrors: true }
         RETURN NEW
     `;
-    const bindVars_last_login = Object.assign({
+    const bindVars_last_use = Object.assign({
       docID: id,
       token,
-      last_login: new Date().getTime()
+      last_use: new Date().getTime()
     });
-    const res_last_login = await query(this.db.db, 'users', aql_last_login, bindVars_last_login);
-    return await res_last_login.all();
+    const res_last_use = await query(this.db.db, 'users', aql_last_use, bindVars_last_use);
+    return await res_last_use.all();
   }
 
   async updateUserTokens(id: string, token: Tokens, expiredTokens?: Tokens[]) {
@@ -355,12 +356,14 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     token = {
       ...token,
       expires_in: token?.expires_in?.getTime(),
-      last_login: token?.last_login?.getTime(),
+      last_use: token?.last_use?.getTime(),
+      created_at: token?.created_at?.getTime()
     } as any;
     expiredTokens = expiredTokens?.map((token): any => ({
       ...token,
       expires_in: token.expires_in?.getTime(),
-      last_login: token.last_login?.getTime()
+      last_use: token.last_use?.getTime(),
+      created_at: token?.created_at?.getTime()
     }));
 
     // temporary hack to update tokens on user(to fix issue when same user login multiple times simultaneously)
@@ -371,30 +374,17 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         FOR doc IN users
         FILTER doc._key == @docID OR doc.id == @docID
         LIMIT 1
-        UPDATE doc WITH { tokens: PUSH(doc.tokens, @token)} IN users
+        UPDATE doc WITH { tokens: PUSH(doc.tokens, @token), last_access: @last_access } IN users
         RETURN doc
       `;
       const bindVars = Object.assign({
         docID: id,
-        token
+        token,
+        last_access: new Date().getTime()
       });
       const res = await query(this.db.db, 'users', aql_token, bindVars);
       await res.all();
-      // update last_access
-      const aql_last_accesss = `
-        FOR doc IN users
-        FILTER doc._key == @docID OR doc.id == @docID
-        LIMIT 1
-        UPDATE doc WITH { last_access: @last_access} IN users
-        RETURN NEW
-      `;
-      const bindVars_last_access = Object.assign({
-        docID: id,
-        last_access: new Date().getTime()
-      });
-      const res_last_access = await query(this.db.db, 'users', aql_last_accesss, bindVars_last_access);
-      await res_last_access.all();
-      this.logger.debug('Tokens updated successuflly for subject', { id });
+      this.logger.info('Token and last_access field updated successuflly for subject', { id });
       // check for expired tokens if they exist and remove them
       if (expiredTokens?.length > 0) {
         const token_remove = `
@@ -452,7 +442,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
           if (userData?.invited_at) userData.invited_at = new Date(userData.invited_at);
           userData?.tokens?.forEach((t: Tokens) => {
             t.expires_in = t.expires_in ? new Date(t.expires_in) : undefined;
-            t.last_login = t.last_login ? new Date(t.last_login) : undefined;
+            t.last_use = t.last_use ? new Date(t.last_use) : undefined;
+            t.created_at = t.created_at ? new Date(t.created_at) : undefined;
           });
           // validate token expiry date and delete it if expired
           const redisToken = userData?.tokens?.find((t: Tokens) => t.token === token);
@@ -467,6 +458,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             if ('data' in userData && userData.data) {
               userData.data.value = Buffer.from(userData.data.value.data);
             }
+            this.updateTokenLastUse(userData.id, token).catch((err) => {
+                logger.error('Error updating last use for token', { subjectId : userData?.id });
+              });
             return { payload: userData, status: returnCodeMessage(200, 'success') };
           } else {
             // delete token from redis and update user entity
@@ -512,8 +506,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               new Date(dbToken.expires_in ?? 0).getTime() === 0
               || new Date(dbToken.expires_in) >= new Date()
             ) {
-              // update token last_login
-              await this.updateTokenLastLogin(user.id, token);
+              // update token last_use
+              this.updateTokenLastUse(user.id, token).catch((err) => {
+                logger.error('Error updating last use for token', { subjectId : user.id });
+              });
               const updatedUser = await super.read(query, context).then(
                 response => {
                   if (response?.items?.length > 1) {
@@ -2133,7 +2129,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               }
               if (redisID === user.id) {
                 for (const token of updatedTokens) {
-                  // compare only token scopes (since it now contains last_login as well)
+                  // compare only token scopes (since it now contains last_use as well)
                   for (const redisToken of redisTokens) {
                     if (redisToken.token === token.token) {
                       if (!redisToken.scopes) {
@@ -2588,7 +2584,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       if (obj.token === request.subject.token) {
         // since AQL is used to remove object - convert DateObject to time in ms
         (obj as any).expires_in = obj.expires_in ? obj.expires_in.getTime() : undefined;
-        (obj as any).last_login = obj.last_login ? obj.last_login.getTime() : undefined;
+        (obj as any).last_use = obj.last_use ? obj.last_use.getTime() : undefined;
+        (obj as any).created_at = obj.created_at ? obj.created_at.getTime() : undefined;
         return obj;
       }
     }));
