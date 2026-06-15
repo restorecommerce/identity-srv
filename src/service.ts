@@ -2924,7 +2924,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const usersWithRole: any = { items: [], operation_status: {} };
 
       for (const user of users) {
-        let found = false;
+        let found;
         if (user && user.payload && user.payload.role_associations) {
           for (const roleAssoc of user.payload.role_associations) {
             if (roleAssoc.role == id) {

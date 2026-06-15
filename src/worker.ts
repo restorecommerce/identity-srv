@@ -285,9 +285,9 @@ export class Worker {
 
     // user service
     logger.verbose('Setting up user and role services');
-    this.roleService = new RoleService(cfg, db, this.topics['role.resource'], logger, true, this.authZ);
-    this.userService = new UserService(cfg, this.topics, db, logger, true, this.roleService, this.authZ);
-    const authLogService = new AuthenticationLogService(cfg, db, this.topics['authlog.resource'], logger, true, this.authZ);
+    this.roleService = new RoleService(cfg, db, this.topics['role.resource'], logger, isEventsEnabled, this.authZ);
+    this.userService = new UserService(cfg, this.topics, db, logger, isEventsEnabled, this.roleService, this.authZ);
+    const authLogService = new AuthenticationLogService(cfg, db, this.topics['authlog.resource'], logger, isEventsEnabled, this.authZ);
 
     // token service
     const tokenService = new TokenService(cfg, logger, this.userService);
