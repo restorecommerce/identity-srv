@@ -13,7 +13,7 @@ RUN npm run build
 
 
 ### Deployment
-FROM node:24.10-alpine AS deployment
+FROM node:26-alpine3.24 AS deployment
 
 ENV NO_UPDATE_NOTIFIER=true
 
