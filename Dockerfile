@@ -1,5 +1,5 @@
 ### Build
-FROM node:24.10-alpine AS build
+FROM node:26-alpine3.24 AS build
 ENV NO_UPDATE_NOTIFIER=true
 
 USER node
