@@ -8,7 +8,6 @@ await esbuild.build({
   outfile: 'lib/start.cjs',
   minify: true,
   treeShaking: true,
-  external: ['@platformatic/wasm-utils'],
   sourcemap: 'linked',
   plugins: [commonifierPlugin],
 });
@@ -21,7 +20,6 @@ await esbuild.build({
   minify: true,
   treeShaking: true,
   sourcemap: 'linked',
-  external: ['@platformatic/wasm-utils'],
   outExtension: {
     '.js': '.cjs'
   },

@@ -26,6 +26,7 @@ COPY --chown=node:node ./templates $APP_HOME/templates
 COPY --chown=node:node ./cfg $APP_HOME/cfg/
 COPY --chown=node:node ./data $APP_HOME/data/
 COPY --chown=node:node --from=build $APP_HOME/lib $APP_HOME/lib
+COPY --chown=node:node --from=build $APP_HOME/dist $APP_HOME/dist
 
 EXPOSE 50051
 
