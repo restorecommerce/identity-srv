@@ -236,7 +236,7 @@ export class TokenService implements TokenServiceImplementation {
                   // since AQL is used to remove object - convert DateObject to time in ms
                   (obj as any).expires_in = obj.expires_in ? obj.expires_in.getTime() : undefined;
                   (obj as any).last_use = obj.last_use ? obj.last_use.getTime() : undefined;
-                  (obj as any).created_at = obj.created_at ? obj.last_created_at.getTime() : undefined;
+                  (obj as any).created_at = obj.created_at ? obj.created_at.getTime() : undefined;
                   return obj;
                 }
               }));
