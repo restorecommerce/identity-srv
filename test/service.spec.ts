@@ -384,6 +384,13 @@ describe('testing identity-srv', () => {
             description: 'Read only user',
             meta,
             assignable_by_roles: ['admin-r-id']
+          },
+          {
+            id: 'test-domain-r-id',
+            name: 'test_domain_role',
+            description: 'Test ownershipDomain role',
+            meta,
+            assignable_by_roles: ['admin-r-id']
           }];
 
         const result = await roleService.create({
@@ -392,7 +399,7 @@ describe('testing identity-srv', () => {
         should.exist(result);
         should.exist(result!.items);
         should.exist(result!.operation_status);
-        result!.items!.should.have.length(4);
+        result!.items!.should.have.length(5);
         // validate overall status
         console.log(result!.operation_status);
         result!.operation_status!.code!.should.equal(200);
@@ -2114,7 +2121,7 @@ describe('testing identity-srv', () => {
           result!.items![0]!.status!.message!.should.equal('success');
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');
-          
+
         });
 
         it('should fail trying to update the user name to a already existing one', async function update(): Promise<void> {
@@ -2168,6 +2175,7 @@ describe('testing identity-srv', () => {
               last_name: 'upsert2'
             }]
           });
+          console.log('RESULT 1 >>>>>>>>>>>>>>>>>>>>>>>>', JSON.stringify(result));
           should.exist(result);
           should.exist(result!.items);
           result!.items![0]!.payload!.email!.should.equal('upsert2@restorecommerce.io');
@@ -2181,6 +2189,7 @@ describe('testing identity-srv', () => {
             collection: true
           });
           should.exist(deleteResult.status);
+          console.log('DELETE RESULT >>>>>>>>>>>>>>', JSON.stringify(deleteResult));
           _.forEach(deleteResult.status, (eachResult: any) => {
             eachResult.code!.should.equal(200);
             eachResult.message!.should.equal('success');
@@ -2303,6 +2312,35 @@ describe('testing identity-srv', () => {
           // validate item status and overall status
           result!.items![0]!.status!.code!.should.equal(200);
           result!.items![0]!.status!.message!.should.equal('success');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
+        });
+        it('should not allow to update a User with invalid DomainOwnership', async () => {
+          // enable and enforce authorization
+          cfg.set('authorization:enabled', true);
+          cfg.set('authorization:enforce', true);
+          updateConfig(cfg);
+          testUser.role_associations.push( {
+              role: 'test-domain-r-id',
+              attributes: [
+                {
+                  id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+                  value: 'urn:restorecommerce:acs:model:ownership_domain.ownershipDomain',
+                  attributes: [{
+                    id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                    value: 'domainInstanceId'
+                  }]
+                }
+              ]
+            });
+          const result = await userService.update({ items: [testUser], subject });
+          console.log('RESULT is..........', JSON.stringify(result));
+          testUser.role_associations = testUser.role_associations.shift();
+          console.log('Test User RoleAssocs after Removal are....', JSON.stringify(testUser.role_associations));
+          should.exist(result);
+          // validate item status and overall status
+          result!.items![0]!.status!.code!.should.equal(403);
+          result!.items![0]!.status!.message!.should.equal('the role test-domain-r-id cannot be assigned to user test.user;do not have permissions to assign target scope domainInstanceId for test.user');
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');
         });

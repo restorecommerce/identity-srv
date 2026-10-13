@@ -165,7 +165,8 @@
       "aclIndicatoryEntity": "urn:restorecommerce:acs:names:aclIndicatoryEntity",
       "aclInstance": "urn:restorecommerce:acs:names:aclInstance",
       "skipACL": "urn:restorecommerce:acs:names:skipACL",
-      "maskedProperty": "urn:restorecommerce:acs:names:obligation:maskedProperty"
+      "maskedProperty": "urn:restorecommerce:acs:names:obligation:maskedProperty",
+      "ownershipDomain": "urn:restorecommerce:acs:model:ownership_domain.ownershipDomain"
     },
     "cache": {
       "url": "redis://localhost:6379",

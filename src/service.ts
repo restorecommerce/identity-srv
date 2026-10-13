@@ -116,6 +116,9 @@ import { Client, createChannel, GrpcClientConfig, createClient } from '@restorec
 import {
   ObjectServiceDefinition,
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ostorage.js';
+import {
+  OwnershipDomainServiceDefinition,
+} from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ownership_domain.js';
 
 import { TokenService } from './token_service.js';
 
@@ -136,6 +139,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
   protected readonly uniqueEmailConstraint: boolean;
 
   ostorageService: Client<ObjectServiceDefinition>;
+  ownershipService: Client<OwnershipDomainServiceDefinition>;
 
   tokenService: TokenService;
 
@@ -211,6 +215,18 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
     else {
       logger?.warn('ostorage config is missing!');
+    }
+
+    const acsSrvCfg = cfg.get('client:acs-srv');
+    if (acsSrvCfg) {
+      this.ownershipService = createClient(
+        {
+          ...acsSrvCfg,
+          logger
+        } as GrpcClientConfig,
+        OwnershipDomainServiceDefinition,
+        createChannel(acsSrvCfg.address),
+      );
     }
 
     this.initMatcher();
@@ -459,8 +475,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               userData.data.value = Buffer.from(userData.data.value.data);
             }
             this.updateTokenLastUse(userData.id, token).catch((err) => {
-                logger.error('Error updating last use for token', { subjectId : userData?.id });
-              });
+              logger.error('Error updating last use for token', { subjectId: userData?.id });
+            });
             return { payload: userData, status: returnCodeMessage(200, 'success') };
           } else {
             // delete token from redis and update user entity
@@ -508,7 +524,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             ) {
               // update token last_use
               this.updateTokenLastUse(user.id, token).catch((err) => {
-                logger.error('Error updating last use for token', { subjectId : user.id });
+                logger.error('Error updating last use for token', { subjectId: user.id });
               });
               const updatedUser = await super.read(query, context).then(
                 response => {
@@ -934,7 +950,10 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             const dbUserPl = dbUser?.items?.[0]?.payload;
             dbUserRoleAssocs = dbUserPl?.role_associations ?? [];
           }
-          const validationResponse = this.validateUserRoleAssociations(user.role_associations, hrScopes, userNameId, subject, user.id, dbUserRoleAssocs);
+          // Main check here
+          // if role scoping entity is ownerhsip Domain URN then read from acs-srv the dowmain instance
+          // and if its OrgScoping then check the HR scoping
+          const validationResponse = await this.validateUserRoleAssociations(user.role_associations, hrScopes, userNameId, subject, user.id, dbUserRoleAssocs);
           if (validationResponse.status.code != 200) {
             return validationResponse;
           }
@@ -961,7 +980,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * Validates assigned role associations for the new user to be cretaed
    * with the HR scope and roles of the creating user
    */
-  private validateUserRoleAssociations(userRoleAssocs: RoleAssociation[],
+  private async validateUserRoleAssociations(userRoleAssocs: RoleAssociation[],
     hrScopes: HierarchicalScope[], userNameId: string, subject: ResolvedSubject, userID: string, dbRoleAssocs: RoleAssociation[]) {
     let validateUserRoleAssoc = [];
     if (dbRoleAssocs?.length && userRoleAssocs?.length) {
@@ -1003,7 +1022,42 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       if (userRole) {
         const userRoleAttr = userRoleAssoc?.attributes as Attribute[];
         let userScope;
+        const ownershipDomainInstances = [];
         for (const roleScopeInstObj of userRoleAttr || []) {
+          if (roleScopeInstObj.id === this.cfg.get('authorization:urns:roleScopingInstance')
+            && roleScopeInstObj.value === this.cfg.get('authorization:urns:ownershipDomain')) {
+            for (const nestedRoleAttributes of roleScopeInstObj.attributes || []) {
+              ownershipDomainInstances.push(nestedRoleAttributes.value);
+            }
+          }
+          if (ownershipDomainInstances?.length) {
+            const ownershipReadResponse = await this.ownershipService.read({
+              filters: [{
+                filters: [{
+                  field: 'id',
+                  operation: Filter_Operation.in,
+                  value: JSON.stringify(ownershipDomainInstances),
+                  type: Filter_ValueType.ARRAY
+                }]
+              }],
+              limit: ownershipDomainInstances.length,
+              // use caller subject
+              subject: {
+                id: subject.id,
+                token: subject.token
+              },
+            });
+
+            const ownershipDomainIds = ownershipReadResponse.items?.map((pl) => pl?.payload?.id);
+            const areEqual = (ownershipDomainInstances.length === ownershipDomainIds.length) &&
+              (ownershipDomainInstances.every(val => ownershipDomainIds.includes(val)));
+            if (!areEqual) {
+              const details = `do not have permissions to assign target scope ${ownershipDomainIds} for ${userNameId}`;
+              const message = `the role ${userRole} cannot be assigned to user ${userNameId};${details}`;
+              this.logger.verbose(message);
+              return returnStatus(403, message, userID);
+            }
+          }
           roleScopeInstObj?.attributes?.filter((obj) => {
             if (obj?.id === this.cfg.get('authorization:urns:roleScopingInstance')) {
               userScope = obj?.value;
