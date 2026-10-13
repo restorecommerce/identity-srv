@@ -1024,7 +1024,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         let userScope;
         const ownershipDomainInstances = [];
         for (const roleScopeInstObj of userRoleAttr || []) {
-          if (roleScopeInstObj.id === this.cfg.get('authorization:urns:roleScopingInstance')
+          if (roleScopeInstObj.id === this.cfg.get('authorization:urns:roleScopingEntity')
             && roleScopeInstObj.value === this.cfg.get('authorization:urns:ownershipDomain')) {
             for (const nestedRoleAttributes of roleScopeInstObj.attributes || []) {
               ownershipDomainInstances.push(nestedRoleAttributes.value);
@@ -1048,6 +1048,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               },
             });
 
+            this.logger.info('Ownership read response', { ownershipDomainInstances, ownershipReadResponse });
             const ownershipDomainIds = ownershipReadResponse.items?.map((pl) => pl?.payload?.id);
             const areEqual = (ownershipDomainInstances.length === ownershipDomainIds.length) &&
               (ownershipDomainInstances.every(val => ownershipDomainIds.includes(val)));
@@ -1056,6 +1057,9 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
               const message = `the role ${userRole} cannot be assigned to user ${userNameId};${details}`;
               this.logger.verbose(message);
               return returnStatus(403, message, userID);
+            } else {
+              this.logger.info(`Subject has valid permissions to assign target scope ${ownershipDomainIds} for ${userNameId}`);
+              continue;
             }
           }
           roleScopeInstObj?.attributes?.filter((obj) => {
@@ -2842,7 +2846,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
         const deleteResponse = await super.delete(DeleteRequest.fromPartial({
           collection: request.collection
         }), context);
-        logger.info('Users collection deleted');
+        logger.info('Users collection deleted', deleteResponse);
         return deleteResponse;
       }
       if (userIDs.length > 0) {

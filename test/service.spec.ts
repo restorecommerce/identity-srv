@@ -261,6 +261,10 @@ const PROTO_PATH: string = 'io/restorecommerce/access_control.proto';
 const PKG_NAME: string = 'io.restorecommerce.access_control';
 const SERVICE_NAME: string = 'AccessControlService';
 
+const OWNERSHIP_DOMAIN_PROTO_PATH: string = 'io/restorecommerce/ownership_domain.proto';
+const OWNERSHIP_DOMAIN_PKG_NAME: string = 'io.restorecommerce.ownership_domain';
+const OWNERSHIP_DOMAIN_SERVICE_NAME: string = 'OwnershipDomainService';
+
 const pkgDef: grpc.GrpcObject = grpc.loadPackageDefinition(
   proto_loader.loadSync(PROTO_PATH, {
     includeDirs: ['node_modules/@restorecommerce/protos/'],
@@ -294,6 +298,39 @@ const startGrpcMockServer = async (methodWithOutput: MethodWithOutput[]) => {
       callback(null, response);
     }
   };
+  const ownershipDomainImplementation = {
+    read: (call: any, callback: any) => {
+      callback(null, {
+        items: [
+          {
+            payload: {
+              id: 'validDomainInstanceId',
+              domain: 'testDataDomain',
+              attributes: [
+                {
+                  id: "urn:restorecommerce:acs:names:ownerIndicatoryEntity",
+                  value: "urn:restorecommerce:acs:model:Test.Test",
+                  attributes: [
+                    {
+                      id: "urn:restorecommerce:acs:names:ownerInstance",
+                      value: "targetScope"
+                    }
+                  ]
+                }
+              ]
+            },
+            status: {
+              code: 200,
+              message: 'success'
+            }
+          }],
+        operation_status: {
+          code: 200,
+          message: 'success'
+        }
+      });
+    }
+  };
   try {
     mockServer.addService(PROTO_PATH, PKG_NAME, SERVICE_NAME, implementations, {
       includeDirs: ['./node_modules/@restorecommerce/protos/'],
@@ -303,8 +340,17 @@ const startGrpcMockServer = async (methodWithOutput: MethodWithOutput[]) => {
       defaults: true,
       oneofs: true
     });
+    mockServer.addService(OWNERSHIP_DOMAIN_PROTO_PATH, OWNERSHIP_DOMAIN_PKG_NAME,
+      OWNERSHIP_DOMAIN_SERVICE_NAME, ownershipDomainImplementation, {
+      includeDirs: ['./node_modules/@restorecommerce/protos/'],
+      keepCase: true,
+      longs: String,
+      enums: String,
+      defaults: true,
+      oneofs: true
+    });
     await mockServer.start();
-    logger.info('Mock ACS Server started on port 50061');
+    logger.info('Mock ACS Server started on port 50161');
   } catch (err) {
     logger.error('Error starting mock ACS server', err);
   }
@@ -401,7 +447,6 @@ describe('testing identity-srv', () => {
         should.exist(result!.operation_status);
         result!.items!.should.have.length(5);
         // validate overall status
-        console.log(result!.operation_status);
         result!.operation_status!.code!.should.equal(200);
         result!.operation_status!.message!.should.equal('success');
         // validate individual status
@@ -2175,7 +2220,6 @@ describe('testing identity-srv', () => {
               last_name: 'upsert2'
             }]
           });
-          console.log('RESULT 1 >>>>>>>>>>>>>>>>>>>>>>>>', JSON.stringify(result));
           should.exist(result);
           should.exist(result!.items);
           result!.items![0]!.payload!.email!.should.equal('upsert2@restorecommerce.io');
@@ -2188,12 +2232,9 @@ describe('testing identity-srv', () => {
           const deleteResult = await userService.delete({
             collection: true
           });
-          should.exist(deleteResult.status);
-          console.log('DELETE RESULT >>>>>>>>>>>>>>', JSON.stringify(deleteResult));
-          _.forEach(deleteResult.status, (eachResult: any) => {
-            eachResult.code!.should.equal(200);
-            eachResult.message!.should.equal('success');
-          });
+          should.exist(deleteResult.operation_status);
+          deleteResult!.operation_status!.code!.should.equal(200);
+          deleteResult!.operation_status!.message!.should.equal('success');
         });
       });
 
@@ -2315,34 +2356,90 @@ describe('testing identity-srv', () => {
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');
         });
-        it('should not allow to update a User with invalid DomainOwnership', async () => {
+        it('should not allow to update a User with DomainOwnership role association when user does not have access to read the ACS Domain', async () => {
           // enable and enforce authorization
           cfg.set('authorization:enabled', true);
           cfg.set('authorization:enforce', true);
           updateConfig(cfg);
-          testUser.role_associations.push( {
-              role: 'test-domain-r-id',
-              attributes: [
-                {
-                  id: 'urn:restorecommerce:acs:names:roleScopingEntity',
-                  value: 'urn:restorecommerce:acs:model:ownership_domain.ownershipDomain',
-                  attributes: [{
-                    id: 'urn:restorecommerce:acs:names:roleScopingInstance',
-                    value: 'domainInstanceId'
-                  }]
-                }
-              ]
-            });
+          testUser.role_associations.push({
+            role: 'test-domain-r-id',
+            attributes: [
+              {
+                id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+                value: 'urn:restorecommerce:acs:model:ownership_domain.ownershipDomain',
+                attributes: [{
+                  id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                  value: 'invalidDomainInstanceId'
+                }]
+              }
+            ]
+          });
           const result = await userService.update({ items: [testUser], subject });
-          console.log('RESULT is..........', JSON.stringify(result));
-          testUser.role_associations = testUser.role_associations.shift();
-          console.log('Test User RoleAssocs after Removal are....', JSON.stringify(testUser.role_associations));
           should.exist(result);
           // validate item status and overall status
           result!.items![0]!.status!.code!.should.equal(403);
-          result!.items![0]!.status!.message!.should.equal('the role test-domain-r-id cannot be assigned to user test.user;do not have permissions to assign target scope domainInstanceId for test.user');
+          result!.items![0]!.status!.message!.should.equal('the role test-domain-r-id cannot be assigned to user test.user;do not have permissions to assign target scope validDomainInstanceId for test.user');
           result!.operation_status!.code!.should.equal(200);
           result!.operation_status!.message!.should.equal('success');
+          // reset test user role associations
+          testUser.role_associations = [{
+            role: 'user-r-id',
+            attributes: [{
+              id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+              value: 'urn:restorecommerce:acs:model:organization.Organization',
+              attributes: [{
+                id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                value: 'orgC'
+              }]
+            }]
+          }];
+        });
+
+        it('should allow to update a User with valid DomainOwnership role association when user has access to read the ACS Domain', async () => {
+          // enable and enforce authorization
+          cfg.set('authorization:enabled', true);
+          cfg.set('authorization:enforce', true);
+          updateConfig(cfg);
+          testUser.role_associations.push({
+            role: 'test-domain-r-id',
+            attributes: [
+              {
+                id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+                value: 'urn:restorecommerce:acs:model:ownership_domain.ownershipDomain',
+                attributes: [{
+                  id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                  value: 'validDomainInstanceId'
+                }]
+              }
+            ]
+          });
+          const result = await userService.update({ items: [testUser], subject });
+
+          should.exist(result);
+          should.exist(result!.items);
+          result!.items![0]!.payload!.id!.should.equal('testuser');
+          result!.items![0]!.payload!.first_name!.should.equal('test');
+          result!.items![0]!.payload!.last_name!.should.equal('user');
+          result!.items![0]!.payload!.role_associations![0]!.attributes![0]!.attributes![0]!.value!.should.equal('orgC');
+          result!.items![0]!.payload!.role_associations![1]!.attributes![0]!.attributes![0]!.value!.should.equal('validDomainInstanceId');
+          // validate item status and overall status
+          result!.items![0]!.status!.code!.should.equal(200);
+          result!.items![0]!.status!.message!.should.equal('success');
+          result!.operation_status!.code!.should.equal(200);
+          result!.operation_status!.message!.should.equal('success');
+
+          // reset test user role associations
+          testUser.role_associations = [{
+            role: 'user-r-id',
+            attributes: [{
+              id: 'urn:restorecommerce:acs:names:roleScopingEntity',
+              value: 'urn:restorecommerce:acs:model:organization.Organization',
+              attributes: [{
+                id: 'urn:restorecommerce:acs:names:roleScopingInstance',
+                value: 'orgC'
+              }]
+            }]
+          }];
         });
         it('should allow to update a User role_associations, first and last name with valid role and valid HR scope', async () => {
           testUser.first_name = 'testFirstName';
