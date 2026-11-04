@@ -2793,7 +2793,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       }), context);
       if (unregisterStatus?.status[0]?.message === 'success') {
         logger.info('user with identifier deleted', { identifier });
-        await this.topics['user.resource'].emit('unregistered', userID);
+        await this.topics['user.resource'].emit('unregistered', { id: userID });
       }
       return { operation_status: unregisterStatus?.status[0] };
     }
