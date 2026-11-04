@@ -17,13 +17,13 @@
     "srv"
   ],
   "dependencies": {
-    "@restorecommerce/acs-client": "^3.4.0",
+    "@restorecommerce/acs-client": "3.5.0",
     "@restorecommerce/chassis-srv": "^1.10.2",
     "@restorecommerce/grpc-client": "^2.3.3",
     "@restorecommerce/kafka-client": "^1.4.5",
     "@restorecommerce/logger": "^1.4.3",
     "@restorecommerce/rc-grpc-clients": "^5.2.5",
-    "@restorecommerce/resource-base-interface": "^1.10.8",
+    "@restorecommerce/resource-base-interface": "^1.10.9",
     "@restorecommerce/scs-jobs": "0.3.5",
     "@restorecommerce/service-config": "1.2.3",
     "@zxcvbn-ts/core": "^3.0.4",
