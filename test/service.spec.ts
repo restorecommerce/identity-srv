@@ -1,6 +1,5 @@
 import should from 'should';
-// @ts-expect-error TS1192
-import _ from 'lodash-es';
+import * as _ from 'lodash-es';
 import { createChannel, createClient } from '@restorecommerce/grpc-client';
 import { Events, Topic } from '@restorecommerce/kafka-client';
 import { Worker } from '../src/worker.js';
@@ -49,11 +48,10 @@ async function start(): Promise<void> {
   cfg = createServiceConfig(process.cwd());
   worker = new Worker(cfg);
   await worker.start();
+  logger = worker.logger;
 }
 
 async function connect<T extends any = any>(clientCfg: string, resourceName: string): Promise<T> { // returns a gRPC service
-  logger = worker.logger;
-
   if (events) {
     await events.stop();
   }
@@ -385,13 +383,7 @@ describe('testing identity-srv', () => {
   }, 120000);
 
   afterAll(async function stopServer(): Promise<void> {
-    // delete user and roles collection
-    // const userService: UserServiceClient = await connect('client:user', 'user');
-    // await userService.delete({
-    //   collection: true
-    // });
-    roleService = await connect('client:role', 'role');
-    await roleService.delete({
+    await roleService?.delete({
       collection: true
     });
     // stop mock acs-srv

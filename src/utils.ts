@@ -1,7 +1,14 @@
 import * as _ from 'lodash-es';
 import {
-  AuthZAction, accessRequest, DecisionResponse, Operation, PolicySetRQResponse, ACSClientContext,
-  ACSClientOptions
+  AuthZAction,
+  accessRequest,
+  DecisionResponse,
+  Operation,
+  PolicySetRQResponse,
+  ACSClientContext,
+  ACSClientOptions,
+  entities as AuthEntities,
+  urns as AuthURNs,
 } from '@restorecommerce/acs-client';
 import { createServiceConfig } from '@restorecommerce/service-config';
 import { createClient, createChannel } from '@restorecommerce/grpc-client';
@@ -23,6 +30,12 @@ import {
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
 import { OperationStatus, Status } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/status.js';
 import { customAlphabet } from 'nanoid';
+
+export const urns = {
+  ...AuthEntities,
+  ...AuthURNs,
+};
+export type urns = typeof urns;
 
 // Create a ids client instance
 let idsClientInstance: UserServiceClient;

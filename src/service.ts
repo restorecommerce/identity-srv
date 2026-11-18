@@ -1,24 +1,8 @@
 import * as fs from 'node:fs';
 import * as _ from 'lodash-es';
 import * as kafkaClient from '@restorecommerce/kafka-client';
-import {
-  checkAccessRequest,
-  getACSFilters,
-  getDefaultFilter,
-  getLoginIdentifierFilter,
-  getNameFilter,
-  marshallProtobufAny,
-  password,
-  resolveSubject,
-  returnCodeMessage,
-  returnOperationStatus,
-  returnStatus,
-  unmarshallProtobufAny,
-  generateAT,
-  getNameIdFilter
-} from './utils.js';
 import { ResourcesAPIBase, ServiceBase, FilterValueType } from '@restorecommerce/resource-base-interface';
-import { Logger } from 'winston';
+import { Logger } from '@restorecommerce/logger';
 import {
   ACSAuthZ,
   AuthZAction,
@@ -27,11 +11,10 @@ import {
   Operation,
   PolicySetRQResponse,
   ResolvedSubject,
-  updateConfig
+  updateConfig,
 } from '@restorecommerce/acs-client';
 import { createClient as createRedisClient, RedisClientType } from 'redis';
 import { query } from '@restorecommerce/chassis-srv/lib/database/provider/arango/common.js';
-import { validateAllChar, validateEmail, validateFirstChar, validateStrLen, validateSymbolRepeat } from './validation.js';
 import { Arango } from '@restorecommerce/chassis-srv/lib/database/provider/arango/base.js';
 import {
   ActivateRequest,
@@ -119,8 +102,25 @@ import {
 import {
   OwnershipDomainServiceDefinition,
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/ownership_domain.js';
-
 import { TokenService } from './token_service.js';
+import { validateAllChar, validateEmail, validateFirstChar, validateStrLen, validateSymbolRepeat } from './validation.js';
+import {
+  checkAccessRequest,
+  getACSFilters,
+  getDefaultFilter,
+  getLoginIdentifierFilter,
+  getNameFilter,
+  marshallProtobufAny,
+  password,
+  resolveSubject,
+  returnCodeMessage,
+  returnOperationStatus,
+  returnStatus,
+  unmarshallProtobufAny,
+  generateAT,
+  getNameIdFilter,
+  urns,
+} from './utils.js';
 
 export const DELETE_USERS_WITH_EXPIRED_ACTIVATION = 'delete-users-with-expired-activation-job';
 
@@ -140,7 +140,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
 
   ostorageService: Client<ObjectServiceDefinition>;
   ownershipService: Client<OwnershipDomainServiceDefinition>;
-
   tokenService: TokenService;
 
   constructor(
@@ -449,7 +448,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
       const { token } = request;
       const logger = this.logger;
       if (token) {
-        const userData = JSON.parse(await this.tokenRedisClient.get(token));
+        const resp = await this.tokenRedisClient.get(token);
+        const userData = typeof resp === 'string' ? JSON.parse(resp) : resp;
         if (userData) {
           logger.debug('Found user data in redis cache', { userId: userData?.id });
           if (userData?.meta?.created) userData.meta.created = new Date(userData.meta.created);
@@ -666,12 +666,23 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     return super.read(request, context);
   }
 
+  superUpdate(request: UserList, context: any): Promise<DeepPartial<UserListResponse>> {
+    const usersList = request.items;
+    for (const user of usersList ?? []) {
+      if (user.password) {
+        user.password_hash = password.hash(user.password);
+        delete user.password;
+      }
+    }
+    return super.update(request, context);
+  }
+
   superUpsert(request: UserList, context: any): Promise<DeepPartial<UserListResponse>> {
     const usersList = request.items;
-    for (const user of usersList || []) {
+    for (const user of usersList ?? []) {
       user.activation_code = this.idGen();
-      user.id = user.id ? user.id : this.idGen();
-      user.active = user.active ? user.active : true;
+      user.id ??= this.idGen();
+      user.active ??= true;
       if (user.password) {
         user.password_hash = password.hash(user.password);
         delete user.password;
@@ -827,7 +838,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                 // check if the rule subject has any scoping Entity
                 const ruleSubjectAttrs = rule?.target?.subjects;
                 for (const ruleAttr of ruleSubjectAttrs || []) {
-                  if (ruleAttr?.id === this.cfg.get('authorization:urns:role')) {
+                  if (ruleAttr?.id === urns.role) {
                     // rule's role which give's user the acess to create User
                     createAccessRole.push(ruleAttr.value);
                     // check if there is no scoping then skip comparing / validating role scope instance
@@ -836,7 +847,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                       skipValidatingScopingInstance = true;
                     }
                   }
-                  if (ruleAttr?.id === this.cfg.get('authorization:urns:roleScopingEntity')) {
+                  if (ruleAttr?.id === urns.roleScopingEntity) {
                     validateRoleScope = true;
                   }
                 }
@@ -1063,7 +1074,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             }
           }
           roleScopeInstObj?.attributes?.filter((obj) => {
-            if (obj?.id === this.cfg.get('authorization:urns:roleScopingInstance')) {
+            if (obj?.id === urns.roleScopingInstance) {
               userScope = obj?.value;
             }
           });
@@ -1094,7 +1105,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
                 const creatorRoleAttr = role.attributes;
                 for (const roleScopeInstObj of creatorRoleAttr) {
                   roleScopeInstObj?.attributes?.filter((obj) => {
-                    if (obj?.id === this.cfg.get('authorization:urns:roleScopingInstance')) {
+                    if (obj?.id === urns.roleScopingInstance) {
                       creatorScope = obj?.value;
                     }
                   });
@@ -2144,7 +2155,7 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
             const tokenValue = token.token;
             const response = await this.tokenRedisClient.get(tokenValue);
             if (response) {
-              const redisResp = JSON.parse(response);
+              const redisResp = typeof response === 'string' ? JSON.parse(response) : response;
               const redisRoleAssocs = redisResp?.role_associations || [];
               const redisTokens = redisResp.tokens;
               const redisID = redisResp.id;
@@ -3356,7 +3367,6 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
    * @param action resource action
    */
   async createMetadata<T extends Resource>(resources: T | T[], action: string, subject?: Subject): Promise<T[]> {
-    const urns = this.cfg.get('authorization:urns');
     if (!Array.isArray(resources)) {
       resources = [resources];
     }
@@ -4208,7 +4218,6 @@ export class RoleService extends ServiceBase<RoleListResponse, RoleList> impleme
    * @param action resource action
    */
   async createMetadata<T extends Resource>(resources: T | T[], action: string, subject?: Subject): Promise<T[]> {
-    const urns = this.cfg.get('authorization:urns');
     if (!Array.isArray(resources)) {
       resources = [resources];
     }

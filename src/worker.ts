@@ -1,10 +1,8 @@
 import { createServiceConfig } from '@restorecommerce/service-config';
 import * as _ from 'lodash-es';
 import { Events, registerProtoMeta } from '@restorecommerce/kafka-client';
-import { createLogger } from '@restorecommerce/logger';
+import { createLogger, Logger } from '@restorecommerce/logger';
 import * as chassis from '@restorecommerce/chassis-srv';
-import { Logger } from 'winston';
-import { UserService, RoleService } from './service.js';
 import { ACSAuthZ, initAuthZ, updateConfig, initializeCache } from '@restorecommerce/acs-client';
 import { createClient, RedisClientType } from 'redis';
 import { AuthenticationLogService } from './authlog_service.js';
@@ -54,6 +52,7 @@ import {
 import { ServerReflectionService } from 'nice-grpc-server-reflection';
 import * as fs from 'node:fs';
 import { runWorker } from '@restorecommerce/scs-jobs';
+import { UserService, RoleService } from './service.js';
 
 registerProtoMeta(
   userMeta,
@@ -430,8 +429,8 @@ export class Worker {
     }
 
     // Start server
+    this.logger.info('Server starting...');
     await server.start();
-
     this.events = events;
     this.server = server;
     this.logger.info('Server started');
@@ -439,13 +438,11 @@ export class Worker {
 
   async stop(): Promise<any> {
     this.logger.info('Shutting down');
-    await Promise.all([
-      this.server.stop(),
-      this.events.stop(),
-      this.offsetStore.stop(),
-      this.redisClient.quit(),
-      this.roleService.stop(),
-      this.userService.stop()
-    ]);
+    await this.server?.stop().catch(this.logger.error);
+    await this.events?.stop().catch(this.logger.error);
+    await this.roleService?.stop().catch(this.logger.error);
+    await this.userService?.stop().catch(this.logger.error);
+    await this.offsetStore?.stop().catch(this.logger.error);
+    await this.redisClient?.quit().catch(this.logger.error);
   }
 }

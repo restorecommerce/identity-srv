@@ -1,0 +1,4 @@
+reject:
+  - 'otplib'
+  - '@zxcvbn-ts/*'
+  - 'bullmq'

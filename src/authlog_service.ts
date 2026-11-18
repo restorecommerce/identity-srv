@@ -8,7 +8,6 @@ import {
   Operation
 } from '@restorecommerce/acs-client';
 import { Topic } from '@restorecommerce/kafka-client';
-import { checkAccessRequest, resolveSubject, returnOperationStatus } from './utils.js';
 import {
   AuthenticationLogServiceImplementation,
   AuthenticationLogListResponse,
@@ -25,6 +24,7 @@ import {
 import { Subject } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/auth.js';
 import { Filter_ValueType } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/filter.js';
 import { randomUUID } from 'crypto';
+import { checkAccessRequest, resolveSubject, returnOperationStatus, urns } from './utils.js';
 
 export class AuthenticationLogService extends ServiceBase<AuthenticationLogListResponse, AuthenticationLogList> implements AuthenticationLogServiceImplementation {
   cfg: any;
@@ -266,7 +266,6 @@ export class AuthenticationLogService extends ServiceBase<AuthenticationLogListR
    * @param action resource action
    */
   async createMetadata<T extends Resource>(resources: T | T[], action: string, subject?: Subject): Promise<T[]> {
-    const urns = this.cfg.get('authorization:urns');
     if (!Array.isArray(resources)) {
       resources = [resources];
     }

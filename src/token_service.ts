@@ -1,7 +1,5 @@
 import * as _ from 'lodash-es';
-import { ACSAuthZ, AuthZAction, DecisionResponse, Operation, PolicySetRQResponse } from '@restorecommerce/acs-client';
-import { checkAccessRequest, createMetadata } from './utils.js';
-import { UserService } from './service.js';
+import { AuthZAction, DecisionResponse, Operation, PolicySetRQResponse } from '@restorecommerce/acs-client';
 import {
   DeepPartial, GrantId,
   Identifier,
@@ -18,6 +16,8 @@ import {
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/access_control.js';
 import { Filter_Operation, ReadRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 import { randomUUID } from 'crypto';
+import { checkAccessRequest, createMetadata, urns } from './utils.js';
+import { UserService } from './service.js';
 
 const unmarshallProtobufAny = (msg: Any): any => JSON.parse(msg.value.toString());
 
@@ -194,7 +194,7 @@ export class TokenService implements TokenServiceImplementation {
       return marshallProtobufAny(response);
     }
     context.subject = request.subject;
-    const resources = await createMetadata(request, this.cfg.get('authorization:urns'), request.subject);
+    const resources = await createMetadata(request, urns, request.subject);
     context.resources = resources;
     let acsResponse: DecisionResponse;
     try {
@@ -338,7 +338,7 @@ export class TokenService implements TokenServiceImplementation {
       tokens = JSON.parse(tokens);
     }
     Object.assign(subject, { tokens });
-    const resources = await createMetadata<any>(request, this.cfg.get('authorization:urns'), subject);
+    const resources = await createMetadata<any>(request, urns, subject);
     let acsResponse: DecisionResponse;
     try {
       if (!context) { context = {}; };

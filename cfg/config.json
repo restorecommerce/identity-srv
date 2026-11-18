@@ -102,12 +102,12 @@
       ],
       "customQueries": [
         {
-          "path": "filter_ownership.aql",
+          "path": "./queries/filter_ownership.aql",
           "name": "filterByOwnership",
           "type": "filter"
         },
         {
-          "path": "filter_role_association.aql",
+          "path": "./queries/filter_role_association.aql",
           "name": "filterByRoleAssociation",
           "type": "filter"
         }
@@ -355,7 +355,7 @@
       {
         "name": "grpcIdentity",
         "provider": "grpc",
-        "addr": "localhost:50051"
+        "addr": "0.0.0.0:50051"
       }
     ]
   },
@@ -442,7 +442,8 @@
         "base_site": "",
         "authorize_path": "https://accounts.google.com/o/oauth2/auth",
         "access_token_path": "https://oauth2.googleapis.com/token",
-        "scope": "email"
+        "scope": "email",
+        "property": "urn:restorecommerce:ids:user:property:google-id"
       }
     }
   },

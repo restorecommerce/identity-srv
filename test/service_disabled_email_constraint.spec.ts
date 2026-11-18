@@ -1,5 +1,5 @@
 import should from 'should';
-import _ from 'lodash-es';
+import * as _ from 'lodash-es';
 import { createClient, createChannel } from '@restorecommerce/grpc-client';
 import * as kafkaClient from '@restorecommerce/kafka-client';
 import { Topic } from '@restorecommerce/kafka-client';
@@ -21,7 +21,7 @@ import {
 import { Filter_Operation } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
 import { PolicySetRQ } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/policy_set.js';
 import { Effect, RuleRQ } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/rule.js';
-import { expect, it, describe, beforeAll, afterAll } from 'vitest';
+import { it, describe, beforeAll, afterAll } from 'vitest';
 import { Logger } from '@restorecommerce/logger';
 
 const Events = kafkaClient.Events;
@@ -46,11 +46,10 @@ async function start(): Promise<void> {
   cfg.set('service:uniqueEmailConstraint', false);
   worker = new Worker(cfg);
   await worker.start();
+  logger = worker.logger;
 }
 
 async function connect(clientCfg: string, resourceName: string): Promise<any> { // returns a gRPC service
-  logger = worker.logger;
-
   if (events) {
     await events.stop();
     events = undefined;
@@ -170,20 +169,16 @@ const startGrpcMockServer = async (methodWithOutput: MethodWithOutput[]) => {
       callback(null, response);
     }
   };
-  try {
-    mockServer.addService(PROTO_PATH, PKG_NAME, SERVICE_NAME, implementations, {
-      includeDirs: ['node_modules/@restorecommerce/protos/'],
-      keepCase: true,
-      longs: String,
-      enums: String,
-      defaults: true,
-      oneofs: true
-    });
-    await mockServer.start();
-    logger.info('Mock ACS Server started on port 50061');
-  } catch (err) {
-    logger.error('Error starting mock ACS server', err);
-  }
+  mockServer.addService(PROTO_PATH, PKG_NAME, SERVICE_NAME, implementations, {
+    includeDirs: ['node_modules/@restorecommerce/protos/'],
+    keepCase: true,
+    longs: String,
+    enums: String,
+    defaults: true,
+    oneofs: true
+  });
+  await mockServer.start();
+  logger.info('Mock ACS Server started on port 50161');
 };
 
 const stopGrpcMockServer = async () => {

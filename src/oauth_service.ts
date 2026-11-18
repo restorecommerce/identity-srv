@@ -1,4 +1,4 @@
-import { Logger } from 'winston';
+import { Logger } from '@restorecommerce/logger';
 import { OAuth2 } from 'oauth';
 import { UserService } from './service.js';
 import * as _ from 'lodash-es';
@@ -18,44 +18,40 @@ import { WithRequestID } from '@restorecommerce/chassis-srv/lib/microservice/tra
 import { FindByTokenRequest } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/user.js';
 import {
   Filter_Operation,
+  FilterOp_Operator,
   ReadRequest
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
-import fetch from 'node-fetch';
 import { randomUUID } from 'crypto';
-
-export const accountResolvers: { [key: string]: (access_token: string) => Promise<string> } = {
-  google: async access_token => {
-    const response: any = await fetch(
-      'https://www.googleapis.com/oauth2/v1/userinfo',
-      {
-        headers: {
-          Authorization: 'Bearer ' + access_token
-        }
-      }
-    ).then(
-      response => response.json()
-    );
-    return response.email;
-  }
-};
+import { ServiceConfig } from '@restorecommerce/service-config';
 
 export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
+  readonly accountResolvers: Record<string, (access_token: string) => Promise<{ id?: string, email?: string }>> = {
+    google: async access_token => {
+      const response: any = await fetch(
+        this.cfg.get('oauth:services:google') ?? 'https://www.googleapis.com/oauth2/v1/userinfo',
+        {
+          headers: {
+            Authorization: 'Bearer ' + access_token
+          }
+        }
+      ).then(
+        response => response.json()
+      );
+      return response;
+    }
+  };
 
-  logger: Logger;
-  cfg: any;
-  clients: { [key: string]: OAuth2 };
-  userService: UserService;
-
-  constructor(cfg: any, logger: any, userService: UserService) {
-    this.logger = logger;
-    this.cfg = cfg;
-    this.clients = {};
-    this.userService = userService;
-
+  constructor(
+    private readonly cfg: ServiceConfig,
+    private readonly logger: Logger,
+    private readonly userService: UserService,
+    private readonly clients: Record<string, OAuth2> = {},
+  ) {
     const services = cfg.get('oauth:services');
+    this.clients ??= {};
     if (services) {
       Object.keys(services).forEach(key => {
-        if (!(key in accountResolvers)) {
+        if (!(key in this.accountResolvers)) {
           throw new Error('Unknown oauth service: ' + key);
         }
 
@@ -84,7 +80,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         ...Object.entries(this.clients).map(([key, value]) => ({
           [key]: value.getAuthorizeUrl({
             redirect_uri: this.cfg.get('oauth:redirect_uri_base') + key,
-            scope: this.cfg.get('oauth:services:' + key + ':scope'),
+            scope: this.cfg.get(`oauth:services:${key}:scope`),
             response_type: 'code',
             state: nonce,
             prompt: 'consent',
@@ -98,6 +94,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
   async exchangeCode(request: ExchangeCodeRequest, context: any): Promise<DeepPartial<ExchangeCodeResponse>> {
     try {
       const oauthService = request.service;
+      const propertyUrn = this.cfg.get(`oauth:${oauthService}:property`);
       if (!(oauthService in this.clients)) {
         throw new Error('Unknown service: ' + oauthService);
       }
@@ -125,31 +122,63 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         )
       );
 
-      const email = await accountResolvers[oauthService](data.access_token);
-      const user = await this.userService.superRead(ReadRequest.fromPartial({
+      const resp = await this.accountResolvers[oauthService](data.access_token);
+      const users = await this.userService.superRead(ReadRequest.fromPartial({
         filters: [
           {
             filters: [
               {
                 field: 'email',
                 operation: Filter_Operation.eq,
-                value: email
-              }
-            ]
+                value: resp.email,
+              },
+              ...(propertyUrn ? [{
+                filters: [
+                  {
+                    filters: [
+                      {
+                        field: 'properties[*].id',
+                        operation: Filter_Operation.in,
+                        value: propertyUrn
+                      },
+                      {
+                        field: 'properties[*].value',
+                        operation: Filter_Operation.in,
+                        value: resp.id
+                      }
+                    ],
+                    operator: FilterOp_Operator.and
+                  }
+                ],
+              }] : [])
+            ],
+            operator: FilterOp_Operator.or,
           }
         ],
-        limit: 1
+        limit: 2
       }), context).then(
-        response => response?.items?.[0]?.payload
+        response => response?.items
       );
 
-      if (!user) {
+      // You shell not return 404 Not Found, telling attackers that an account does not exists!
+      // You shell not return 409 Conflict, telling attackers that another account with this configuration exists!
+      // You shell always return 401 Unauthorized, leaving uncertainty!
+      // But we can log it:
+      if (users.length == 0) {
+        this.logger?.debug('OAuth.exchangeCode(): No user found:', resp); // this is no error!
+      }
+      else if (users.length > 1) {
+        this.logger?.error('OAuth.exchangeCode(): User identifier ambigous:', resp); // something's fishy!
+      }
+
+      if (users.length !== 1) {
         throw {
-          code: 404,
-          message: `No user found for ${email}`,
+          code: 401,
+          message: `Unauthorized for ${resp.email}`,
         };
       }
 
+      const user = users[0].payload;
       const resultTokens = (user.tokens || []).filter(
         t => t.name === oauthService + '-access_token'
           || t.name === oauthService + '-refresh_token'
@@ -157,7 +186,6 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
       delete user.tokens;
       delete user.password_hash;
-      delete user.data;
 
       const token = new jose.UnsecuredJWT({
         user
@@ -208,10 +236,26 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       // append auth token on user entity
       await this.userService.updateUserTokens(user.id, authToken);
       this.logger.info('Token updated on user entity', { id: user.id });
+      // Add identifier property if any
+      if (propertyUrn) {
+        this.logger.debug('Append identification property');
+        user.properties ??= [];
+        user.properties.push({
+          id: propertyUrn,
+          value: resp.id,
+        });
+        await this.userService.superUpdate(
+          {
+            items: [{
+              properties: _.uniqWith(user.properties, _.isEqual)
+            }]
+          }, {}
+        );
+      }
 
       authToken.expires_in = new Date(authToken.expires_in);
       return {
-        email,
+        email: resp.email,
         user: {
           payload: user,
           status: {
@@ -251,10 +295,11 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       );
 
       if (!user?.payload?.tokens) {
+        this.logger.debug('OAuth.getToken(): No user found!'); // don't tell attackers!
         return {
           status: {
-            code: 404,
-            message: 'user not found'
+            code: 401,
+            message: 'Unauthorized!'
           }
         };
       }
@@ -266,10 +311,11 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
             token: tokens[0].token
           };
         } else {
+          this.logger.debug('OAuth.getToken(): User has no token for this service!'); // don't tell attackers!
           return {
             status: {
-              code: 404,
-              message: 'user has no token for this service'
+              code: 401,
+              message: 'Unauthorized!'
             }
           };
         }

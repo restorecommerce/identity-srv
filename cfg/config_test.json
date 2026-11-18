@@ -26,7 +26,7 @@
   },
   "logger": {
     "console": {
-      "level": "debug"
+      "level": "error"
     }
   },
   "client": {
@@ -69,7 +69,7 @@
       {
         "name": "grpcIdentityTest",
         "provider": "grpc",
-        "addr": "localhost:50151"
+        "addr": "0.0.0.0:50151"
       }
     ]
   }
