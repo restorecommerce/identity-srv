@@ -247,8 +247,10 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         await this.userService.superUpdate(
           {
             items: [{
+              id: user.id,
               email: resp.email,
-              properties: _.uniqWith(user.properties, _.isEqual)
+              properties: _.uniqWith(user.properties, _.isEqual),
+              meta: user.meta
             }]
           }, {}
         );
