@@ -21,14 +21,15 @@ import {
   FilterOp_Operator,
   ReadRequest
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
 import { ServiceConfig } from '@restorecommerce/service-config';
 
 export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
+  readonly nonce = randomBytes(16).toString('hex')
   readonly accountResolvers: Record<string, (access_token: string) => Promise<{ id?: string, email?: string }>> = {
     google: async access_token => {
       const response: any = await fetch(
-        this.cfg.get('oauth:services:google') ?? 'https://www.googleapis.com/oauth2/v1/userinfo',
+        this.cfg.get('oauth:services:google:api_path') ?? 'https://www.googleapis.com/oauth2/v2/userinfo',
         {
           headers: {
             Authorization: 'Bearer ' + access_token
@@ -74,42 +75,49 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
   }
 
   async generateLinks(request: Empty, context: any): Promise<DeepPartial<GenerateLinksResponse>> {
-    const nonce = 'nonce'; // TODO Generate, store and compare unique nonce
     return {
-      links: Object.assign({},
-        ...Object.entries(this.clients).map(([key, value]) => ({
-          [key]: value.getAuthorizeUrl({
-            redirect_uri: this.cfg.get('oauth:redirect_uri_base') + key,
-            scope: this.cfg.get(`oauth:services:${key}:scope`),
-            response_type: 'code',
-            state: nonce,
-            prompt: 'consent',
-            access_type: 'offline'
-          })
-        }))
-      )
+      links: Object.entries(this.clients).reduce((a: any, [key, value]) => {
+        const srvCfg = this.cfg.get(`oauth:services:${key}`);
+        const params = {
+          redirect_uri: srvCfg.redirect_uri ?? (this.cfg.get('oauth::redirect_uri_base') + key),
+          response_type: srvCfg.code ?? 'code',
+          scope: srvCfg.scope,
+          prompt: srvCfg.prompt ?? 'consent',
+          access_type: srvCfg.access_type ?? 'offline',
+          state: this.nonce,
+        };
+        a[key] = value.getAuthorizeUrl(params);
+        return a;
+      }, {})
     };
   }
 
   async exchangeCode(request: ExchangeCodeRequest, context: any): Promise<DeepPartial<ExchangeCodeResponse>> {
     try {
       const oauthService = request.service;
-      const propertyUrn = this.cfg.get(`oauth:${oauthService}:property`);
+      const srvCfg = this.cfg.get(`oauth:services:${oauthService}`);
+      const propertyUrn = srvCfg.property;
       if (!(oauthService in this.clients)) {
         throw new Error('Unknown service: ' + oauthService);
       }
 
+      const params: any = {
+        grant_type: 'authorization_code',
+        redirect_uri: srvCfg.redirect_uri ?? (this.cfg.get('oauth::redirect_uri_base') + oauthService),
+      };
       const data: any = await new Promise(
         (resolve, reject) => this.clients[oauthService].getOAuthAccessToken(
           request.code,
-          {
-            grant_type: 'authorization_code',
-            redirect_uri: this.cfg.get('oauth:redirect_uri_base') + oauthService,
-          },
-          (err, access_token, refresh_token, result) => {
+          params,
+          (err: any, access_token, refresh_token, result) => {
             if (err) {
-              this.logger.error('Oauth failed:', { err });
-              reject(err);
+              delete params.client_secret;
+              this.logger.error('Oauth failed:', { err, params, access_token, refresh_token, result });
+              const data = JSON.parse(err.data ?? '{}');
+              reject({
+                code: Number.isInteger(err.statusCode) ? err.statusCode : 500,
+                message: data.error ? `${oauthService}: ${data.error}` : `${oauthService}: Unknown error!`
+              });
               return;
             }
 
@@ -164,7 +172,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       // You shell not return 409 Conflict, telling attackers that another account with this configuration exists!
       // You shell always return 401 Unauthorized, leaving uncertainty!
       // But we can log it:
-      if (users.length == 0) {
+      if (users.length === 0) {
         this.logger?.debug('OAuth.exchangeCode(): No user found:', resp); // this is no error!
       }
       else if (users.length > 1) {
@@ -273,8 +281,8 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       return {
         user: {
           status: {
-            code: err.code,
-            message: err.message
+            code: Number.isInteger(err.code) ? err.code : 500,
+            message: err.message ?? 'Unknown Error!'
           }
         }
       };
