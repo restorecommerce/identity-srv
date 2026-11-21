@@ -301,11 +301,8 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     }
 
     // add ACS filters if subject is not tech user
-    let acsFilterObj, techUser;
-    const techUsersCfg = this.cfg.get('techUsers');
-    if (techUsersCfg?.length) {
-      techUser = techUsersCfg?.find((obj: any) => obj.id === subject?.id);
-    }
+    let acsFilterObj;
+    const techUser = Object.values(this.cfg.get('techUsers') ?? {})?.find((obj: any) => obj.id === subject?.id);
     const filters = getACSFilters(acsResponse, 'user');
     if (!techUser && filters) {
       acsFilterObj = filters;
@@ -3077,12 +3074,11 @@ export class UserService extends ServiceBase<UserListResponse, UserList> impleme
     try {
       const hbsTemplates = this.cfg.get('service:hbs_templates');
       const enableEmail = this.cfg.get('service:enableEmail');
-      let hbsUser: any = {};
-      const techUsersCfg = this.cfg.get('techUsers');
-      if (techUsersCfg?.length) {
-        hbsUser = techUsersCfg?.find((obj: any) => obj.id === 'hbs_user');
-      }
-
+      const hbsUser: any = this.cfg.get('techUsers')?.hbs_user ?? Object.values<any>(
+        this.cfg.get('techUsers') ?? {}
+      ).find(
+        u => u.id === 'hbs_user',
+      );
 
       if (hbsTemplates && enableEmail) {
         await Promise.all(

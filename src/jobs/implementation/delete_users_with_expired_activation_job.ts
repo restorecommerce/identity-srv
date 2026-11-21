@@ -72,11 +72,11 @@ export const deleteUsersWithExpiredActivation = async (cfg: any, logger: any, ev
         }
       ]
     }];
-    let tokenTechUser: any = {};
-    const techUsersCfg = cfg.get('techUsers');
-    if (techUsersCfg?.length) {
-      tokenTechUser = techUsersCfg?.find((obj: any) => obj.id === 'delete_tech_user');
-    }
+    const tokenTechUser: any = cfg.get('techUsers')?.delete_tech_user ?? Object.values<any>(
+      cfg.get('techUsers') ?? {}
+    ).find(
+      u => u.id === 'delete_tech_user'
+    );
 
     const users = await idsClient.read({ filters, subject: { token: tokenTechUser.token } }, {});
     logger.info('Retrieved users: ', users);
