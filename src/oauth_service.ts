@@ -53,7 +53,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
     if (services) {
       Object.keys(services).forEach(key => {
         if (!(key in this.accountResolvers)) {
-          throw new Error('Unknown oauth service: ' + key);
+          this.logger?.warn('Unknown oauth service: ', key);
         }
 
         const service = services[key];
@@ -111,8 +111,8 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
           params,
           (err: any, access_token, refresh_token, result) => {
             if (err) {
-              delete params.client_secret;
-              this.logger.error('Oauth failed:', { err, params, access_token, refresh_token, result });
+              this.logger.error('Oauth failed:', err);
+              this.logger.debug('Oauth details:', { params, access_token, refresh_token, result });
               const data = JSON.parse(err.data ?? '{}');
               reject({
                 code: Number.isInteger(err.statusCode) ? err.statusCode : 500,
