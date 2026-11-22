@@ -440,11 +440,9 @@
         "redirect_uri": "http://127.0.0.1:5000/oauth2/google",
         "client_id": "",
         "client_secret": "",
-        "base_site": "https://accounts.google.com/",
+        "issuer": "https://accounts.google.com",
         "api_path": "https://www.googleapis.com/oauth2/v2/userinfo",
-        "authorize_path": "o/oauth2/v2/auth",
-        "access_token_path": "o/oauth2/token",
-        "scope": "email https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.profile",
+        "scope": "email profile",
         "prompt": "consent",
         "property": "urn:restorecommerce:ids:user:property:google-id"
       }

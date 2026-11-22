@@ -1,8 +1,8 @@
-import { Logger } from '@restorecommerce/logger';
-import { OAuth2 } from 'oauth';
-import { UserService } from './service.js';
 import * as _ from 'lodash-es';
 import * as jose from 'jose';
+import * as openid from 'openid-client';
+import { Logger } from '@restorecommerce/logger';
+import { UserService } from './service.js';
 import {
   DeepPartial,
   ExchangeCodeRequest,
@@ -21,11 +21,10 @@ import {
   FilterOp_Operator,
   ReadRequest
 } from '@restorecommerce/rc-grpc-clients/dist/generated-server/io/restorecommerce/resource_base.js';
-import { randomUUID, randomBytes } from 'crypto';
+import { randomUUID } from 'crypto';
 import { ServiceConfig } from '@restorecommerce/service-config';
 
 export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
-  readonly nonce = randomBytes(16).toString('hex')
   readonly accountResolvers: Record<string, (access_token: string) => Promise<{ id?: string, email?: string }>> = {
     google: async access_token => {
       const response: any = await fetch(
@@ -46,10 +45,9 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
     private readonly cfg: ServiceConfig,
     private readonly logger: Logger,
     private readonly userService: UserService,
-    private readonly clients: Record<string, OAuth2> = {},
+    private readonly clients = new Map<string, openid.Configuration>(),
   ) {
     const services = cfg.get('oauth:services');
-    this.clients ??= {};
     if (services) {
       Object.keys(services).forEach(key => {
         if (!(key in this.accountResolvers)) {
@@ -57,12 +55,14 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         }
 
         const service = services[key];
-        this.clients[key] = new OAuth2(
+        openid.discovery(
+          new URL(service.issuer),
           service.client_id,
           service.client_secret,
-          service.base_site,
-          service.authorize_path,
-          service.access_token_path
+          openid.ClientSecretPost(service.client_secret)
+        ).then(
+          client => this.clients.set(key, client),
+          err => this.logger.warn('OpenID discovery failed:', err),
         );
       });
     }
@@ -70,13 +70,13 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
   async availableServices(request: Empty, context: any): Promise<DeepPartial<ServicesResponse>> {
     return {
-      services: Object.keys(this.clients)
+      services: Array.from(this.clients.keys()),
     };
   }
 
   async generateLinks(request: Empty, context: any): Promise<DeepPartial<GenerateLinksResponse>> {
     return {
-      links: Object.entries(this.clients).reduce((a: any, [key, value]) => {
+      links: Array.from(this.clients).reduce((a: any, [key, client]) => {
         const srvCfg = this.cfg.get(`oauth:services:${key}`);
         const params = {
           redirect_uri: srvCfg.redirect_uri ?? (this.cfg.get('oauth::redirect_uri_base') + key),
@@ -84,9 +84,11 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
           scope: srvCfg.scope,
           prompt: srvCfg.prompt ?? 'consent',
           access_type: srvCfg.access_type ?? 'offline',
-          state: this.nonce,
         };
-        a[key] = value.getAuthorizeUrl(params);
+        a[key] = openid.buildAuthorizationUrl(
+          client,
+          params
+        );
         return a;
       }, {})
     };
@@ -97,39 +99,22 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       const oauthService = request.service;
       const srvCfg = this.cfg.get(`oauth:services:${oauthService}`);
       const propertyUrn = srvCfg.property;
-      if (!(oauthService in this.clients)) {
-        throw new Error('Unknown service: ' + oauthService);
+      const client = this.clients.get(oauthService);
+      if (!client) {
+        throw new Error(`Unknown service: ${oauthService}`);
       }
 
-      const params: any = {
-        grant_type: 'authorization_code',
-        redirect_uri: srvCfg.redirect_uri ?? (this.cfg.get('oauth::redirect_uri_base') + oauthService),
-      };
-      const data: any = await new Promise(
-        (resolve, reject) => this.clients[oauthService].getOAuthAccessToken(
-          request.code,
-          params,
-          (err: any, access_token, refresh_token, result) => {
-            if (err) {
-              this.logger.error('Oauth failed:', err);
-              this.logger.debug('Oauth details:', { params, access_token, refresh_token, result });
-              const data = JSON.parse(err.data ?? '{}');
-              reject({
-                code: Number.isInteger(err.statusCode) ? err.statusCode : 500,
-                message: data.error ? `${oauthService}: ${data.error}` : `${oauthService}: Unknown error!`
-              });
-              return;
-            }
-
-            resolve({
-              access_token,
-              refresh_token,
-              result
-            });
-          }
-        )
+      const currentUrl = new URL(
+        srvCfg.redirect_uri ?? (this.cfg.get('oauth::redirect_uri_base') + oauthService)
       );
+      currentUrl.searchParams.set('iss', srvCfg.issuer);
+      currentUrl.searchParams.set('code', request.code);
+      currentUrl.searchParams.set('scope', srvCfg.scope);
 
+      const data = await openid.authorizationCodeGrant(
+        client,
+        currentUrl,
+      );
       const resp = await this.accountResolvers[oauthService](data.access_token);
       const users = await this.userService.superRead(ReadRequest.fromPartial({
         filters: [
@@ -186,7 +171,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         };
       }
 
-      const user = users[0].payload;
+      let user = users[0].payload;
       const resultTokens = (user.tokens || []).filter(
         t => t.name === oauthService + '-access_token'
           || t.name === oauthService + '-refresh_token'
@@ -213,7 +198,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
       const accessToken = {
         name: oauthService + '-access_token',
-        expires_in: new Date(Date.now() + data.result.expires_in * 1000),
+        expires_in: new Date(Date.now() + data.expires_in * 1000),
         token: data.access_token,
         type: 'access_token',
         interactive: true,
@@ -252,7 +237,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
           id: propertyUrn,
           value: resp.id,
         });
-        await this.userService.superUpdate(
+        user = await this.userService.superUpdate(
           {
             items: [{
               id: user.id,
@@ -261,12 +246,21 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
               meta: user.meta
             }]
           }, {}
+        ).then(
+          resp => {
+            if (resp.operation_status?.code !== 200) {
+              throw resp.operation_status;
+            }
+            else {
+              return resp.items?.pop()?.payload;
+            }
+          }
         );
       }
 
       authToken.expires_in = new Date(authToken.expires_in);
       return {
-        email: resp.email,
+        email: user.email,
         user: {
           payload: user,
           status: {
@@ -277,7 +271,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         token: authToken
       };
     } catch (err: any) {
-      this.logger.error('Error on token exchange', err);
+      this.logger.error('Error on token exchange', err.cause ?? err);
       return {
         user: {
           status: {
@@ -292,7 +286,8 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
   async getToken(request: GetTokenRequest, context: any): Promise<DeepPartial<GetTokenResponse>> {
     try {
       const oauthService = request.service;
-      if (!(oauthService in this.clients)) {
+      const client = this.clients.get(oauthService);
+      if (!client) {
         throw new Error('Unknown service: ' + oauthService);
       }
 
@@ -362,26 +357,9 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
           && t.expires_in.getTime() >= Date.now()
       );
 
-      const data: any = validRefreshToken && await new Promise(
-        (resolve, reject) => this.clients[oauthService].getOAuthAccessToken(
-          validRefreshToken.token,
-          {
-            grant_type: 'refresh_token'
-          },
-          (err, access_token, refresh_token, result) => {
-            if (err) {
-              this.logger.error('Error Refreshing Token', err);
-              reject(err);
-              return;
-            }
-
-            resolve({
-              access_token,
-              refresh_token,
-              result
-            });
-          }
-        )
+      const data = await openid.refreshTokenGrant(
+        client,
+        validRefreshToken.token,
       );
 
       if (!data) {
@@ -390,7 +368,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
       const newAccessToken = {
         name: oauthService + '-access_token',
-        expires_in: new Date(Date.now() + data.result.expires_in * 1000),
+        expires_in: new Date(Date.now() + data.expires_in * 1000),
         token: data.access_token,
         type: 'access_token',
         interactive: true,
