@@ -35,37 +35,40 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
           }
         }
       ).then(
-        response => response.json()
+        response => response.json(),
+        err => this.logger?.error('Oauth resolver setup failed:', err)
       );
       return response;
     }
   };
 
-  constructor(
+  protected constructor(
     private readonly cfg: ServiceConfig,
-    private readonly logger: Logger,
     private readonly userService: UserService,
+    private readonly logger?: Logger,
     private readonly clients = new Map<string, openid.Configuration>(),
-  ) {
-    const services = cfg.get('oauth:services');
-    if (services) {
-      Object.keys(services).forEach(key => {
-        if (!(key in this.accountResolvers)) {
-          this.logger?.warn('Unknown oauth service: ', key);
-        }
+  ) {}
 
-        const service = services[key];
-        openid.discovery(
-          new URL(service.issuer),
-          service.client_id,
-          service.client_secret,
-          openid.ClientSecretPost(service.client_secret)
-        ).then(
-          client => this.clients.set(key, client),
-          err => this.logger.warn('OpenID discovery failed:', err),
-        );
-      });
-    }
+  protected async init() {
+    const services = this.cfg.get('oauth:services') ?? {};
+    this.logger?.debug('Oauth Service Cfg:', services);
+    for (const key of Object.keys(services)) {
+      if (!(key in this.accountResolvers)) {
+        this.logger?.warn('Unknown oauth service: ', key);
+      }
+
+      const service = services[key];
+      await openid.discovery(
+        new URL(service.issuer),
+        service.client_id,
+        service.client_secret,
+        openid.ClientSecretPost(service.client_secret)
+      ).then(
+        client => this.clients.set(key, client),
+        err => this.logger?.error('OpenID discovery failed:', err),
+      );
+    };
+    return this;
   }
 
   async availableServices(request: Empty, context: any): Promise<DeepPartial<ServicesResponse>> {
@@ -228,10 +231,10 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       }));
       // append auth token on user entity
       await this.userService.updateUserTokens(user.id, authToken);
-      this.logger.info('Token updated on user entity', { id: user.id });
+      this.logger?.info('Token updated on user entity', { id: user.id });
       // Add identifier property if any
       if (propertyUrn) {
-        this.logger.debug('Append identification property');
+        this.logger?.debug('Append identification property');
         user.properties ??= [];
         user.properties.push({
           id: propertyUrn,
@@ -271,7 +274,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         token: authToken
       };
     } catch (err: any) {
-      this.logger.error('Error on token exchange', err.cause ?? err);
+      this.logger?.error('Error on token exchange', err.cause ?? err);
       return {
         user: {
           status: {
@@ -301,7 +304,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       );
 
       if (!user?.payload?.tokens) {
-        this.logger.debug('OAuth.getToken(): No user found!'); // don't tell attackers!
+        this.logger?.debug('OAuth.getToken(): No user found!'); // don't tell attackers!
         return {
           status: {
             code: 401,
@@ -317,7 +320,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
             token: tokens[0].token
           };
         } else {
-          this.logger.debug('OAuth.getToken(): User has no token for this service!'); // don't tell attackers!
+          this.logger?.debug('OAuth.getToken(): User has no token for this service!'); // don't tell attackers!
           return {
             status: {
               code: 401,
@@ -335,7 +338,7 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
         user.payload.id,
         toRemove
       ).catch(
-        err => this.logger.warn(
+        err => this.logger?.warn(
           'Failed to remove expired tokens',
           { err, toRemove }
         )
@@ -378,10 +381,10 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
 
       // append access token on user entity
       await this.userService.updateUserTokens(user.payload.id, newAccessToken);
-      this.logger.info('Token updated on user entity', {id: user.payload.id});
+      this.logger?.info('Token updated on user entity', {id: user.payload.id});
       return { token: newAccessToken.token };
     } catch (err: any) {
-      this.logger.error('Error Updating Token', err);
+      this.logger?.error('Error Updating Token', err);
       return {
         status: {
           code: err.code,
@@ -390,4 +393,18 @@ export class OAuthService implements OAuthServiceImplementation<WithRequestID> {
       };
     }
   }
+
+  public static async init(
+    cfg: ServiceConfig,
+    userService: UserService,
+    logger?: Logger,
+    clients = new Map<string, openid.Configuration>(),
+  ) {
+    return await new OAuthService(
+      cfg,
+      userService,
+      logger,
+      clients,
+    ).init();
+  }; 
 }
