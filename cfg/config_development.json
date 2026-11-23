@@ -6,5 +6,6 @@
       "colorize": true,
       "prettyPrint": true
     }
-  }
+  },
+  "oauth": null
 }

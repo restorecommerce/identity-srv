@@ -293,8 +293,7 @@ export class Worker {
     this.userService.tokenService = tokenService;
 
     // oauth service
-    const oauthServices = cfg.get('oauth:services');
-    if (oauthServices) {
+    if (cfg.get('oauth:services')) {
       const oauthService = new OAuthService(cfg, logger, this.userService);
       await server.bind(serviceNamesCfg.oauth, {
         service: OAuthServiceDefinition,
